@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:dio/dio.dart';
+import '../../../../core/services/api_client.dart';
 import 'login_page.dart';
 
 /// 앱의 회원가입 화면을 담당하는 페이지입니다.
@@ -77,7 +79,7 @@ class _SignupPageState extends State<SignupPage> {
 
   /// 이메일 검증 및 OTP 전송
   ///
-  /// TODO: 실제 API 서비스 연동 시 이메일 OTP 전송 로직 구현
+  /// strike_log_api 연동하여 이메일 OTP 전송
   Future<void> _sendOtpCode() async {
     String email = _emailController.text.trim();
     if (email.isEmpty || !email.contains('@')) {
@@ -92,18 +94,23 @@ class _SignupPageState extends State<SignupPage> {
     });
 
     try {
-      // TODO: 이메일 인증번호 발송 API 호출
+      final dio = ApiClient().dio;
+      final response = await dio.post('/email/send-otp', data: {'email': email});
 
-      setState(() {
-        _isCodeSent = true;
-        _isLoading = false;
-      });
-      _startTimer();
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        setState(() {
+          _isCodeSent = true;
+          _isLoading = false;
+        });
+        _startTimer();
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('이메일로 인증번호가 발송되었습니다.')),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('이메일로 인증번호가 발송되었습니다.')),
+          );
+        }
+      } else {
+        throw Exception('서버 응답 오류');
       }
     } catch (e) {
       setState(() {
@@ -111,7 +118,7 @@ class _SignupPageState extends State<SignupPage> {
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('오류 발생: $e')),
+          SnackBar(content: Text('발송 실패: $e')),
         );
       }
     }
@@ -119,8 +126,9 @@ class _SignupPageState extends State<SignupPage> {
 
   /// 입력된 OTP 코드 확인
   ///
-  /// TODO: 실제 API 서비스 연동 시 OTP 검증 로직 구현
+  /// strike_log_api 연동하여 OTP 검증
   Future<void> _verifyOtp() async {
+    String email = _emailController.text.trim();
     String otpCode = _otpController.text.trim();
 
     if (otpCode.length < 6) {
@@ -135,18 +143,26 @@ class _SignupPageState extends State<SignupPage> {
     });
 
     try {
-      // TODO: 인증번호 확인 API 호출
-
-      _timer?.cancel();
-      setState(() {
-        _isEmailVerified = true;
-        _isLoading = false;
+      final dio = ApiClient().dio;
+      final response = await dio.post('/email/verify-otp', data: {
+        'email': email,
+        'code': otpCode,
       });
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('이메일 인증이 완료되었습니다. 나머지 정보를 입력해주세요.')),
-        );
+      if (response.statusCode == 200) {
+        _timer?.cancel();
+        setState(() {
+          _isEmailVerified = true;
+          _isLoading = false;
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('이메일 인증이 완료되었습니다. 나머지 정보를 입력해주세요.')),
+          );
+        }
+      } else {
+        throw Exception('서버 응답 오류');
       }
     } catch (e) {
       setState(() {
@@ -162,7 +178,7 @@ class _SignupPageState extends State<SignupPage> {
 
   /// 최종 회원가입 처리
   ///
-  /// TODO: 실제 API 서비스 연동 시 회원가입 로직 구현
+  /// strike_log_api 연동하여 회원가입 진행
   Future<void> _signUp() async {
     if (!_isEmailVerified) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -171,6 +187,7 @@ class _SignupPageState extends State<SignupPage> {
       return;
     }
 
+    String email = _emailController.text.trim();
     String password = _passwordController.text.trim();
     String passwordConfirm = _passwordConfirmController.text.trim();
     String nickname = _nicknameController.text.trim();
@@ -201,13 +218,22 @@ class _SignupPageState extends State<SignupPage> {
     });
 
     try {
-      // TODO: 회원가입 API 호출
+      final dio = ApiClient().dio;
+      final response = await dio.post('/users/signup', data: {
+        'email': email,
+        'password': password,
+        'nickname': nickname,
+      });
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('회원가입이 완료되었습니다!')),
-        );
-        Navigator.pop(context);
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('회원가입이 완료되었습니다!')),
+          );
+          Navigator.pop(context); // 로그인 페이지로 이동
+        }
+      } else {
+        throw Exception('회원가입 실패: 서버 응답 오류');
       }
     } catch (e) {
       setState(() {
@@ -332,28 +358,35 @@ class _SignupPageState extends State<SignupPage> {
                             enabled: !_isEmailVerified,
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        SizedBox(
-                          height: 52,
-                          child: ElevatedButton(
-                            onPressed: (_isLoading || _isEmailVerified)
-                                ? null
-                                : _sendOtpCode,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF152243),
-                              foregroundColor: const Color(0xFF3B72FF),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                        if (!_isEmailVerified) ...[
+                          const SizedBox(width: 8),
+                          SizedBox(
+                            height: 52,
+                            child: ElevatedButton(
+                              onPressed: _isLoading ? null : _sendOtpCode,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF152243),
+                                foregroundColor: const Color(0xFF3B72FF),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                elevation: 0,
                               ),
-                              elevation: 0,
-                            ),
-                            child: Text(
-                              _isCodeSent ? '재전송' : '인증번호 전송',
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.bold),
+                              child: Text(
+                                _isCodeSent ? '재전송' : '인증번호 전송',
+                                style:
+                                    const TextStyle(fontWeight: FontWeight.bold),
+                              ),
                             ),
                           ),
-                        ),
+                        ] else ...[
+                          const SizedBox(width: 12),
+                          const Icon(
+                            Symbols.check_circle,
+                            color: Color(0xFF03C75A), // 네이버 초록색과 유사한 성공 컬러
+                            size: 28,
+                          ),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 16),

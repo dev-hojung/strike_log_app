@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:dio/dio.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/widgets/main_container.dart';
+import '../../../../core/services/api_client.dart';
 import 'signup_page.dart';
 
 /// 앱의 로그인 화면을 담당하는 페이지입니다.
@@ -11,8 +13,79 @@ import 'signup_page.dart';
 /// - 이메일 및 비밀번호 입력 폼
 /// - 소셜 로그인 (카카오, 네이버, 애플) 버튼
 /// - 배경 이미지 및 오버레이 디자인
-class LoginPage extends StatelessWidget {
+class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
+
+  @override
+  State<LoginPage> createState() => _LoginPageState();
+}
+
+class _LoginPageState extends State<LoginPage> {
+  final ScrollController _scrollController = ScrollController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  /// 이메일/비밀번호 로그인 API 호출
+  Future<void> _login() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('이메일과 비밀번호를 입력해주세요.')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final dio = ApiClient().dio;
+      final response = await dio.post('/users/login', data: {
+        'email': email,
+        'password': password,
+      });
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        // 로그인 성공: 유저 정보를 받음 (추후 로컬 저장소 등에 저장 가능)
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const MainContainer()),
+          );
+        }
+      } else {
+        throw Exception('서버 응답 오류');
+      }
+    } catch (e) {
+      if (mounted) {
+        String errorMessage = '로그인에 실패했습니다. 이메일 또는 비밀번호를 확인해주세요.';
+        if (e is DioException && e.response?.data != null) {
+           errorMessage = e.response?.data['message'] ?? errorMessage;
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(errorMessage)),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -44,6 +117,7 @@ class LoginPage extends StatelessWidget {
           // 메인 컨텐츠
           Center(
             child: SingleChildScrollView(
+              controller: _scrollController,
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -108,9 +182,9 @@ class LoginPage extends StatelessWidget {
                           ),
                         ),
                       ),
-                      TextField(
-                        style: const TextStyle(color: Colors.white),
-                        decoration: InputDecoration(
+                                          TextField(
+                                            controller: _emailController,
+                                            style: const TextStyle(color: Colors.white),                        decoration: InputDecoration(
                           hintText: 'email@example.com',
                           hintStyle: const TextStyle(
                               color: Color(0xFF64748B)), // slate-500
@@ -163,9 +237,9 @@ class LoginPage extends StatelessWidget {
                           ),
                         ],
                       ),
-                      TextField(
-                        obscureText: true,
-                        style: const TextStyle(color: Colors.white),
+                                          TextField(
+                                            controller: _passwordController,
+                                            obscureText: true,                        style: const TextStyle(color: Colors.white),
                         decoration: InputDecoration(
                           hintText: '••••••••',
                           hintStyle: const TextStyle(
@@ -195,36 +269,36 @@ class LoginPage extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 24),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 56,
-                        child: ElevatedButton(
-                          onPressed: () {
-                            // 로그인 성공 시 메인 화면으로 이동
-                            Navigator.pushReplacement(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (_) => const MainContainer()));
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            elevation: 4,
-                            shadowColor: AppColors.primary.withOpacity(0.2),
-                          ),
-                          child: const Text(
-                            '로그인',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                                          SizedBox(
+                                            width: double.infinity,
+                                            height: 56,
+                                            child: ElevatedButton(
+                                              onPressed: _isLoading ? null : _login,
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: AppColors.primary,
+                                                foregroundColor: Colors.white,
+                                                disabledBackgroundColor: AppColors.primary.withOpacity(0.5),
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius: BorderRadius.circular(12),
+                                                ),
+                                                elevation: 4,
+                                                shadowColor: AppColors.primary.withOpacity(0.2),
+                                              ),
+                                              child: _isLoading 
+                                                  ? const SizedBox(
+                                                      width: 24,
+                                                      height: 24,
+                                                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                                    )
+                                                  : const Text(
+                                                      '로그인',
+                                                      style: TextStyle(
+                                                        fontSize: 18,
+                                                        fontWeight: FontWeight.bold,
+                                                      ),
+                                                    ),
+                                            ),
+                                          ),                    ],
                   ),
 
                   const SizedBox(height: 32),
@@ -297,7 +371,16 @@ class LoginPage extends StatelessWidget {
                             context,
                             MaterialPageRoute(
                                 builder: (context) => const SignupPage()),
-                          );
+                          ).then((_) {
+                            // 회원가입 페이지에서 돌아올 때 스크롤 상단으로 초기화
+                            if (mounted && _scrollController.hasClients) {
+                              _scrollController.animateTo(
+                                0.0,
+                                duration: const Duration(milliseconds: 300),
+                                curve: Curves.easeOut,
+                              );
+                            }
+                          });
                         },
                         child: const Text(
                           '회원가입',

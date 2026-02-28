@@ -3,6 +3,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import '../../features/home/presentation/pages/home_dashboard_page.dart';
 import '../../features/group/presentation/pages/club_members_page.dart';
 import '../../features/game/presentation/pages/frame_entry_page.dart';
+import '../../features/profile/presentation/pages/profile_page.dart';
 import '../constants/app_colors.dart';
 
 /// 앱의 주요 내비게이션 구조를 담당하는 위젯입니다.
@@ -21,11 +22,11 @@ class _MainContainerState extends State<MainContainer> {
   int _selectedIndex = 0;
 
   /// 각 탭에 해당하는 페이지 위젯 리스트입니다.
-  final List<Widget> _pages = [
+  List<Widget> get _pages => [
     const HomeDashboardPage(),
     const Center(child: Text('기록')), // History placeholder
     const ClubMembersPage(),
-    const Center(child: Text('프로필')), // Profile placeholder
+    const ProfilePage(),
   ];
 
   @override
