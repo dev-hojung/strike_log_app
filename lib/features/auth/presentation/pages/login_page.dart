@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:dio/dio.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/widgets/main_container.dart';
 import '../../../../core/services/api_client.dart';
@@ -58,7 +59,14 @@ class _LoginPageState extends State<LoginPage> {
       });
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        // 로그인 성공: 유저 정보를 받음 (추후 로컬 저장소 등에 저장 가능)
+        // 로그인 성공: 유저 정보를 받음
+        final userId = response.data['id'];
+        
+        if (userId != null) {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('user_id', userId);
+        }
+
         if (mounted) {
           Navigator.pushReplacement(
             context,
