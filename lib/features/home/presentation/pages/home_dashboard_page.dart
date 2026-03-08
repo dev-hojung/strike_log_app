@@ -5,8 +5,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
-import '../../../game/presentation/pages/game_summary_page.dart';
-import '../../../game/presentation/pages/frame_entry_page.dart';
+
 import '../../../group/presentation/pages/group_detail_page.dart';
 import '../../data/models/home_dashboard_data.dart';
 import '../../data/services/home_api_service.dart';
@@ -355,7 +354,9 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
           ],
         ),
         InkWell(
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const GameSummaryPage())),
+          onTap: () {
+            // TODO: 게임 상세 데이터를 API에서 불러와 GameSummaryPage에 전달
+          },
           child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -413,8 +414,8 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
         ),
         const SizedBox(height: 16),
         _buildGroupItem(
-          context, 
-          name: 'Thursday Night League', 
+          context,
+          name: '목요 나이트 리그',
           details: '리그 순위: 3위',
           imageUrl: 'https://api.dicebear.com/7.x/shapes/png?seed=tnl',
           members: [
@@ -426,8 +427,8 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
         ),
         const SizedBox(height: 12),
         _buildGroupItem(
-          context, 
-          name: 'Weekend Strikers', 
+          context,
+          name: '주말 스트라이커즈',
           details: '다음 모임: 토요일 오후 7시',
           imageUrl: 'https://api.dicebear.com/7.x/shapes/png?seed=ws',
           members: [
@@ -436,8 +437,7 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
           ],
           extraMembersCount: 5,
           isDark: isDark
-        ),
-      ],
+        ),      ],
     );
   }
 

@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../features/home/presentation/pages/home_dashboard_page.dart';
-import '../../features/group/presentation/pages/club_members_page.dart';
+import '../../features/group/presentation/pages/my_groups_page.dart';
+import '../../features/game/presentation/pages/game_mode_page.dart';
 import '../../features/game/presentation/pages/frame_entry_page.dart';
+import '../../features/game/presentation/pages/game_history_page.dart';
+import '../../features/game/presentation/widgets/location_input_dialog.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
 import '../constants/app_colors.dart';
+import '../services/api_client.dart';
 
 /// 앱의 주요 내비게이션 구조를 담당하는 위젯입니다.
 ///
@@ -20,14 +25,66 @@ class MainContainer extends StatefulWidget {
 class _MainContainerState extends State<MainContainer> {
   /// 현재 선택된 탭의 인덱스입니다.
   int _selectedIndex = 0;
+  bool _isCheckingClub = false;
 
   /// 각 탭에 해당하는 페이지 위젯 리스트입니다.
   List<Widget> get _pages => [
     const HomeDashboardPage(),
-    const Center(child: Text('기록')), // History placeholder
-    const ClubMembersPage(),
+    const GameHistoryPage(),
+    const MyGroupsPage(),
     const ProfilePage(),
   ];
+
+  Future<void> _startIndividualGame() async {
+    final location = await showLocationInputDialog(context);
+    if (location != null && mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => FrameEntryPage(isClubGame: false, location: location)),
+      );
+    }
+  }
+
+  Future<void> _onAddButtonPressed() async {
+    if (_isCheckingClub) return;
+    setState(() {
+      _isCheckingClub = true;
+    });
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('user_id');
+
+      if (userId == null) {
+        setState(() { _isCheckingClub = false; });
+        await _startIndividualGame();
+        return;
+      }
+
+      final response = await ApiClient().dio.get('/groups/me/$userId');
+      final groups = response.data;
+
+      if (mounted) {
+        setState(() { _isCheckingClub = false; });
+        if (groups is List && groups.isNotEmpty) {
+          // 클럽(그룹)이 있는 경우 게임 모드 선택 페이지로 이동
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const GameModePage()),
+          );
+        } else {
+          // 클럽이 없는 경우 개인 게임 바로 시작
+          await _startIndividualGame();
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() { _isCheckingClub = false; });
+        // 오류 발생 시 기본적으로 개인 게임 시작
+        await _startIndividualGame();
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -44,12 +101,7 @@ class _MainContainerState extends State<MainContainer> {
         width: 64,
         margin: const EdgeInsets.only(top: 10), // Adjust positioning if needed
         child: FloatingActionButton(
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const FrameEntryPage()),
-            );
-          },
+          onPressed: _onAddButtonPressed,
           backgroundColor: AppColors.primary,
           elevation: 4,
           focusElevation: 4,
@@ -69,7 +121,13 @@ class _MainContainerState extends State<MainContainer> {
                 ),
               ],
             ),
-            child: const Icon(Symbols.add, color: Colors.white, size: 28),
+            child: _isCheckingClub 
+                ? const SizedBox(
+                    width: 24, 
+                    height: 24, 
+                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
+                  )
+                : const Icon(Symbols.add, color: Colors.white, size: 28),
           ),
         ),
       ),

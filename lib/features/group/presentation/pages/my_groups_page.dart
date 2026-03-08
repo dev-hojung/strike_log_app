@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import '../../../../core/constants/app_colors.dart';
+import 'create_club_page.dart';
 
 /// 사용자가 소속된 클럽(그룹) 목록을 보여주는 페이지입니다.
 ///
@@ -21,7 +22,7 @@ class MyGroupsPage extends StatelessWidget {
           icon: const Icon(Symbols.arrow_back),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text('My Groups', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        title: const Text('내 클럽', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         centerTitle: true,
       ),
       body: Stack(
@@ -30,13 +31,13 @@ class MyGroupsPage extends StatelessWidget {
           ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              _buildGroupListItem(context, 'Strike Force', '8 Members', '185', isDark),
+              _buildGroupListItem(context, '스트라이크 포스', '8명', '185', isDark),
               const SizedBox(height: 12),
-              _buildGroupListItem(context, 'Gutter Gang', '12 Members', '142', isDark),
+              _buildGroupListItem(context, '거터 갱', '12명', '142', isDark),
               const SizedBox(height: 12),
-              _buildGroupListItem(context, 'Monday Night League', '24 Members', '198', isDark),
+              _buildGroupListItem(context, '먼데이 나이트 리그', '24명', '198', isDark),
               const SizedBox(height: 12),
-              _buildGroupListItem(context, 'Spare Me', '4 Members', '165', isDark),
+              _buildGroupListItem(context, '스페어 미', '4명', '165', isDark),
               const SizedBox(height: 100), // 하단 버튼 공간 확보
             ],
           ),
@@ -46,9 +47,14 @@ class MyGroupsPage extends StatelessWidget {
             left: 16,
             right: 16,
             child: ElevatedButton.icon(
-              onPressed: () {},
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const CreateClubPage()),
+                );
+              },
               icon: const Icon(Symbols.add_circle, color: Colors.white),
-              label: const Text('Create New Group', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              label: const Text('새 클럽 생성', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 padding: const EdgeInsets.symmetric(vertical: 16),
@@ -101,7 +107,7 @@ class MyGroupsPage extends StatelessWidget {
                   text: TextSpan(
                     style: TextStyle(color: isDark ? Colors.white60 : Colors.black54, fontSize: 13),
                     children: [
-                      const TextSpan(text: 'My Avg: '),
+                      const TextSpan(text: '내 평균: '),
                       TextSpan(text: avg, style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold)),
                     ],
                   ),

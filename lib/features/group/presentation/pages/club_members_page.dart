@@ -156,7 +156,7 @@ class ClubMembersPage extends StatelessWidget {
                 // Current User (Highlighted)
                 _buildMemberItem(
                   context,
-                  name: 'Sarah Chen',
+                  name: '김서연',
                   avgScore: '210',
                   imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuD1kKXS6j0jr4jDMjLaUNQOc4HXxTq9bEw0Z8AL8oKda-KHKM_ki37tCdvYT1-VUmHwqEsE8euKRYDi9NaHaf4Bty1wOz-TrYjEJJDb0RIJPNheuHHYlvl__-mr7kdvhLroC-qDeeL2MvvYPxhzmy6YOnK3jXW4LuWOFJlb8P22SH-EE8LoXPaw5I41HUJaw3gTUPkW6UHSbLcW5fmtQIo137B1Bjag40gtd3I6tW1DwLbZzudKy9z4TLFMzcHqQdri3StsJwi6Y1zY',
                   isMe: true,
@@ -167,7 +167,7 @@ class ClubMembersPage extends StatelessWidget {
                 // Other Members
                 _buildMemberItem(
                   context,
-                  name: 'Marcus Thorne',
+                  name: '박민준',
                   avgScore: '198',
                   imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAT786m9AG8ftpnhSgj1lv2Fh774bfXILGxFz2P22XsejJ15XmxXg6do38py1-L4ggOHiNd55CxHcB4uBarYQ1JthC2kuHVxLkL3_iE95bP6bfT3BIPv38qYxNqizJpzyh83JFVhb6GxbUKTz6ty9yqwGRVIujV416wrYCjZQJ6e-wll_BpdU5zmf1nMji4J8s2o8nRXo-lgGCy9J-O21suA7PbhfvBDYPDl-9Gq6jyMPEF4wbblYh7nIkHxiNCPDNRmrjU1_gMYl9y',
                   isDark: isDark,
@@ -176,7 +176,7 @@ class ClubMembersPage extends StatelessWidget {
                 
                 _buildMemberItem(
                   context,
-                  name: 'Elena Rodriguez',
+                  name: '이수진',
                   avgScore: '185',
                   imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCdE341sTCsYOftbNA17M8YwGooN5Eg377yqF8_P5xgooBxZvfP-AYTStpTiiGNjeLB0qZkBfeBwpARIdIkgCVled2kcm5MZKsys8er1kMfgcbTdpOlqRgs194WcCwlRedxgcJjRrIdoFOv4BwGg4UwDCiYRG8FEULteJQC9fOi7z_KSry1GVzCbbqCvasoNXwZAKvEsP6IGuk8HVy3uR3mLZviBSA1R9XScs715i_bCP6TQmmi3tlmfj0gOIbH1FobumVajWOD1wbZ',
                   isDark: isDark,
@@ -185,7 +185,7 @@ class ClubMembersPage extends StatelessWidget {
                 
                 _buildMemberItem(
                   context,
-                  name: 'James Wilson',
+                  name: '정우성',
                   avgScore: '204',
                   imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAMAL2xIpB4PXmv1uz6nphBZi9VIndK5pSgVMEJiXtIZzJPPdWu8sWHVN_mp3Bm5ggKn5q6ZCllBSzmJg_clk6GcqzqPnWoqbgmCOrokEF811MBn3WZAiQ2r2aY2q9fBnHvKribSGfkGwsCcJsyFTGV50Au5owkskWC1YV4Gr9Rvt36xALMNaZlkdYO48so4gwRk7NtH_Nd9x5qC69tPJmH16NFolcFwRgcnztdpgl85BiCaqOeB6eDNYAG9TXSgHOsGrmsaFKHo40_',
                   isDark: isDark,
@@ -194,7 +194,7 @@ class ClubMembersPage extends StatelessWidget {
                 
                 _buildMemberItem(
                   context,
-                  name: 'Chloe Kim',
+                  name: '최하나',
                   avgScore: '177',
                   imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDcZgr0SA4WGQFEtV9VcVaU_OPEHfr22O944bZdR-43BT6QFCtNy6ZXhMU0aqiboMl3JY2sJA7n-c_p8bCmYGWG8oH9nhXu9wlEF23M2yWiCzfR1QNy0riL9zPtP8v2W60n0ZxuSoFd1CTBMFKEoFo_RuAfaN1PmvI5XXnRu6FcJX7TJx6NQ77rUJMCLRWSNaMe_JiejfXw0_gdscVKI2lNCMslxOoNvMroQdz1l5sLz0apQFP2_CoThwW96-tjNKyk8bIvPKzbbjvn',
                   isDark: isDark,
@@ -203,7 +203,7 @@ class ClubMembersPage extends StatelessWidget {
                 
                 _buildMemberItem(
                   context,
-                  name: 'David Park',
+                  name: '강지훈',
                   avgScore: '162',
                   imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuD4yztNf-dU0JBkhDrGcINw2Pbl-M40U0B81RetQ_7X6xFmBxI-3IswWv2Olo0xcNHiENc-4As804FhMt2dmP57_RMRclVEs31TPhJG6BLECt56B4sGtHH9Dy_4EgAoyv0EjhnDjrdC4Xz9g3NUqjZhWjDNFjnwelElosJr0FGNsRk2o3DEoWE7Fh5VWteSywjnyByUwDZmtqBfz0gY_plcPHo3cL_N0iXbBYmy41mzQubPwRQpZpH9mFAkyQGTV4n1lSLTn-krEYzL',
                   isDark: isDark,
