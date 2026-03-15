@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/services/api_client.dart';
 
 /// 전화번호 변경 페이지
 class EditPhonePage extends StatefulWidget {
@@ -79,15 +81,29 @@ class _EditPhonePageState extends State<EditPhonePage> {
 
     setState(() => _isLoading = true);
 
-    // TODO: 실제 인증 확인 + 전화번호 변경 API 호출
-    await Future.delayed(const Duration(milliseconds: 500));
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('user_id');
+      if (userId == null) return;
 
-    if (mounted) {
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('전화번호가 변경되었습니다.')),
-      );
-      Navigator.pop(context, true);
+      await ApiClient().dio.patch('/users/$userId', data: {
+        'phone': _phoneController.text.trim(),
+      });
+
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('전화번호가 변경되었습니다.')),
+        );
+        Navigator.pop(context, true);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('전화번호 변경에 실패했습니다.')),
+        );
+      }
     }
   }
 

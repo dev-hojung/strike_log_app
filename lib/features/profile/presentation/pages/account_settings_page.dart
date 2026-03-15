@@ -4,7 +4,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/api_client.dart';
 import 'edit_nickname_page.dart';
-import 'edit_phone_page.dart';
 import 'change_password_page.dart';
 
 /// 계정 설정 페이지
@@ -193,22 +192,7 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
                               textColor: textColor,
                               secondaryColor: secondaryColor,
                               borderColor: borderColor,
-                            ),
-                            _buildInfoRow(
-                              label: '전화번호',
-                              value: _profile?['phone'] ?? '미등록',
-                              textColor: textColor,
-                              secondaryColor: secondaryColor,
-                              borderColor: borderColor,
-                              showChevron: true,
                               isLast: true,
-                              onTap: () async {
-                                final result = await Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (_) => const EditPhonePage()),
-                                );
-                                if (result == true) _fetchProfile();
-                              },
                             ),
                           ],
                         ),

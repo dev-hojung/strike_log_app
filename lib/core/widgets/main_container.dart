@@ -34,8 +34,8 @@ class _MainContainerState extends State<MainContainer> {
   List<Widget> get _pages => [
     HomeDashboardPage(key: _refreshKey),
     GameHistoryPage(key: _refreshKey),
-    const MyGroupsPage(),
-    const ProfilePage(),
+    MyGroupsPage(key: _refreshKey),
+    ProfilePage(key: _refreshKey),
   ];
 
   Future<void> _startIndividualGame() async {
@@ -147,13 +147,15 @@ class _MainContainerState extends State<MainContainer> {
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       // 하단 내비게이션 바
+      extendBody: true,
       bottomNavigationBar: BottomAppBar(
         padding: const EdgeInsets.symmetric(horizontal: 8),
-        height: 64, // Matches Tailwind h-16
+        height: 64,
         color: isDark ? AppColors.surfaceDark : Colors.white,
         shape: const CircularNotchedRectangle(),
         notchMargin: 8,
-        elevation: 0, // Flat look as per HTML border-t
+        elevation: 0,
+        clipBehavior: Clip.antiAlias,
         child: Row(
           mainAxisSize: MainAxisSize.max,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -184,7 +186,7 @@ class _MainContainerState extends State<MainContainer> {
     return Expanded(
       child: InkWell(
         onTap: () => setState(() {
-          if (index == 0 && _selectedIndex != 0) {
+          if (index != _selectedIndex) {
             _refreshKey = UniqueKey();
           }
           _selectedIndex = index;

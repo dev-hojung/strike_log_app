@@ -78,7 +78,7 @@ class _GameHistoryPageState extends State<GameHistoryPage> {
 
             final history = snapshot.data!;
             return ListView.builder(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(16).copyWith(bottom: 100),
               itemCount: history.length,
               itemBuilder: (context, index) {
                 return _buildHistoryItem(context, history[index], isDark);
@@ -92,8 +92,10 @@ class _GameHistoryPageState extends State<GameHistoryPage> {
 
   Widget _buildEmptyState(bool isDark) {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 100),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
             Symbols.history,
@@ -119,6 +121,7 @@ class _GameHistoryPageState extends State<GameHistoryPage> {
             ),
           ),
         ],
+      ),
       ),
     );
   }

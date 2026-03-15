@@ -1,13 +1,12 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/services/api_client.dart';
 
 /// 새로운 클럽(그룹)을 생성하는 페이지입니다.
-///
-/// 주요 기능:
-/// - 클럽 프로필 이미지 선택
-/// - 클럽 이름 및 소개 입력
-/// - 클럽 생성 API 호출 (추후 연동)
 class CreateClubPage extends StatefulWidget {
   const CreateClubPage({super.key});
 
@@ -18,7 +17,31 @@ class CreateClubPage extends StatefulWidget {
 class _CreateClubPageState extends State<CreateClubPage> {
   final _nameController = TextEditingController();
   final _descController = TextEditingController();
+  final _imagePicker = ImagePicker();
   bool _isLoading = false;
+  bool _isPublic = true;
+  String? _selectedRegion;
+  File? _selectedImage;
+
+  final List<String> _regions = [
+    '서울',
+    '경기',
+    '인천',
+    '부산',
+    '대구',
+    '광주',
+    '대전',
+    '울산',
+    '세종',
+    '강원',
+    '충북',
+    '충남',
+    '전북',
+    '전남',
+    '경북',
+    '경남',
+    '제주',
+  ];
 
   @override
   void dispose() {
@@ -27,7 +50,19 @@ class _CreateClubPageState extends State<CreateClubPage> {
     super.dispose();
   }
 
-  void _handleCreate() async {
+  Future<void> _pickImage() async {
+    final picked = await _imagePicker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1024,
+      maxHeight: 1024,
+      imageQuality: 80,
+    );
+    if (picked != null) {
+      setState(() => _selectedImage = File(picked.path));
+    }
+  }
+
+  Future<void> _handleCreate() async {
     if (_nameController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('클럽 이름을 입력해주세요.')),
@@ -35,43 +70,60 @@ class _CreateClubPageState extends State<CreateClubPage> {
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
-    // TODO: 백엔드 API 연동 (POST /groups)
-    await Future.delayed(const Duration(seconds: 1)); // API 호출 대기 시뮬레이션
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('user_id');
 
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
+      await ApiClient().dio.post('/groups', data: {
+        'name': _nameController.text.trim(),
+        'description': _descController.text.trim(),
+        'user_id': userId,
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('클럽이 성공적으로 생성되었습니다.')),
-      );
-      Navigator.pop(context);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('클럽이 성공적으로 생성되었습니다.')),
+        );
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('클럽 생성에 실패했습니다. 다시 시도해주세요.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+    final bgColor = isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
+    final surfaceColor = isDark ? AppColors.surfaceDark : Colors.white;
+    final textColor = isDark ? Colors.white : AppColors.textPrimaryLight;
+    final secondaryColor = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final borderColor = isDark ? Colors.white10 : Colors.black12;
+
     return Scaffold(
-      backgroundColor: isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
+      backgroundColor: bgColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        scrolledUnderElevation: 0,
         leading: IconButton(
-          icon: Icon(Symbols.arrow_back, color: isDark ? Colors.white : AppColors.textPrimaryLight),
+          icon: Icon(Symbols.arrow_back, color: textColor),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          '클럽 생성',
+          '클럽 생성하기',
           style: TextStyle(
-            fontSize: 18, 
+            fontSize: 18,
             fontWeight: FontWeight.bold,
-            color: isDark ? Colors.white : AppColors.textPrimaryLight,
+            color: textColor,
           ),
         ),
         centerTitle: true,
@@ -80,150 +132,61 @@ class _CreateClubPageState extends State<CreateClubPage> {
         children: [
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24.0),
+              padding: const EdgeInsets.all(20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Profile Image Upload Area
-                  Center(
-                    child: Stack(
-                      children: [
-                        Container(
-                          width: 100,
-                          height: 100,
-                          decoration: BoxDecoration(
-                            color: isDark ? AppColors.surfaceDark : Colors.grey.withOpacity(0.2),
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: isDark ? Colors.white10 : Colors.black12,
-                            ),
-                          ),
-                          child: Icon(
-                            Symbols.photo_camera,
-                            size: 40,
-                            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                          ),
-                        ),
-                        Positioned(
-                          bottom: 0,
-                          right: 0,
-                          child: Container(
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              color: AppColors.primary,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
-                                width: 3,
-                              ),
-                            ),
-                            child: const Icon(
-                              Symbols.add,
-                              color: Colors.white,
-                              size: 20,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 40),
+                  // 클럽 대표 이미지 업로드
+                  _buildImageUploadArea(surfaceColor, secondaryColor, borderColor),
+                  const SizedBox(height: 28),
 
-                  // Club Name Field
-                  Text(
-                    '클럽 이름',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? Colors.white : AppColors.textPrimaryLight,
-                    ),
-                  ),
+                  // 클럽 이름
+                  _buildLabel('클럽 이름', textColor),
                   const SizedBox(height: 8),
-                  TextField(
+                  _buildTextField(
                     controller: _nameController,
-                    style: TextStyle(
-                      color: isDark ? Colors.white : AppColors.textPrimaryLight,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: '클럽 이름을 입력하세요',
-                      hintStyle: TextStyle(
-                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                      ),
-                      filled: true,
-                      fillColor: isDark ? AppColors.surfaceDark : Colors.white,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(
-                          color: isDark ? Colors.white10 : Colors.black12,
-                        ),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(
-                          color: isDark ? Colors.white10 : Colors.black12,
-                        ),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: AppColors.primary),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                    ),
+                    hintText: '클럽 이름을 입력하세요',
+                    surfaceColor: surfaceColor,
+                    textColor: textColor,
+                    secondaryColor: secondaryColor,
+                    borderColor: borderColor,
                   ),
                   const SizedBox(height: 24),
 
-                  // Club Description Field
-                  Text(
-                    '클럽 소개',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? Colors.white : AppColors.textPrimaryLight,
-                    ),
-                  ),
+                  // 클럽 소개
+                  _buildLabel('클럽 소개', textColor),
                   const SizedBox(height: 8),
-                  TextField(
+                  _buildTextField(
                     controller: _descController,
+                    hintText: '클럽을 소개해주세요',
                     maxLines: 5,
-                    style: TextStyle(
-                      color: isDark ? Colors.white : AppColors.textPrimaryLight,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: '클럽을 소개해주세요',
-                      hintStyle: TextStyle(
-                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                      ),
-                      filled: true,
-                      fillColor: isDark ? AppColors.surfaceDark : Colors.white,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(
-                          color: isDark ? Colors.white10 : Colors.black12,
-                        ),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(
-                          color: isDark ? Colors.white10 : Colors.black12,
-                        ),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: AppColors.primary),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                    ),
+                    surfaceColor: surfaceColor,
+                    textColor: textColor,
+                    secondaryColor: secondaryColor,
+                    borderColor: borderColor,
                   ),
+                  const SizedBox(height: 24),
+
+                  // 활동 지역
+                  _buildLabel('활동 지역', textColor),
+                  const SizedBox(height: 8),
+                  _buildRegionDropdown(surfaceColor, textColor, secondaryColor, borderColor),
+                  const SizedBox(height: 24),
+
+                  // 공개 설정
+                  _buildLabel('공개 설정', textColor),
+                  const SizedBox(height: 8),
+                  _buildVisibilitySelector(surfaceColor, textColor, secondaryColor, borderColor),
+                  const SizedBox(height: 32),
                 ],
               ),
             ),
           ),
-          
-          // Create Button
+
+          // 생성하기 버튼
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.all(24.0),
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
               child: SizedBox(
                 width: double.infinity,
                 height: 56,
@@ -231,9 +194,11 @@ class _CreateClubPageState extends State<CreateClubPage> {
                   onPressed: _isLoading ? null : _handleCreate,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
+                    disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.5),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
+                    elevation: 0,
                   ),
                   child: _isLoading
                       ? const SizedBox(
@@ -257,4 +222,358 @@ class _CreateClubPageState extends State<CreateClubPage> {
       ),
     );
   }
+
+  Widget _buildLabel(String text, Color color) {
+    return Text(
+      text,
+      style: TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        color: color,
+      ),
+    );
+  }
+
+  Widget _buildImageUploadArea(Color surfaceColor, Color secondaryColor, Color borderColor) {
+    if (_selectedImage != null) {
+      return GestureDetector(
+        onTap: _pickImage,
+        child: Stack(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Image.file(
+                _selectedImage!,
+                width: double.infinity,
+                height: 200,
+                fit: BoxFit.cover,
+              ),
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: Row(
+                children: [
+                  _buildImageActionButton(
+                    icon: Symbols.edit,
+                    onTap: _pickImage,
+                  ),
+                  const SizedBox(width: 6),
+                  _buildImageActionButton(
+                    icon: Symbols.close,
+                    onTap: () => setState(() => _selectedImage = null),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return GestureDetector(
+      onTap: _pickImage,
+      child: CustomPaint(
+        painter: _DashedBorderPainter(
+          color: secondaryColor.withValues(alpha: 0.5),
+          borderRadius: 16,
+          dashWidth: 6,
+          dashSpace: 4,
+        ),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 32),
+          decoration: BoxDecoration(
+            color: surfaceColor,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Symbols.cloud_upload,
+                  color: AppColors.primary,
+                  size: 28,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                '이미지 업로드',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: secondaryColor,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'JPG, PNG (최대 5MB)',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: secondaryColor.withValues(alpha: 0.7),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  '파일 선택',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildImageActionButton({required IconData icon, required VoidCallback onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.5),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, color: Colors.white, size: 18),
+      ),
+    );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String hintText,
+    int maxLines = 1,
+    required Color surfaceColor,
+    required Color textColor,
+    required Color secondaryColor,
+    required Color borderColor,
+  }) {
+    return TextField(
+      controller: controller,
+      maxLines: maxLines,
+      style: TextStyle(color: textColor, fontSize: 14),
+      decoration: InputDecoration(
+        hintText: hintText,
+        hintStyle: TextStyle(color: secondaryColor),
+        filled: true,
+        fillColor: surfaceColor,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: borderColor),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: borderColor),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.primary),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      ),
+    );
+  }
+
+  Widget _buildRegionDropdown(
+    Color surfaceColor, Color textColor, Color secondaryColor, Color borderColor,
+  ) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: surfaceColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: borderColor),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: _selectedRegion,
+          hint: Text(
+            '활동 지역을 선택하세요',
+            style: TextStyle(color: secondaryColor, fontSize: 14),
+          ),
+          isExpanded: true,
+          icon: Icon(Symbols.keyboard_arrow_down, color: secondaryColor),
+          dropdownColor: surfaceColor,
+          style: TextStyle(color: textColor, fontSize: 14),
+          items: _regions.map((region) {
+            return DropdownMenuItem(
+              value: region,
+              child: Text(region),
+            );
+          }).toList(),
+          onChanged: (value) => setState(() => _selectedRegion = value),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVisibilitySelector(
+    Color surfaceColor, Color textColor, Color secondaryColor, Color borderColor,
+  ) {
+    return Row(
+      children: [
+        Expanded(
+          child: _buildVisibilityCard(
+            icon: Symbols.public,
+            title: '전체 공개',
+            description: '누구나 검색하고\n가입할 수 있어요',
+            isSelected: _isPublic,
+            onTap: () => setState(() => _isPublic = true),
+            surfaceColor: surfaceColor,
+            textColor: textColor,
+            secondaryColor: secondaryColor,
+            borderColor: borderColor,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildVisibilityCard(
+            icon: Symbols.lock,
+            title: '비공개',
+            description: '초대를 통해서만\n가입할 수 있어요',
+            isSelected: !_isPublic,
+            onTap: () => setState(() => _isPublic = false),
+            surfaceColor: surfaceColor,
+            textColor: textColor,
+            secondaryColor: secondaryColor,
+            borderColor: borderColor,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildVisibilityCard({
+    required IconData icon,
+    required String title,
+    required String description,
+    required bool isSelected,
+    required VoidCallback onTap,
+    required Color surfaceColor,
+    required Color textColor,
+    required Color secondaryColor,
+    required Color borderColor,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppColors.primary.withValues(alpha: 0.08)
+              : surfaceColor,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : borderColor,
+            width: isSelected ? 1.5 : 1,
+          ),
+        ),
+        child: Column(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? AppColors.primary.withValues(alpha: 0.15)
+                    : secondaryColor.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                color: isSelected ? AppColors.primary : secondaryColor,
+                size: 22,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: isSelected ? AppColors.primary : textColor,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              description,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 11,
+                height: 1.4,
+                color: secondaryColor,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 대시 점선 테두리를 그리는 CustomPainter
+class _DashedBorderPainter extends CustomPainter {
+  final Color color;
+  final double borderRadius;
+  final double dashWidth;
+  final double dashSpace;
+
+  _DashedBorderPainter({
+    required this.color,
+    required this.borderRadius,
+    required this.dashWidth,
+    required this.dashSpace,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke;
+
+    final path = Path()
+      ..addRRect(RRect.fromRectAndRadius(
+        Rect.fromLTWH(0, 0, size.width, size.height),
+        Radius.circular(borderRadius),
+      ));
+
+    final dashPath = Path();
+    for (final metric in path.computeMetrics()) {
+      double distance = 0;
+      while (distance < metric.length) {
+        final end = distance + dashWidth;
+        dashPath.addPath(
+          metric.extractPath(distance, end.clamp(0, metric.length)),
+          Offset.zero,
+        );
+        distance = end + dashSpace;
+      }
+    }
+
+    canvas.drawPath(dashPath, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

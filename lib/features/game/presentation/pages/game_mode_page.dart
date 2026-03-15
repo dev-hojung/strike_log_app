@@ -41,23 +41,27 @@ class GameModePage extends StatelessWidget {
         centerTitle: true,
       ),
       body: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.only(top: 16, left: 24, right: 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 16),
             Text(
               '게임 모드를 선택하세요',
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
                 color: textColor,
+                height: 1.25,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               '혼자 기록하거나, 클럽 멤버들과 함께 플레이하세요.',
-              style: TextStyle(fontSize: 14, color: subTextColor),
+              style: TextStyle(
+                fontSize: 14,
+                color: subTextColor,
+                height: 1.5,
+              ),
             ),
             const SizedBox(height: 40),
 
@@ -67,7 +71,8 @@ class GameModePage extends StatelessWidget {
               icon: Symbols.person,
               title: '개인 게임',
               description: '혼자서 게임 점수를 기록합니다.',
-              color: AppColors.primary,
+              iconBgColor: AppColors.primary.withValues(alpha: 0.1),
+              iconColor: AppColors.primary,
               isDark: isDark,
               onTap: () async {
                 final location = await showLocationInputDialog(context);
@@ -89,7 +94,8 @@ class GameModePage extends StatelessWidget {
               icon: Symbols.groups,
               title: '클럽 게임',
               description: '방을 만들어 클럽 멤버들과 함께 점수를 기록합니다.',
-              color: Colors.green,
+              iconBgColor: const Color(0xFF4CAF50).withValues(alpha: 0.1),
+              iconColor: const Color(0xFF4CAF50),
               isDark: isDark,
               onTap: () => _startClubGame(context),
             ),
@@ -112,8 +118,6 @@ class GameModePage extends StatelessWidget {
       return;
     }
 
-    // TODO: 클럽 멤버 여부 확인 API 호출
-    // 현재는 바로 방 생성 페이지로 이동
     if (context.mounted) {
       Navigator.pushReplacement(
         context,
@@ -129,7 +133,8 @@ class GameModePage extends StatelessWidget {
     required IconData icon,
     required String title,
     required String description,
-    required Color color,
+    required Color iconBgColor,
+    required Color iconColor,
     required bool isDark,
     required VoidCallback onTap,
   }) {
@@ -141,12 +146,13 @@ class GameModePage extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(20),
       child: Container(
+        width: double.infinity,
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
           color: surfaceColor,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isDark ? Colors.white10 : Colors.black12,
+            color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black12,
           ),
         ),
         child: Row(
@@ -155,10 +161,10 @@ class GameModePage extends StatelessWidget {
               width: 56,
               height: 56,
               decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
+                color: iconBgColor,
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: Icon(icon, color: color, size: 28),
+              child: Icon(icon, color: iconColor, size: 28),
             ),
             const SizedBox(width: 20),
             Expanded(
@@ -171,17 +177,22 @@ class GameModePage extends StatelessWidget {
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color: textColor,
+                      height: 1.5,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 2),
                   Text(
                     description,
-                    style: TextStyle(fontSize: 13, color: subTextColor),
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: subTextColor,
+                      height: 1.5,
+                    ),
                   ),
                 ],
               ),
             ),
-            Icon(Symbols.chevron_right, color: subTextColor),
+            Icon(Symbols.chevron_right, color: subTextColor, size: 20),
           ],
         ),
       ),

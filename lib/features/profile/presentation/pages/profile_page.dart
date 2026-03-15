@@ -65,7 +65,7 @@ class _ProfilePageState extends State<ProfilePage> {
     final email = _profile?['email'] ?? '';
     final profileImageUrl = _profile?['profile_image_url'];
     final createdAt = _profile?['created_at'] != null
-        ? DateFormat('yyyy년 MM월').format(DateTime.parse(_profile!['created_at']))
+        ? DateFormat('yyyy년 MM월 dd일').format(DateTime.parse(_profile!['created_at']))
         : '';
 
     return Scaffold(
@@ -101,6 +101,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                   const SizedBox(height: 32),
                   _buildSettingsList(surfaceColor, textColor, secondaryTextColor, borderColor),
+                  const SizedBox(height: 100),
                 ],
               ),
             ),

@@ -127,7 +127,7 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
             if (data.recentGame != null)
               _buildLatestGame(context, isDark, data.recentGame!),
 
-            const SizedBox(height: 100), // 하단 여백
+            const SizedBox(height: 140), // 하단 여백 (네비게이션 + FAB 영역)
           ],
         ),
       ),
@@ -231,7 +231,7 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
       physics: const AlwaysScrollableScrollPhysics(),
       child: Center(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 80),
+          padding: const EdgeInsets.only(left: 24, right: 24, top: 80, bottom: 100),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
