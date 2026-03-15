@@ -1,21 +1,36 @@
 class HomeDashboardData {
   final int averageScore;
   final int highestScore;
+  final double? trendPercentage; // Added trend percentage
   final DateTime? highestScoreDate;
   final List<TrendData> recentTrend;
   final RecentGame? recentGame;
   final String nickname;
 
+  /// 유저가 클럽(그룹)에 소속되어 있는지 여부 (nullable: 핫 리로드 안전성 확보)
+  final bool? hasGroup;
+
+  /// 월별 트렌드 상태 ('both' | 'current_only' | 'last_only' | 'none')
+  final String? trendStatus;
+
+  /// 이번 달 경기 수
+  final int? currentMonthGameCount;
+
   HomeDashboardData({
     required this.averageScore,
     required this.highestScore,
+    this.trendPercentage,
     this.highestScoreDate,
     required this.recentTrend,
     this.recentGame,
     this.nickname = 'Alex', // Default fallback
+    this.hasGroup = false,
+    this.trendStatus,
+    this.currentMonthGameCount,
   });
 
-  bool get isEmpty => averageScore == 0 && highestScore == 0 && recentGame == null;
+  bool get isEmpty =>
+      averageScore == 0 && highestScore == 0 && recentGame == null;
 }
 
 class TrendData {

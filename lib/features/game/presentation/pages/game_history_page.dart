@@ -40,7 +40,8 @@ class _GameHistoryPageState extends State<GameHistoryPage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
+    final bgColor =
+        isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
     final textColor = isDark ? Colors.white : AppColors.textPrimaryLight;
 
     return Scaffold(
@@ -103,7 +104,9 @@ class _GameHistoryPageState extends State<GameHistoryPage> {
           Text(
             '아직 기록된 경기가 없습니다.',
             style: TextStyle(
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
               fontSize: 16,
             ),
           ),
@@ -121,8 +124,8 @@ class _GameHistoryPageState extends State<GameHistoryPage> {
   }
 
   Widget _buildHistoryItem(BuildContext context, RecentGame game, bool isDark) {
-    final formattedDate = DateFormat('yyyy. MM. dd').format(game.playDate);
-    
+    final formattedDate = DateFormat('yyyy년 MM월 dd일').format(game.playDate);
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -169,7 +172,8 @@ class _GameHistoryPageState extends State<GameHistoryPage> {
                     Text(
                       game.location ?? '장소 정보 없음',
                       style: TextStyle(
-                        color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                        color:
+                            isDark ? Colors.white : AppColors.textPrimaryLight,
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
@@ -178,7 +182,9 @@ class _GameHistoryPageState extends State<GameHistoryPage> {
                     Text(
                       formattedDate,
                       style: TextStyle(
-                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
                         fontSize: 13,
                       ),
                     ),

@@ -38,6 +38,7 @@ class GameSummaryPage extends StatefulWidget {
 
 class _GameSummaryPageState extends State<GameSummaryPage> {
   bool _isSaving = false;
+  bool _isSaved = false;
 
   String _getThrowDisplay(int frameIndex, int throwIndex) {
     final frame = widget.frames[frameIndex];
@@ -108,10 +109,10 @@ class _GameSummaryPageState extends State<GameSummaryPage> {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         if (mounted) {
+          _isSaved = true;
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('게임이 성공적으로 저장되었습니다.')),
           );
-          // 홈 화면 등으로 이동 (여기서는 뒤로 2번 가서 홈으로 간다고 가정)
           Navigator.of(context).popUntil((route) => route.isFirst);
         }
       } else {
@@ -132,6 +133,116 @@ class _GameSummaryPageState extends State<GameSummaryPage> {
     }
   }
 
+  Future<bool> _showExitConfirmDialog() async {
+    if (_isSaved) return true;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final result = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.surfaceDark : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 핸들 바
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 24),
+              decoration: BoxDecoration(
+                color: isDark ? Colors.white24 : Colors.black12,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            // 경고 아이콘
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: Colors.orange.withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: const Center(
+                child: Icon(Symbols.warning, color: Colors.orange, size: 28),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              '경기가 저장되지 않았습니다',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : AppColors.textPrimaryLight,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '저장하지 않고 나가면 기록이 사라집니다.',
+              style: TextStyle(
+                fontSize: 14,
+                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              ),
+            ),
+            const SizedBox(height: 24),
+            // 버튼 영역
+            Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 50,
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: isDark ? Colors.white24 : Colors.black12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      child: Text(
+                        '취소',
+                        style: TextStyle(
+                          color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: SizedBox(
+                    height: 50,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.of(context).pop(true),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      child: const Text(
+                        '나가기',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+    return result ?? false;
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -142,9 +253,12 @@ class _GameSummaryPageState extends State<GameSummaryPage> {
 
     return PopScope(
       canPop: false,
-      onPopInvokedWithResult: (didPop, result) {
+      onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
-        Navigator.of(context).popUntil((route) => route.isFirst);
+        final shouldLeave = await _showExitConfirmDialog();
+        if (shouldLeave && mounted) {
+          Navigator.of(context).popUntil((route) => route.isFirst);
+        }
       },
       child: Scaffold(
         backgroundColor: bgColor,
@@ -154,7 +268,12 @@ class _GameSummaryPageState extends State<GameSummaryPage> {
         scrolledUnderElevation: 0,
         leading: IconButton(
           icon: Icon(Symbols.arrow_back, color: textColor),
-          onPressed: () => Navigator.of(context).popUntil((route) => route.isFirst),
+          onPressed: () async {
+            final shouldLeave = await _showExitConfirmDialog();
+            if (shouldLeave && mounted) {
+              Navigator.of(context).popUntil((route) => route.isFirst);
+            }
+          },
         ),
         title: Text(
           '경기 요약',
@@ -227,11 +346,11 @@ class _GameSummaryPageState extends State<GameSummaryPage> {
                   // 통계 박스 목록
                   Row(
                     children: [
-                      _buildStatBox('${widget.strikeCount}', '스트라이크', Symbols.sports_golf, Colors.blue, isDark),
+                      _buildStatBox('${widget.strikeCount}', '스트라이크', 'X', Colors.blue, isDark),
                       const SizedBox(width: 12),
-                      _buildStatBox('${widget.spareCount}', '스페어', Symbols.north_east, Colors.purple, isDark),
+                      _buildStatBox('${widget.spareCount}', '스페어', '/', Colors.purple, isDark),
                       const SizedBox(width: 12),
-                      _buildStatBox('${widget.openCount}', '오픈', Symbols.remove_circle_outline, Colors.amber, isDark),
+                      _buildStatBox('${widget.openCount}', '오픈', '-', Colors.amber, isDark),
                     ],
                   ),
                   const SizedBox(height: 32),
@@ -289,7 +408,7 @@ class _GameSummaryPageState extends State<GameSummaryPage> {
             physics: const NeverScrollableScrollPhysics(),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 5,
-              childAspectRatio: 0.9,
+              childAspectRatio: 0.75,
             ),
             itemCount: 10,
             itemBuilder: (context, index) {
@@ -317,34 +436,41 @@ class _GameSummaryPageState extends State<GameSummaryPage> {
                         ),
                       ),
                     ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: List.generate(frameSlotCount, (tIndex) {
-                        final display = _getThrowDisplay(index, tIndex);
-                        final isStrikeOrSpare = display == 'X' || display == '/';
-                        return Padding(
-                          padding: const EdgeInsets.only(left: 4),
-                          child: Text(
-                            display,
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                              color: isStrikeOrSpare 
-                                  ? AppColors.primary 
-                                  : (isDark ? Colors.white70 : Colors.black87),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerRight,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: List.generate(frameSlotCount, (tIndex) {
+                          final display = _getThrowDisplay(index, tIndex);
+                          final isStrikeOrSpare = display == 'X' || display == '/';
+                          return Padding(
+                            padding: const EdgeInsets.only(left: 4),
+                            child: Text(
+                              display,
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                                color: isStrikeOrSpare
+                                    ? AppColors.primary
+                                    : (isDark ? Colors.white70 : Colors.black87),
+                              ),
                             ),
-                          ),
-                        );
-                      }),
+                          );
+                        }),
+                      ),
                     ),
-                    Text(
-                      scoreText,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                        color: isLastFrame 
-                            ? AppColors.primary 
-                            : (isDark ? Colors.white : AppColors.textPrimaryLight),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        scoreText,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                          color: isLastFrame
+                              ? AppColors.primary
+                              : (isDark ? Colors.white : AppColors.textPrimaryLight),
+                        ),
                       ),
                     ),
                   ],
@@ -358,7 +484,7 @@ class _GameSummaryPageState extends State<GameSummaryPage> {
   }
 
   /// 게임의 주요 통계(스트라이크, 스페어 등)를 박스 형태로 보여주는 위젯입니다.
-  Widget _buildStatBox(String value, String label, IconData icon, Color color, bool isDark) {
+  Widget _buildStatBox(String value, String label, String symbol, Color color, bool isDark) {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
@@ -370,12 +496,24 @@ class _GameSummaryPageState extends State<GameSummaryPage> {
         child: Column(
           children: [
             Container(
-              padding: const EdgeInsets.all(10),
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
-                color: color.withOpacity(0.15),
+                color: color.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon, color: color, size: 24),
+              child: Center(
+                child: Text(
+                  symbol,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    height: 1.0,
+                  ),
+                ),
+              ),
             ),
             const SizedBox(height: 12),
             Text(

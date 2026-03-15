@@ -41,6 +41,9 @@ class _FrameEntryPageState extends State<FrameEntryPage> {
   // 게임 완료 여부
   bool _isGameComplete = false;
 
+  // 키패드 표시 여부
+  bool _showKeypad = false;
+
   // 클럽 게임: 소켓 서비스 및 다른 참가자 점수
   final SocketService _socketService = SocketService();
   String _userId = '';
@@ -416,8 +419,18 @@ class _FrameEntryPageState extends State<FrameEntryPage> {
   /// 프레임 탭 시 해당 프레임으로 이동 (수정 모드)
   /// 선택한 프레임으로 포커스만 이동하며, 데이터는 삭제하지 않습니다.
   void _onFrameTap(int frameIndex) {
-    // 아직 입력되지 않은 프레임은 선택 불가 (현재 프레임 제외)
-    if (_frames[frameIndex].isEmpty && frameIndex != _currentFrame) return;
+    // 현재 프레임이거나, 데이터가 있거나, 이전 프레임이 완료된 경우 선택 가능
+    if (_frames[frameIndex].isEmpty && frameIndex != _currentFrame) {
+      // 이전 프레임들이 모두 완료되었으면 선택 허용
+      bool previousComplete = true;
+      for (int i = 0; i < frameIndex; i++) {
+        if (!_isFrameComplete(i)) {
+          previousComplete = false;
+          break;
+        }
+      }
+      if (!previousComplete) return;
+    }
 
     setState(() {
       _currentFrame = frameIndex;
@@ -429,6 +442,7 @@ class _FrameEntryPageState extends State<FrameEntryPage> {
       } else if (_currentFrame < 9 && _frames[frameIndex].isNotEmpty && _frames[frameIndex][0] == 10) {
         _currentThrow = 0; // 1-9프레임 스트라이크 시 1구로
       }
+      _showKeypad = true;
       _isGameComplete = false;
     });
   }
@@ -504,166 +518,204 @@ class _FrameEntryPageState extends State<FrameEntryPage> {
       ),
       body: Column(
         children: [
-          // 상단 콘텐츠 (스크롤 가능)
+          // 상단 콘텐츠 (스크롤 없음, 탭하면 키패드 닫힘)
           Expanded(
-            child: SingleChildScrollView(
+            child: ClipRect(
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: () {
+                if (_showKeypad) setState(() => _showKeypad = false);
+              },
               child: Column(
-                children: [
-                  const SizedBox(height: 20),
-                  // 총점 표시
-                  Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Spacer(),
+                // 총점 표시
+                Text(
+                  '$_totalScore',
+                  style: TextStyle(
+                    fontSize: _showKeypad ? 40 : 64,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primary,
+                    height: 1.0,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  '총점',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textSecondaryDark,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                const Spacer(),
+
+                // 프레임 스크롤 영역
+                SizedBox(
+                  height: 100,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    itemCount: 10,
+                    separatorBuilder: (_, __) => const SizedBox(width: 12),
+                    itemBuilder: (context, index) {
+                      return _buildFrameCard(index);
+                    },
+                  ),
+                ),
+
+                // 클럽 게임: 참가자 점수 목록
+                if (widget.isClubGame && widget.participants != null) ...[
+                  const SizedBox(height: 24),
+                  _buildParticipantScores(),
+                ],
+                SizedBox(height: _showKeypad ? 8 : 24),
+              ],
+            ),
+            ),
+            ),
+          ),
+
+          // 키패드 또는 결과 확인 버튼 (프레임 선택 시에만 표시)
+          if (_isGameComplete)
+            SafeArea(
+              top: false,
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
+                decoration: const BoxDecoration(
+                  color: AppColors.surfaceDark,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black26,
+                      blurRadius: 20,
+                      offset: Offset(0, -5),
+                    ),
+                  ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        '$_totalScore',
-                        style: const TextStyle(
-                          fontSize: 64,
-                          fontWeight: FontWeight.bold,
+                      const Text(
+                        '게임이 완료되었습니다!',
+                        style: TextStyle(
                           color: AppColors.primary,
-                          height: 1.0,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      const Text(
-                        '총점',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.textSecondaryDark,
-                          letterSpacing: 1.2,
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 56,
+                        child: ElevatedButton(
+                          onPressed: _navigateToSummary,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          child: const Text(
+                            '결과 확인',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 32),
-
-                  // 프레임 스크롤 영역
-                  SizedBox(
-                    height: 100,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      itemCount: 10,
-                      separatorBuilder: (_, __) => const SizedBox(width: 12),
-                      itemBuilder: (context, index) {
-                        return _buildFrameCard(index);
-                      },
+                ),
+              ),
+            )
+          else if (_showKeypad)
+            SafeArea(
+              top: false,
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
+                decoration: const BoxDecoration(
+                  color: AppColors.surfaceDark,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black26,
+                      blurRadius: 20,
+                      offset: Offset(0, -5),
                     ),
-                  ),
-
-                  // 클럽 게임: 참가자 점수 목록
-                  if (widget.isClubGame && widget.participants != null) ...[
-                    const SizedBox(height: 24),
-                    _buildParticipantScores(),
                   ],
-                ],
-              ),
-            ),
-          ),
-
-          // 키패드 또는 결과 확인 버튼
-          SafeArea(
-            top: false,
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
-              decoration: const BoxDecoration(
-                color: AppColors.surfaceDark,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black26,
-                    blurRadius: 20,
-                    offset: Offset(0, -5),
-                  ),
-                ],
-              ),
-              child: _isGameComplete
-                  ? Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 24),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Text(
-                            '게임이 완료되었습니다!',
-                            style: TextStyle(
-                              color: AppColors.primary,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 56,
-                            child: ElevatedButton(
-                              onPressed: _navigateToSummary,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.primary,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                              ),
-                              child: const Text(
-                                '결과 확인',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // 현재 프레임 안내
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Text(
+                        '${_currentFrame + 1}프레임 · ${_currentThrow + 1}번째 투구 (남은 핀: $_remainingPins)',
+                        style: const TextStyle(
+                          color: AppColors.textSecondaryDark,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
-                    )
-                  : Column(
-                      mainAxisSize: MainAxisSize.min,
+                    ),
+                    _buildKeypadRow(['1', '2', '3']),
+                    const SizedBox(height: 10),
+                    _buildKeypadRow(['4', '5', '6']),
+                    const SizedBox(height: 10),
+                    _buildKeypadRow(['7', '8', '9']),
+                    const SizedBox(height: 10),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        // 현재 프레임 안내
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: Text(
-                            '${_currentFrame + 1}프레임 · ${_currentThrow + 1}번째 투구 (남은 핀: $_remainingPins)',
-                            style: const TextStyle(
-                              color: AppColors.textSecondaryDark,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                        _buildKeypadRow(['1', '2', '3']),
-                        const SizedBox(height: 10),
-                        _buildKeypadRow(['4', '5', '6']),
-                        const SizedBox(height: 10),
-                        _buildKeypadRow(['7', '8', '9']),
-                        const SizedBox(height: 10),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            _buildKey('X',
-                                color: AppColors.primary,
-                                isAction: true,
-                                enabled: _canStrike),
-                            _buildKey('0'),
-                            _buildKey('/',
-                                color: AppColors.primary,
-                                isAction: true,
-                                enabled: _canSpare),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            _buildKey('←',
-                                color: Colors.red,
-                                isAction: true,
-                                enabled: _canBackspace),
-                          ],
-                        ),
+                        _buildKey('X',
+                            color: AppColors.primary,
+                            isAction: true,
+                            enabled: _canStrike),
+                        _buildKey('0'),
+                        _buildKey('/',
+                            color: AppColors.primary,
+                            isAction: true,
+                            enabled: _canSpare),
                       ],
                     ),
+                    const SizedBox(height: 10),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _buildKey('←',
+                            color: Colors.red,
+                            isAction: true,
+                            enabled: _canBackspace),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+                child: Text(
+                  '프레임을 선택하여 점수를 입력하세요',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: AppColors.textSecondaryDark,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -706,9 +758,7 @@ class _FrameEntryPageState extends State<FrameEntryPage> {
     final scores = _cumulativeScores;
 
     return GestureDetector(
-      onTap: hasData || index == _currentFrame
-          ? () => _onFrameTap(index)
-          : null,
+      onTap: () => _onFrameTap(index),
       child: Container(
         width: index == 9 ? 96 : 80,
         decoration: BoxDecoration(
