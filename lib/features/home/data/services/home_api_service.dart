@@ -1,65 +1,59 @@
-import 'package:dio/dio.dart';
 import '../../../../core/services/api_client.dart';
 import '../models/home_dashboard_data.dart';
 
 class HomeApiService {
   final ApiClient _apiClient = ApiClient();
 
-  /// 사용자의 홈 대시보드 데이터(통계 및 최근 게임)를 가져옵니다.
-  /// 
-  /// [userId]는 임시로 파라미터로 받습니다 (추후 인증 토큰에서 처리).
+  /// 여러 API를 조합하여 홈 대시보드 데이터를 구성합니다.
   Future<HomeDashboardData> fetchDashboardData(String userId) async {
     try {
-      // 1. 유저 프로필 호출 (닉네임 획득)
-      String nickname = 'Alex'; // Default fallback
-      try {
-        final profileResponse = await _apiClient.dio.get('/users/$userId');
-        if (profileResponse.data != null && profileResponse.data['nickname'] != null) {
-          nickname = profileResponse.data['nickname'];
-        }
-      } catch (e) {
-        // 프로필 조회 실패 시 기본 닉네임 사용
-        print('프로필 조회 실패: $e');
-      }
+      final dio = _apiClient.dio;
 
-      // 2. 통계 데이터 호출
-      final statsResponse = await _apiClient.dio.get('/games/users/$userId/statistics');
-      
-      // 3. 최근 게임 호출 (404가 발생할 수 있으므로 에러 핸들링)
-      RecentGame? recentGame;
-      try {
-        final recentResponse = await _apiClient.dio.get('/games/users/$userId/recent');
-        if (recentResponse.data != null) {
-          recentGame = RecentGame.fromJson(recentResponse.data);
-        }
-      } on DioException catch (e) {
-        if (e.response?.statusCode != 404) {
-          rethrow;
-        }
-        // 404면 최근 게임이 없는 것이므로 null 유지
-      }
+      // 프로필 + 통계는 필수, 최근 경기 + 클럽은 실패해도 무방
+      final profileFuture = dio.get('/users/$userId');
+      final statsFuture = dio.get('/games/users/$userId/statistics');
+      final recentFuture = dio.get('/games/users/$userId/recent').then((r) => r.data).catchError((_) => null);
+      final groupsFuture = dio.get('/groups/me/$userId').then((r) => r.data).catchError((_) => null);
 
-      final statsData = statsResponse.data;
-      
-      List<TrendData> trend = [];
-      if (statsData['recentTrend'] != null) {
-        trend = (statsData['recentTrend'] as List)
-            .map((item) => TrendData.fromJson(item))
-            .toList();
-      }
+      final profileRes = await profileFuture;
+      final statsRes = await statsFuture;
+      final recentGameData = await recentFuture;
+      final groupsData = await groupsFuture;
+
+      final profile = profileRes.data ?? {};
+      final stats = statsRes.data ?? {};
+
+      // 월별 트렌드 파싱
+      final monthlyTrend = stats['monthlyTrend'] ?? {};
+      final trendStatus = monthlyTrend['status'] ?? 'none';
 
       return HomeDashboardData(
-        averageScore: statsData['averageScore'] ?? 0,
-        highestScore: statsData['highestScore'] ?? 0,
-        highestScoreDate: statsData['highestScoreDate'] != null 
-            ? DateTime.parse(statsData['highestScoreDate']) 
+        nickname: profile['nickname'] ?? 'Guest',
+        averageScore: stats['averageScore'] ?? 0,
+        highestScore: stats['highestScore'] ?? 0,
+        highestScoreDate: stats['highestScoreDate'] != null
+            ? DateTime.parse(stats['highestScoreDate'].toString())
             : null,
-        recentTrend: trend,
-        recentGame: recentGame,
-        nickname: nickname,
+        trendPercentage: monthlyTrend['percentage']?.toDouble(),
+        trendStatus: trendStatus,
+        currentMonthGameCount: monthlyTrend['currentMonthGameCount'],
+        recentTrend: stats['recentTrend'] != null
+            ? (stats['recentTrend'] as List)
+                .map((e) => TrendData.fromJson(Map<String, dynamic>.from(e)))
+                .toList()
+            : [],
+        recentGame: recentGameData != null && recentGameData is Map
+            ? RecentGame.fromJson(Map<String, dynamic>.from(recentGameData))
+            : null,
+        hasGroup: groupsData is List && groupsData.isNotEmpty,
       );
     } catch (e) {
-      throw Exception('대시보드 데이터를 불러오는데 실패했습니다: $e');
+      return HomeDashboardData(
+        averageScore: 0,
+        highestScore: 0,
+        recentTrend: [],
+        nickname: 'Guest',
+      );
     }
   }
 }

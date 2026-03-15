@@ -61,10 +61,10 @@ class _LoginPageState extends State<LoginPage> {
       if (response.statusCode == 200 || response.statusCode == 201) {
         // 로그인 성공: 유저 정보를 받음
         final userId = response.data['id'];
-        
+
         if (userId != null) {
           final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('user_id', userId);
+          await prefs.setString('user_id', userId.toString());
         }
 
         if (mounted) {
@@ -97,6 +97,7 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    print("=== _LoginPageState build ===");
     return Scaffold(
       body: Stack(
         children: [
@@ -123,13 +124,14 @@ class _LoginPageState extends State<LoginPage> {
           ),
 
           // 메인 컨텐츠
-          Center(
-            child: SingleChildScrollView(
-              controller: _scrollController,
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
+          SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                controller: _scrollController,
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
                   const SizedBox(height: 48),
 
                   // 로고 섹션
@@ -406,6 +408,7 @@ class _LoginPageState extends State<LoginPage> {
                 ],
               ),
             ),
+          ),
           ),
         ],
       ),

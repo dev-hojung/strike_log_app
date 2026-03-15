@@ -27,10 +27,13 @@ class _MainContainerState extends State<MainContainer> {
   int _selectedIndex = 0;
   bool _isCheckingClub = false;
 
+  /// 페이지 갱신을 위한 키 (값이 바뀌면 페이지가 재생성됨)
+  Key _refreshKey = UniqueKey();
+
   /// 각 탭에 해당하는 페이지 위젯 리스트입니다.
   List<Widget> get _pages => [
-    const HomeDashboardPage(),
-    const GameHistoryPage(),
+    HomeDashboardPage(key: _refreshKey),
+    GameHistoryPage(key: _refreshKey),
     const MyGroupsPage(),
     const ProfilePage(),
   ];
@@ -38,10 +41,16 @@ class _MainContainerState extends State<MainContainer> {
   Future<void> _startIndividualGame() async {
     final location = await showLocationInputDialog(context);
     if (location != null && mounted) {
-      Navigator.push(
+      await Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => FrameEntryPage(isClubGame: false, location: location)),
       );
+      // 게임 화면에서 돌아오면 대시보드 및 기록 갱신
+      if (mounted) {
+        setState(() {
+          _refreshKey = UniqueKey();
+        });
+      }
     }
   }
 
@@ -68,10 +77,15 @@ class _MainContainerState extends State<MainContainer> {
         setState(() { _isCheckingClub = false; });
         if (groups is List && groups.isNotEmpty) {
           // 클럽(그룹)이 있는 경우 게임 모드 선택 페이지로 이동
-          Navigator.push(
+          await Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const GameModePage()),
           );
+          if (mounted) {
+            setState(() {
+              _refreshKey = UniqueKey();
+            });
+          }
         } else {
           // 클럽이 없는 경우 개인 게임 바로 시작
           await _startIndividualGame();
@@ -144,7 +158,7 @@ class _MainContainerState extends State<MainContainer> {
           mainAxisSize: MainAxisSize.max,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: <Widget>[
-            _buildNavItem(0, Symbols.dashboard, '홈'),
+            _buildNavItem(0, Symbols.home, '홈'),
             _buildNavItem(1, Symbols.history, '기록'),
             const SizedBox(width: 48), // FAB 공간 확보
             _buildNavItem(2, Symbols.groups, '클럽'),
@@ -169,7 +183,12 @@ class _MainContainerState extends State<MainContainer> {
 
     return Expanded(
       child: InkWell(
-        onTap: () => setState(() => _selectedIndex = index),
+        onTap: () => setState(() {
+          if (index == 0 && _selectedIndex != 0) {
+            _refreshKey = UniqueKey();
+          }
+          _selectedIndex = index;
+        }),
         borderRadius: BorderRadius.circular(8),
         child: Column(
           mainAxisSize: MainAxisSize.min,
