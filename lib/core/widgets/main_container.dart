@@ -45,8 +45,9 @@ class _MainContainerState extends State<MainContainer> {
         context,
         MaterialPageRoute(builder: (context) => FrameEntryPage(isClubGame: false, location: location)),
       );
-      // 게임 화면에서 돌아오면 대시보드 및 기록 갱신
+      // 게임 화면에서 돌아오면 캐시 무효화 후 대시보드 및 기록 갱신
       if (mounted) {
+        HomeDashboardPage.invalidateCache();
         setState(() {
           _refreshKey = UniqueKey();
         });
@@ -82,6 +83,7 @@ class _MainContainerState extends State<MainContainer> {
             MaterialPageRoute(builder: (context) => const GameModePage()),
           );
           if (mounted) {
+            HomeDashboardPage.invalidateCache();
             setState(() {
               _refreshKey = UniqueKey();
             });

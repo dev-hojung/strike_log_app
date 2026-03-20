@@ -12,6 +12,11 @@ import '../../data/services/home_api_service.dart';
 class HomeDashboardPage extends StatefulWidget {
   const HomeDashboardPage({super.key});
 
+  /// 캐시된 데이터를 무효화합니다 (게임 저장 후 최신 데이터 로드를 위해 사용).
+  static void invalidateCache() {
+    _HomeDashboardPageState._cachedData = null;
+  }
+
   @override
   State<HomeDashboardPage> createState() => _HomeDashboardPageState();
 }
@@ -23,11 +28,13 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
   static HomeDashboardData? _cachedData;
 
   HomeDashboardData? _data;
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
     _data = _cachedData;
+    _isLoading = _cachedData == null;
     _fetchData();
   }
 
@@ -39,6 +46,7 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
       setState(() {
         _data = data;
         _cachedData = data;
+        _isLoading = false;
       });
     }
   }
@@ -48,7 +56,17 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final data = _data;
 
-    // 데이터 로딩 전이거나 빈 데이터일 경우
+    // 로딩 중일 때 (캐시 데이터 없는 첫 로드)
+    if (_isLoading && data == null) {
+      return Scaffold(
+        backgroundColor:
+            isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
+        appBar: _buildAppBar(isDark, ''),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    // 로딩 완료 후 빈 데이터일 경우
     if (data == null || data.isEmpty) {
       return Scaffold(
         backgroundColor:

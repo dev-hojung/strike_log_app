@@ -19,7 +19,7 @@ class _CreateClubPageState extends State<CreateClubPage> {
   final _descController = TextEditingController();
   final _imagePicker = ImagePicker();
   bool _isLoading = false;
-  bool _isPublic = true;
+
   String? _selectedRegion;
   File? _selectedImage;
 
@@ -171,12 +171,6 @@ class _CreateClubPageState extends State<CreateClubPage> {
                   _buildLabel('활동 지역', textColor),
                   const SizedBox(height: 8),
                   _buildRegionDropdown(surfaceColor, textColor, secondaryColor, borderColor),
-                  const SizedBox(height: 24),
-
-                  // 공개 설정
-                  _buildLabel('공개 설정', textColor),
-                  const SizedBox(height: 8),
-                  _buildVisibilitySelector(surfaceColor, textColor, secondaryColor, borderColor),
                   const SizedBox(height: 32),
                 ],
               ),
@@ -426,109 +420,6 @@ class _CreateClubPageState extends State<CreateClubPage> {
     );
   }
 
-  Widget _buildVisibilitySelector(
-    Color surfaceColor, Color textColor, Color secondaryColor, Color borderColor,
-  ) {
-    return Row(
-      children: [
-        Expanded(
-          child: _buildVisibilityCard(
-            icon: Symbols.public,
-            title: '전체 공개',
-            description: '누구나 검색하고\n가입할 수 있어요',
-            isSelected: _isPublic,
-            onTap: () => setState(() => _isPublic = true),
-            surfaceColor: surfaceColor,
-            textColor: textColor,
-            secondaryColor: secondaryColor,
-            borderColor: borderColor,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildVisibilityCard(
-            icon: Symbols.lock,
-            title: '비공개',
-            description: '초대를 통해서만\n가입할 수 있어요',
-            isSelected: !_isPublic,
-            onTap: () => setState(() => _isPublic = false),
-            surfaceColor: surfaceColor,
-            textColor: textColor,
-            secondaryColor: secondaryColor,
-            borderColor: borderColor,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildVisibilityCard({
-    required IconData icon,
-    required String title,
-    required String description,
-    required bool isSelected,
-    required VoidCallback onTap,
-    required Color surfaceColor,
-    required Color textColor,
-    required Color secondaryColor,
-    required Color borderColor,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? AppColors.primary.withValues(alpha: 0.08)
-              : surfaceColor,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: isSelected ? AppColors.primary : borderColor,
-            width: isSelected ? 1.5 : 1,
-          ),
-        ),
-        child: Column(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? AppColors.primary.withValues(alpha: 0.15)
-                    : secondaryColor.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                icon,
-                color: isSelected ? AppColors.primary : secondaryColor,
-                size: 22,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: isSelected ? AppColors.primary : textColor,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              description,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 11,
-                height: 1.4,
-                color: secondaryColor,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 /// 대시 점선 테두리를 그리는 CustomPainter

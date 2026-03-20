@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/api_client.dart';
 import 'create_club_page.dart';
+import 'explore_clubs_page.dart';
 
 /// 사용자가 소속된 클럽의 멤버 목록을 보여주는 페이지입니다.
 class MyGroupsPage extends StatefulWidget {
@@ -606,6 +607,28 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   elevation: 4,
                   shadowColor: AppColors.primary.withValues(alpha: 0.3),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              height: 56,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const ExploreClubsPage()),
+                  ).then((_) => _fetchData());
+                },
+                icon: Icon(Symbols.explore, color: AppColors.primary),
+                label: Text(
+                  '클럽 탐색하기',
+                  style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 18),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: AppColors.primary.withValues(alpha: 0.4)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),
             ),

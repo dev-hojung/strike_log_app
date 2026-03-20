@@ -1,6 +1,9 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/services/api_client.dart';
 
 /// 비밀번호 변경 페이지
 class ChangePasswordPage extends StatefulWidget {
@@ -49,15 +52,38 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
 
     setState(() => _isLoading = true);
 
-    // TODO: 실제 비밀번호 변경 API 호출
-    await Future.delayed(const Duration(milliseconds: 500));
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('user_id');
 
-    if (mounted) {
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('비밀번호가 변경되었습니다.')),
-      );
-      Navigator.pop(context, true);
+      if (userId == null) {
+        _showError('로그인 정보를 찾을 수 없습니다.');
+        return;
+      }
+
+      await ApiClient().dio.post('/users/$userId/change-password', data: {
+        'currentPassword': current,
+        'newPassword': newPw,
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('비밀번호가 변경되었습니다.')),
+        );
+        Navigator.pop(context, true);
+      }
+    } catch (e) {
+      if (mounted) {
+        String message = '비밀번호 변경에 실패했습니다.';
+        if (e is DioException && e.response?.data != null) {
+          message = e.response?.data['message'] ?? message;
+        }
+        _showError(message);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
