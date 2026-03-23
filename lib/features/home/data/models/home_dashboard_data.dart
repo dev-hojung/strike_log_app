@@ -16,6 +16,9 @@ class HomeDashboardData {
   /// 이번 달 경기 수
   final int? currentMonthGameCount;
 
+  /// 소속 클럽 목록
+  final List<ClubInfo> clubs;
+
   HomeDashboardData({
     required this.averageScore,
     required this.highestScore,
@@ -27,6 +30,7 @@ class HomeDashboardData {
     this.hasGroup = false,
     this.trendStatus,
     this.currentMonthGameCount,
+    this.clubs = const [],
   });
 
   bool get isEmpty =>
@@ -66,6 +70,32 @@ class RecentGame {
       totalScore: json['total_score'],
       playDate: DateTime.parse(json['play_date']),
       location: json['location'],
+    );
+  }
+}
+
+class ClubInfo {
+  final int id;
+  final String name;
+  final String? description;
+  final String? coverImageUrl;
+  final int memberCount;
+
+  ClubInfo({
+    required this.id,
+    required this.name,
+    this.description,
+    this.coverImageUrl,
+    this.memberCount = 0,
+  });
+
+  factory ClubInfo.fromJson(Map<String, dynamic> json) {
+    return ClubInfo(
+      id: json['id'],
+      name: json['name'] ?? '',
+      description: json['description'],
+      coverImageUrl: json['cover_image_url'],
+      memberCount: json['member_count'] ?? 0,
     );
   }
 }

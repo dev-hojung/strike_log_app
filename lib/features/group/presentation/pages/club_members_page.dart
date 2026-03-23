@@ -19,7 +19,7 @@ class ClubMembersPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
       appBar: AppBar(
-        backgroundColor: isDark ? AppColors.backgroundDark.withOpacity(0.8) : AppColors.backgroundLight.withOpacity(0.8),
+        backgroundColor: isDark ? AppColors.backgroundDark.withValues(alpha:0.8) : AppColors.backgroundLight.withValues(alpha:0.8),
         elevation: 0,
         scrolledUnderElevation: 0,
         toolbarHeight: 70,
@@ -33,7 +33,7 @@ class ClubMembersPage extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.primary.withOpacity(0.2),
+                    color: AppColors.primary.withValues(alpha:0.2),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
@@ -232,12 +232,12 @@ class ClubMembersPage extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: isMe 
-            ? AppColors.primary.withOpacity(isDark ? 0.05 : 0.1) 
+            ? AppColors.primary.withValues(alpha:isDark ? 0.05 : 0.1) 
             : (isDark ? AppColors.surfaceDark : Colors.white),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isMe 
-              ? AppColors.primary.withOpacity(0.4) 
+              ? AppColors.primary.withValues(alpha:0.4) 
               : (isDark ? Colors.white10 : Colors.black12),
           width: isMe ? 2 : 1,
         ),
@@ -361,7 +361,7 @@ class ClubMembersPage extends StatelessWidget {
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
                 elevation: 4,
-                shadowColor: AppColors.primary.withOpacity(0.4),
+                shadowColor: AppColors.primary.withValues(alpha:0.4),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -377,12 +377,12 @@ class ClubMembersPage extends StatelessWidget {
             TextButton(
               onPressed: () {},
               style: TextButton.styleFrom(
-                backgroundColor: AppColors.primary.withOpacity(0.05),
+                backgroundColor: AppColors.primary.withValues(alpha:0.05),
                 foregroundColor: AppColors.primary,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                   side: BorderSide(
-                    color: AppColors.primary.withOpacity(isDark ? 0.4 : 0.2),
+                    color: AppColors.primary.withValues(alpha:isDark ? 0.4 : 0.2),
                   ),
                 ),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

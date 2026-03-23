@@ -145,6 +145,12 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
             if (data.recentGame != null)
               _buildLatestGame(context, isDark, data.recentGame!),
 
+            // 나의 클럽 섹션
+            if (data.clubs.isNotEmpty) ...[
+              const SizedBox(height: 24),
+              _buildMyClubs(isDark, data.clubs),
+            ],
+
             const SizedBox(height: 140), // 하단 여백 (네비게이션 + FAB 영역)
           ],
         ),
@@ -480,7 +486,7 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('에버리지 변화',
+                  Text('성과 추이',
                       style: TextStyle(
                           color: isDark
                               ? AppColors.textSecondaryDark
@@ -564,6 +570,10 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: isDark ? Colors.white : Colors.black)),
+            Text('기록 보기',
+                style: TextStyle(
+                    fontSize: 14,
+                    color: AppColors.primary)),
           ],
         ),
         const SizedBox(height: 8),
@@ -636,6 +646,104 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
             ],
           ),
         ),
+      ],
+    );
+  }
+
+  Widget _buildMyClubs(bool isDark, List<ClubInfo> clubs) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('나의 클럽',
+                style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : Colors.black)),
+            Icon(Symbols.add, color: AppColors.primary, size: 20),
+          ],
+        ),
+        const SizedBox(height: 12),
+        ...clubs.map((club) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: isDark ? AppColors.surfaceDark : Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                      color: isDark ? Colors.white10 : Colors.black12),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? const Color(0xFF32343E)
+                            : Colors.grey[200],
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: club.coverImageUrl != null
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.network(club.coverImageUrl!,
+                                  fit: BoxFit.cover),
+                            )
+                          : Icon(Symbols.groups,
+                              color: AppColors.primary, size: 24),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            club.name,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? Colors.white : Colors.black,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              Icon(Symbols.person,
+                                  color: Colors.grey, size: 14),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${club.memberCount}명',
+                                style: const TextStyle(
+                                    color: Colors.grey, fontSize: 12),
+                              ),
+                              if (club.description != null &&
+                                  club.description!.isNotEmpty) ...[
+                                const SizedBox(width: 8),
+                                Flexible(
+                                  child: Text(
+                                    club.description!,
+                                    style: const TextStyle(
+                                        color: Colors.grey, fontSize: 12),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(Symbols.chevron_right,
+                        color: Colors.grey[600], size: 20),
+                  ],
+                ),
+              ),
+            )),
       ],
     );
   }

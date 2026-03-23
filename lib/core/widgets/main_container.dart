@@ -130,7 +130,7 @@ class _MainContainerState extends State<MainContainer> {
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.primary.withOpacity(0.4),
+                  color: AppColors.primary.withValues(alpha:0.4),
                   blurRadius: 10,
                   spreadRadius: 2,
                   offset: const Offset(0, 4),
@@ -163,7 +163,7 @@ class _MainContainerState extends State<MainContainer> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: <Widget>[
             _buildNavItem(0, Symbols.home, '홈'),
-            _buildNavItem(1, Symbols.history, '기록'),
+            _buildNavItem(1, Symbols.bar_chart, '기록'),
             const SizedBox(width: 48), // FAB 공간 확보
             _buildNavItem(2, Symbols.groups, '클럽'),
             _buildNavItem(3, Symbols.person, '프로필'),

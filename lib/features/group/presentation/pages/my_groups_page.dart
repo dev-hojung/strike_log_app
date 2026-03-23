@@ -117,6 +117,24 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
+      appBar: _club == null
+          ? AppBar(
+              backgroundColor: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              surfaceTintColor: Colors.transparent,
+              automaticallyImplyLeading: false,
+              centerTitle: true,
+              title: Text(
+                '클럽',
+                style: TextStyle(
+                  color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            )
+          : null,
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _club == null
@@ -621,7 +639,7 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
                     MaterialPageRoute(builder: (context) => const ExploreClubsPage()),
                   ).then((_) => _fetchData());
                 },
-                icon: Icon(Symbols.explore, color: AppColors.primary),
+                icon: Icon(Symbols.search, color: AppColors.primary),
                 label: Text(
                   '클럽 탐색하기',
                   style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 18),

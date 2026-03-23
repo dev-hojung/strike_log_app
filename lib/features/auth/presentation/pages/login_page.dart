@@ -99,32 +99,8 @@ class _LoginPageState extends State<LoginPage> {
   Widget build(BuildContext context) {
     print("=== _LoginPageState build ===");
     return Scaffold(
-      body: Stack(
-        children: [
-          // 배경 이미지 및 오버레이
-          Positioned.fill(
-            child: Image.network(
-              'https://lh3.googleusercontent.com/aida-public/AB6AXuDGM-Jx4OQRaN-AEZazNBNz36V-HmiHAfy6iHFuCRIQbSMjPeLAwWVx-fvC9mvTGX9DOFtjZ8MhJtj1M88_KGpVgieBPxDr7OjeghijLtl6mZ8H1K9CVbnq_kIfan439IPhuUgkL3FjoU4aPhc7Tu9c_k_5Shg2fUmyIwGoykBp9ULWzxMVuRzW0op6qnef41IIBllWHquBJQp0wWO2A4uEDthlJv98CeC3ui3UrsnJqp1jqpb2672BOl3rpS7mNYOekJjlhVwQkRUS',
-              fit: BoxFit.cover,
-            ),
-          ),
-          Positioned.fill(
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    const Color(0xFF101622).withOpacity(0.7),
-                    const Color(0xFF101622).withOpacity(0.95),
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-          // 메인 컨텐츠
-          SafeArea(
+      backgroundColor: AppColors.backgroundDark,
+      body: SafeArea(
             child: Center(
               child: SingleChildScrollView(
                 controller: _scrollController,
@@ -143,7 +119,7 @@ class _LoginPageState extends State<LoginPage> {
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: AppColors.primary.withOpacity(0.3),
+                          color: AppColors.primary.withValues(alpha: 0.3),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
@@ -171,7 +147,7 @@ class _LoginPageState extends State<LoginPage> {
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w500,
-                      color: AppColors.primary.withOpacity(0.9),
+                      color: AppColors.primary.withValues(alpha: 0.9),
                     ),
                   ),
 
@@ -200,7 +176,7 @@ class _LoginPageState extends State<LoginPage> {
                               color: Color(0xFF64748B)), // slate-500
                           filled: true,
                           fillColor: const Color(0xFF1E293B)
-                              .withOpacity(0.5), // slate-800/50
+                              .withValues(alpha: 0.5), // slate-800/50
                           contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16, vertical: 16),
                           border: OutlineInputBorder(
@@ -256,7 +232,7 @@ class _LoginPageState extends State<LoginPage> {
                               color: Color(0xFF64748B)), // slate-500
                           filled: true,
                           fillColor: const Color(0xFF1E293B)
-                              .withOpacity(0.5), // slate-800/50
+                              .withValues(alpha: 0.5), // slate-800/50
                           contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16, vertical: 16),
                           border: OutlineInputBorder(
@@ -287,12 +263,12 @@ class _LoginPageState extends State<LoginPage> {
                                               style: ElevatedButton.styleFrom(
                                                 backgroundColor: AppColors.primary,
                                                 foregroundColor: Colors.white,
-                                                disabledBackgroundColor: AppColors.primary.withOpacity(0.5),
+                                                disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.5),
                                                 shape: RoundedRectangleBorder(
                                                   borderRadius: BorderRadius.circular(12),
                                                 ),
                                                 elevation: 4,
-                                                shadowColor: AppColors.primary.withOpacity(0.2),
+                                                shadowColor: AppColors.primary.withValues(alpha: 0.2),
                                               ),
                                               child: _isLoading 
                                                   ? const SizedBox(
@@ -319,7 +295,7 @@ class _LoginPageState extends State<LoginPage> {
                       Expanded(
                           child: Container(
                               height: 1,
-                              color: const Color(0xFF334155).withOpacity(0.5))),
+                              color: const Color(0xFF334155).withValues(alpha: 0.5))),
                       const Padding(
                         padding: EdgeInsets.symmetric(horizontal: 16),
                         child: Text(
@@ -334,7 +310,7 @@ class _LoginPageState extends State<LoginPage> {
                       Expanded(
                           child: Container(
                               height: 1,
-                              color: const Color(0xFF334155).withOpacity(0.5))),
+                              color: const Color(0xFF334155).withValues(alpha: 0.5))),
                     ],
                   ),
 
@@ -409,8 +385,6 @@ class _LoginPageState extends State<LoginPage> {
               ),
             ),
           ),
-          ),
-        ],
       ),
     );
   }

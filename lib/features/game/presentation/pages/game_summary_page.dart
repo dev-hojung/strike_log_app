@@ -390,7 +390,7 @@ class _GameSummaryPageState extends State<GameSummaryPage> {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             decoration: BoxDecoration(
-              color: isDark ? Colors.white.withOpacity(0.03) : Colors.black.withOpacity(0.02),
+              color: isDark ? Colors.white.withValues(alpha:0.03) : Colors.black.withValues(alpha:0.02),
               borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
             ),
             child: const Text(
@@ -418,8 +418,8 @@ class _GameSummaryPageState extends State<GameSummaryPage> {
 
               return Container(
                 decoration: BoxDecoration(
-                  border: Border.all(color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.05)),
-                  color: isLastFrame ? AppColors.primary.withOpacity(0.05) : null,
+                  border: Border.all(color: isDark ? Colors.white.withValues(alpha:0.05) : Colors.black.withValues(alpha:0.05)),
+                  color: isLastFrame ? AppColors.primary.withValues(alpha:0.05) : null,
                 ),
                 padding: const EdgeInsets.all(8),
                 child: Column(

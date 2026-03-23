@@ -210,11 +210,11 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
           child: Column(
             children: [
-              _buildSettingsTile('계정 설정', Symbols.person, textColor, secondaryTextColor, borderColor, onTap: () {
+              _buildSettingsTile('계정 설정', Symbols.settings, textColor, secondaryTextColor, borderColor, onTap: () {
                 Navigator.push(context, MaterialPageRoute(builder: (_) => const AccountSettingsPage())).then((_) => _fetchProfile());
               }),
               _buildSettingsTile('알림 설정', Symbols.notifications, textColor, secondaryTextColor, borderColor),
-              _buildSettingsTile('앱 설정', Symbols.tune, textColor, secondaryTextColor, borderColor, isLast: true),
+              _buildSettingsTile('앱 설정', Symbols.settings, textColor, secondaryTextColor, borderColor, isLast: true),
             ],
           ),
         ),

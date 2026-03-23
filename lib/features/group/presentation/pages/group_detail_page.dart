@@ -59,7 +59,7 @@ class GroupDetailPage extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(color: isDark ? Colors.white10 : Colors.black12, width: 4),
-                color: Colors.grey.withOpacity(0.2),
+                color: Colors.grey.withValues(alpha:0.2),
               ),
               child: const Icon(Symbols.groups, size: 60, color: Colors.grey),
             ),
@@ -178,7 +178,7 @@ class GroupDetailPage extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? AppColors.surfaceDark : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: isFirst ? Colors.amber.withOpacity(0.5) : (isDark ? Colors.white10 : Colors.black12)),
+        border: Border.all(color: isFirst ? Colors.amber.withValues(alpha:0.5) : (isDark ? Colors.white10 : Colors.black12)),
       ),
       child: Row(
         children: [

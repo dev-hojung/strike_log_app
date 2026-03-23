@@ -2,9 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:material_symbols_icons/symbols.dart';
-import 'package:dio/dio.dart';
+import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/api_client.dart';
-import 'login_page.dart';
 
 /// 앱의 회원가입 화면을 담당하는 페이지입니다.
 ///
@@ -249,13 +248,12 @@ class _SignupPageState extends State<SignupPage> {
 
   @override
   Widget build(BuildContext context) {
-    // 배경 테마 색상 강제 지정 (스크린샷 기반 다크 테마)
-    const backgroundColor = Color(0xFF141923);
+    final backgroundColor = AppColors.backgroundDark;
     const textColor = Colors.white;
-    const subTextColor = Color(0xFF8F939A);
-    const inputBgColor = Color(0xFF1F242F);
-    const borderColor = Color(0xFF333842);
-    const primaryColor = Color(0xFF1A5CFF); // 파란색
+    final subTextColor = AppColors.textSecondaryDark;
+    final inputBgColor = AppColors.surfaceDark;
+    final borderColor = const Color(0xFF333842);
+    final primaryColor = AppColors.primary;
 
     return Scaffold(
       backgroundColor: backgroundColor,
@@ -424,7 +422,7 @@ class _SignupPageState extends State<SignupPage> {
                                 children: [
                                   Text(
                                     _formattedTime,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       color: primaryColor,
                                       fontWeight: FontWeight.w500,
                                     ),
@@ -529,7 +527,7 @@ class _SignupPageState extends State<SignupPage> {
                           backgroundColor: primaryColor,
                           foregroundColor: Colors.white,
                           disabledBackgroundColor:
-                              primaryColor.withOpacity(0.5),
+                              primaryColor.withValues(alpha:0.5),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -616,7 +614,7 @@ class _SignupPageState extends State<SignupPage> {
                   const SizedBox(width: 8),
                   GestureDetector(
                     onTap: () => Navigator.pop(context),
-                    child: const Text(
+                    child: Text(
                       '로그인',
                       style: TextStyle(
                         color: primaryColor,

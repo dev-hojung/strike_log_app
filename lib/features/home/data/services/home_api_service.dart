@@ -46,6 +46,9 @@ class HomeApiService {
             ? RecentGame.fromJson(Map<String, dynamic>.from(recentGameData))
             : null,
         hasGroup: groupsData is List && groupsData.isNotEmpty,
+        clubs: groupsData is List
+            ? groupsData.map((g) => ClubInfo.fromJson(Map<String, dynamic>.from(g))).toList()
+            : [],
       );
     } catch (e) {
       return HomeDashboardData(
