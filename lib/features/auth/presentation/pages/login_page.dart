@@ -61,10 +61,14 @@ class _LoginPageState extends State<LoginPage> {
       if (response.statusCode == 200 || response.statusCode == 201) {
         // 로그인 성공: 유저 정보를 받음
         final userId = response.data['id'];
+        final nickname = response.data['nickname'];
 
         if (userId != null) {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('user_id', userId.toString());
+          if (nickname != null) {
+            await prefs.setString('nickname', nickname.toString());
+          }
         }
 
         if (mounted) {

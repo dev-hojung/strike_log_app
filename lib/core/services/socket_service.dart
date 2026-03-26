@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'api_client.dart';
 
@@ -14,9 +16,13 @@ class SocketService {
   IO.Socket? get socket => _socket;
   bool get isConnected => _socket?.connected ?? false;
 
-  /// 소켓 연결
-  void connect() {
-    if (_socket != null && _socket!.connected) return;
+  /// 소켓 연결 (연결 완료 시 Future 반환)
+  Future<void> connect() {
+    if (_socket != null && _socket!.connected) {
+      return Future.value();
+    }
+
+    final completer = Completer<void>();
 
     _socket = IO.io(ApiClient.baseUrl, <String, dynamic>{
       'transports': ['websocket'],
@@ -25,6 +31,11 @@ class SocketService {
 
     _socket!.onConnect((_) {
       print('[Socket] Connected: ${_socket!.id}');
+      if (!completer.isCompleted) completer.complete();
+    });
+
+    _socket!.onAny((event, data) {
+      print('[Socket] Event: $event, Data: $data');
     });
 
     _socket!.onDisconnect((_) {
@@ -33,18 +44,19 @@ class SocketService {
 
     _socket!.onConnectError((err) {
       print('[Socket] Connection Error: $err');
+      if (!completer.isCompleted) completer.completeError(err);
     });
+
+    return completer.future;
   }
 
   /// 방 생성
   void createRoom({
-    required String roomId,
     required String userId,
     required String nickname,
   }) {
-    _socket?.emit('create_room', {
-      'roomId': roomId,
-      'userId': userId,
+    _socket?.emit('createRoom', {
+      'user_id': userId,
       'nickname': nickname,
     });
   }
@@ -55,38 +67,40 @@ class SocketService {
     required String userId,
     required String nickname,
   }) {
-    _socket?.emit('join_room', {
+    _socket?.emit('joinRoom', {
       'roomId': roomId,
-      'userId': userId,
+      'user_id': userId,
       'nickname': nickname,
     });
   }
 
   /// 방 나가기
-  void leaveRoom(String roomId) {
-    _socket?.emit('leave_room', {'roomId': roomId});
+  void leaveRoom({
+    required String roomId,
+    required String userId,
+  }) {
+    _socket?.emit('leaveRoom', {
+      'roomId': roomId,
+      'user_id': userId,
+    });
   }
 
   /// 점수 업데이트 전송
   void sendScoreUpdate({
     required String roomId,
     required String userId,
-    required int frameIndex,
-    required List<int> throws,
-    required int totalScore,
+    required int score,
   }) {
-    _socket?.emit('score_update', {
+    _socket?.emit('updateScore', {
       'roomId': roomId,
-      'userId': userId,
-      'frameIndex': frameIndex,
-      'throws': throws,
-      'totalScore': totalScore,
+      'user_id': userId,
+      'score': score,
     });
   }
 
   /// 게임 시작 알림
   void startGame(String roomId) {
-    _socket?.emit('start_game', {'roomId': roomId});
+    _socket?.emit('startGame', {'roomId': roomId});
   }
 
   /// 이벤트 리스너 등록

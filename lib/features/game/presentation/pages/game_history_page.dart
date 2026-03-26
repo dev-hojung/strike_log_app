@@ -149,7 +149,7 @@ class _GameHistoryPageState extends State<GameHistoryPage> {
           );
         }
 
-        // 월간 성과 카드 (첫 번째 그룹 다음)
+        // 이번 달 요약 카드 (첫 번째 그룹 다음)
         if (index == 1) {
           return Padding(
             padding: const EdgeInsets.only(bottom: 24),
@@ -309,7 +309,7 @@ class _GameHistoryPageState extends State<GameHistoryPage> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                '월간 성과',
+                '이번 달 요약',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 18,

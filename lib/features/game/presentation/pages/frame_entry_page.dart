@@ -13,7 +13,7 @@ import 'game_summary_page.dart';
 class FrameEntryPage extends StatefulWidget {
   final bool isClubGame;
   final String? roomId;
-  final List<Map<String, String>>? participants;
+  final List<Map<String, dynamic>>? participants;
   final String? location;
 
   const FrameEntryPage({
@@ -69,21 +69,26 @@ class _FrameEntryPageState extends State<FrameEntryPage> {
       }
     }
 
-    // 다른 참가자의 점수 업데이트 수신
-    _socketService.on('score_update', (data) {
+    // 방 상태 업데이트 수신 (점수 변경 포함)
+    _socketService.on('roomStateUpdated', (data) {
       if (!mounted) return;
-      final senderId = data['userId'] as String?;
-      if (senderId == null || senderId == _userId) return;
-      setState(() {
-        _participantScores[senderId] = data['totalScore'] ?? 0;
-      });
+      if (data['participants'] != null) {
+        final participants = data['participants'] as Map<String, dynamic>;
+        setState(() {
+          for (final userId in participants.keys) {
+            if (userId == _userId) continue;
+            final p = participants[userId];
+            _participantScores[userId] = p?['score'] ?? 0;
+          }
+        });
+      }
     });
   }
 
   @override
   void dispose() {
     if (widget.isClubGame) {
-      _socketService.off('score_update');
+      _socketService.off('roomStateUpdated');
     }
     super.dispose();
   }
@@ -94,9 +99,7 @@ class _FrameEntryPageState extends State<FrameEntryPage> {
     _socketService.sendScoreUpdate(
       roomId: widget.roomId!,
       userId: _userId,
-      frameIndex: _currentFrame,
-      throws: _frames[_currentFrame],
-      totalScore: _totalScore,
+      score: _totalScore,
     );
   }
 
@@ -520,63 +523,64 @@ class _FrameEntryPageState extends State<FrameEntryPage> {
         children: [
           // 상단 콘텐츠 (스크롤 없음, 탭하면 키패드 닫힘)
           Expanded(
-            child: ClipRect(
             child: GestureDetector(
               behavior: HitTestBehavior.translucent,
               onTap: () {
                 if (_showKeypad) setState(() => _showKeypad = false);
               },
-              child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Spacer(),
-                // 총점 표시
-                Text(
-                  '$_totalScore',
-                  style: TextStyle(
-                    fontSize: _showKeypad ? 40 : 64,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.primary,
-                    height: 1.0,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  '총점',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.textSecondaryDark,
-                    letterSpacing: 1.2,
-                  ),
-                ),
-                const Spacer(),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(height: _showKeypad ? 16 : 40),
+                    // 총점 표시
+                    Text(
+                      '$_totalScore',
+                      style: TextStyle(
+                        fontSize: _showKeypad ? 40 : 64,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary,
+                        height: 1.0,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      '총점',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.textSecondaryDark,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                    SizedBox(height: _showKeypad ? 16 : 40),
 
-                // 프레임 스크롤 영역
-                SizedBox(
-                  height: 100,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    itemCount: 10,
-                    separatorBuilder: (_, __) => const SizedBox(width: 12),
-                    itemBuilder: (context, index) {
-                      return _buildFrameCard(index);
-                    },
-                  ),
-                ),
+                    // 프레임 스크롤 영역
+                    SizedBox(
+                      height: 100,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        itemCount: 10,
+                        separatorBuilder: (_, __) => const SizedBox(width: 12),
+                        itemBuilder: (context, index) {
+                          return _buildFrameCard(index);
+                        },
+                      ),
+                    ),
 
-                // 클럽 게임: 참가자 점수 목록
-                if (widget.isClubGame && widget.participants != null) ...[
-                  const SizedBox(height: 24),
-                  _buildParticipantScores(),
-                ],
-                SizedBox(height: _showKeypad ? 8 : 24),
-              ],
-            ),
-            ),
+                    SizedBox(height: _showKeypad ? 8 : 24),
+                  ],
+                ),
+              ),
             ),
           ),
+
+          // // 클럽 게임: 참가자 점수 목록 (임시 비활성화)
+          // if (widget.isClubGame && widget.participants != null && !_showKeypad) ...[
+          //   _buildParticipantScores(),
+          //   const SizedBox(height: 8),
+          // ],
 
           // 키패드 또는 결과 확인 버튼 (프레임 선택 시에만 표시)
           if (_isGameComplete)
@@ -636,10 +640,11 @@ class _FrameEntryPageState extends State<FrameEntryPage> {
               ),
             )
           else if (_showKeypad)
-            SafeArea(
+            Flexible(
+              child: SafeArea(
               top: false,
               child: Container(
-                padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
+                padding: const EdgeInsets.fromLTRB(24, 16, 24, 4),
                 decoration: const BoxDecoration(
                   color: AppColors.surfaceDark,
                   borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
@@ -699,6 +704,7 @@ class _FrameEntryPageState extends State<FrameEntryPage> {
                   ],
                 ),
               ),
+            ),
             )
           else
             SafeArea(
@@ -855,76 +861,79 @@ class _FrameEntryPageState extends State<FrameEntryPage> {
     );
   }
 
-  /// 클럽 게임 참가자 점수 목록
+  /// 클럽 게임 참가자 점수 목록 (가로 스크롤 컴팩트)
   Widget _buildParticipantScores() {
     final participants = widget.participants ?? [];
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceDark,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            '참가자 점수',
-            style: TextStyle(
-              color: AppColors.textSecondaryDark,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
+    return SizedBox(
+      height: 56,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        itemCount: participants.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final p = participants[index];
+          final isMe = p['userId'] == _userId;
+          final score = isMe
+              ? _totalScore
+              : (_participantScores[p['userId']] ?? 0);
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: isMe
+                  ? AppColors.primary.withValues(alpha: 0.1)
+                  : AppColors.surfaceDark,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isMe
+                    ? AppColors.primary.withValues(alpha: 0.3)
+                    : Colors.white10,
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
-          ...participants.map((p) {
-            final isMe = p['userId'] == _userId;
-            final score = isMe
-                ? _totalScore
-                : (_participantScores[p['userId']] ?? 0);
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 14,
-                    backgroundColor: isMe
-                        ? AppColors.primary.withValues(alpha: 0.2)
-                        : Colors.white10,
-                    child: Text(
-                      (p['nickname'] ?? '?')[0],
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isMe ? AppColors.primary : Colors.white70,
-                        fontWeight: FontWeight.bold,
-                      ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircleAvatar(
+                  radius: 14,
+                  backgroundColor: isMe
+                      ? AppColors.primary.withValues(alpha: 0.2)
+                      : Colors.white10,
+                  child: Text(
+                    (p['nickname'] ?? '?')[0],
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isMe ? AppColors.primary : Colors.white70,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
+                ),
+                const SizedBox(width: 8),
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
                       '${p['nickname']}${isMe ? ' (나)' : ''}',
                       style: TextStyle(
-                        fontSize: 14,
+                        fontSize: 11,
                         color: isMe ? Colors.white : Colors.white70,
                         fontWeight: isMe ? FontWeight.bold : FontWeight.normal,
                       ),
                     ),
-                  ),
-                  Text(
-                    '$score',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: isMe ? AppColors.primary : Colors.white,
+                    Text(
+                      '$score',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: isMe ? AppColors.primary : Colors.white,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            );
-          }),
-        ],
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }

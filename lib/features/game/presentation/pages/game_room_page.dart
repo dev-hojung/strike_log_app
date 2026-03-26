@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -36,6 +35,21 @@ class _GameRoomPageState extends State<GameRoomPage> {
     _loadUserInfo();
   }
 
+  void _updateParticipantsFromState(dynamic state) {
+    if (state == null || state['participants'] == null) return;
+    final participants = state['participants'] as Map<String, dynamic>;
+    setState(() {
+      _participants.clear();
+      for (final userId in participants.keys) {
+        final p = participants[userId];
+        _participants.add({
+          'userId': userId,
+          'nickname': p?['nickname'] ?? '게스트',
+        });
+      }
+    });
+  }
+
   Future<void> _loadUserInfo() async {
     final prefs = await SharedPreferences.getInstance();
     _userId = prefs.getString('user_id') ?? '';
@@ -44,53 +58,31 @@ class _GameRoomPageState extends State<GameRoomPage> {
   }
 
   void _setupSocketListeners() {
-    _socketService.on('room_created', (data) {
+    // 방 생성 응답 (메타데이터만 설정, 참가자 목록은 roomStateUpdated에서 관리)
+    _socketService.on('roomCreated', (data) {
       setState(() {
         _roomId = data['roomId'];
         _isInRoom = true;
         _isHost = true;
         _isConnecting = false;
-        _participants.clear();
-        _participants.add({'userId': _userId, 'nickname': _nickname});
       });
+      // 서버에 roomStateUpdated 요청 (참가자 목록 동기화)
+      _updateParticipantsFromState(data['state']);
     });
 
-    _socketService.on('user_joined', (data) {
+    // 참가자 목록 통합 관리 (모든 상태 변경 시)
+    _socketService.on('roomStateUpdated', (data) {
+      if (!mounted) return;
       setState(() {
-        final exists = _participants.any((p) => p['userId'] == data['userId']);
-        if (!exists) {
-          _participants.add({
-            'userId': data['userId'] ?? '',
-            'nickname': data['nickname'] ?? '게스트',
-          });
-        }
-      });
-    });
-
-    _socketService.on('user_left', (data) {
-      setState(() {
-        _participants.removeWhere((p) => p['userId'] == data['userId']);
-      });
-    });
-
-    _socketService.on('room_joined', (data) {
-      setState(() {
-        _roomId = data['roomId'];
+        _roomId = data['roomId'] ?? _roomId;
         _isInRoom = true;
         _isConnecting = false;
-        _participants.clear();
-        if (data['participants'] != null) {
-          for (final p in data['participants']) {
-            _participants.add({
-              'userId': p['userId'] ?? '',
-              'nickname': p['nickname'] ?? '게스트',
-            });
-          }
-        }
       });
+      _updateParticipantsFromState(data);
     });
 
-    _socketService.on('game_started', (data) {
+    // 게임 시작
+    _socketService.on('gameStarted', (data) {
       if (!mounted) return;
       Navigator.pushReplacement(
         context,
@@ -104,6 +96,29 @@ class _GameRoomPageState extends State<GameRoomPage> {
       );
     });
 
+    // 방 생성/참가 응답 (에러 처리)
+    _socketService.on('createRoomResponse', (data) {
+      if (data['success'] == false) {
+        setState(() => _isConnecting = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(data['data']?['message'] ?? data['message'] ?? '방 생성에 실패했습니다.')),
+          );
+        }
+      }
+    });
+
+    _socketService.on('joinRoomResponse', (data) {
+      if (data['success'] == false) {
+        setState(() => _isConnecting = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(data['data']?['message'] ?? data['message'] ?? '방 참가에 실패했습니다.')),
+          );
+        }
+      }
+    });
+
     _socketService.on('error', (data) {
       setState(() => _isConnecting = false);
       if (mounted) {
@@ -114,54 +129,64 @@ class _GameRoomPageState extends State<GameRoomPage> {
     });
   }
 
-  void _createRoom() {
+  Future<void> _createRoom() async {
     setState(() => _isConnecting = true);
-    _socketService.connect();
-    _setupSocketListeners();
+    try {
+      await _socketService.connect();
+      _setupSocketListeners();
 
-    // 6자리 방 코드 생성
-    final code = (100000 + Random().nextInt(900000)).toString();
-    _socketService.createRoom(
-      roomId: code,
-      userId: _userId,
-      nickname: _nickname,
-    );
+      _socketService.createRoom(
+        userId: _userId,
+        nickname: _nickname,
+      );
+    } catch (e) {
+      setState(() => _isConnecting = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('서버 연결에 실패했습니다.')),
+        );
+      }
+    }
   }
 
-  void _joinRoom() {
+  Future<void> _joinRoom() async {
     final code = _roomCodeController.text.trim();
-    if (code.isEmpty || code.length != 6) {
+    if (code.isEmpty || code.length != 7) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('6자리 방 코드를 입력해주세요.')),
+        const SnackBar(content: Text('7자리 방 코드를 입력해주세요.')),
       );
       return;
     }
 
     setState(() => _isConnecting = true);
-    _socketService.connect();
-    _setupSocketListeners();
+    try {
+      await _socketService.connect();
+      _setupSocketListeners();
 
-    _socketService.joinRoom(
-      roomId: code,
-      userId: _userId,
-      nickname: _nickname,
-    );
-  }
-
-  void _startGame() {
-    if (_roomId == null) return;
-    _socketService.startGame(_roomId!);
+      _socketService.joinRoom(
+        roomId: code,
+        userId: _userId,
+        nickname: _nickname,
+      );
+    } catch (e) {
+      setState(() => _isConnecting = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('서버 연결에 실패했습니다.')),
+        );
+      }
+    }
   }
 
   void _leaveRoom() {
     if (_roomId != null) {
-      _socketService.leaveRoom(_roomId!);
+      _socketService.leaveRoom(roomId: _roomId!, userId: _userId);
     }
-    _socketService.off('room_created');
-    _socketService.off('user_joined');
-    _socketService.off('user_left');
-    _socketService.off('room_joined');
-    _socketService.off('game_started');
+    _socketService.off('roomCreated');
+    _socketService.off('roomStateUpdated');
+    _socketService.off('gameStarted');
+    _socketService.off('createRoomResponse');
+    _socketService.off('joinRoomResponse');
     _socketService.off('error');
     _socketService.disconnect();
 
@@ -311,8 +336,8 @@ class _GameRoomPageState extends State<GameRoomPage> {
               Expanded(
                 child: TextField(
                   controller: _roomCodeController,
-                  keyboardType: TextInputType.number,
-                  maxLength: 6,
+                  keyboardType: TextInputType.text,
+                  maxLength: 7,
                   style: TextStyle(
                     color: textColor,
                     fontSize: 18,
@@ -322,7 +347,7 @@ class _GameRoomPageState extends State<GameRoomPage> {
                   textAlign: TextAlign.center,
                   decoration: InputDecoration(
                     counterText: '',
-                    hintText: '000000',
+                    hintText: 'abc1234',
                     hintStyle: TextStyle(
                       color: subTextColor.withValues(alpha: 0.3),
                       letterSpacing: 8,
@@ -353,7 +378,7 @@ class _GameRoomPageState extends State<GameRoomPage> {
                       ),
                     ),
                   ),
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[a-z0-9]'))],
                 ),
               ),
               const SizedBox(width: 12),
@@ -416,13 +441,18 @@ class _GameRoomPageState extends State<GameRoomPage> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(
-                      _roomId ?? '',
-                      style: TextStyle(
-                        fontSize: 36,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.primary,
-                        letterSpacing: 8,
+                    Flexible(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          _roomId ?? '',
+                          style: TextStyle(
+                            fontSize: 36,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primary,
+                            letterSpacing: 8,
+                          ),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -581,7 +611,9 @@ class _GameRoomPageState extends State<GameRoomPage> {
               width: double.infinity,
               height: 56,
               child: ElevatedButton.icon(
-                onPressed: _participants.length >= 1 ? _startGame : null,
+                onPressed: _participants.length >= 1 && _roomId != null
+                    ? () => _socketService.startGame(_roomId!)
+                    : null,
                 icon: const Icon(Symbols.play_arrow, color: Colors.white),
                 label: const Text(
                   '게임 시작',
