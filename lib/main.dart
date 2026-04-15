@@ -6,8 +6,12 @@ import 'features/auth/presentation/pages/login_page.dart';
 /// 앱 전역 RouteObserver.
 /// MainContainer가 RouteAware로 구독해, 다른 라우트가 pop되어 다시 top이 될 때마다
 /// 홈 대시보드/기록 캐시를 무효화하고 리프레시한다.
-final RouteObserver<ModalRoute<void>> appRouteObserver =
-    RouteObserver<ModalRoute<void>>();
+///
+/// 제네릭을 `PageRoute<dynamic>`으로 두어 MaterialPageRoute/CupertinoPageRoute 모두 매칭되도록 함.
+/// (iOS에서 `MaterialPageRoute<dynamic>`이 `ModalRoute<void>`로는 `is R` 체크를 통과하지 못해
+///  didPopNext가 호출되지 않던 문제 대응)
+final RouteObserver<PageRoute<dynamic>> appRouteObserver =
+    RouteObserver<PageRoute<dynamic>>();
 
 void main() async {
   // Flutter 엔진 초기화 보장 (비동기 처리 시 필수)
