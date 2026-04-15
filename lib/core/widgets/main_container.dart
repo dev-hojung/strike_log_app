@@ -7,7 +7,10 @@ import '../../features/game/presentation/pages/game_mode_page.dart';
 import '../../features/game/presentation/pages/frame_entry_page.dart';
 import '../../features/game/presentation/pages/game_history_page.dart';
 import '../../features/game/presentation/widgets/location_input_dialog.dart';
+import '../../features/game/data/services/game_draft_repository.dart';
+import '../../features/game/data/services/game_save_service.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
+import '../../main.dart' show appRouteObserver;
 import '../constants/app_colors.dart';
 import '../services/api_client.dart';
 
@@ -22,13 +25,93 @@ class MainContainer extends StatefulWidget {
   State<MainContainer> createState() => _MainContainerState();
 }
 
-class _MainContainerState extends State<MainContainer> {
+class _MainContainerState extends State<MainContainer> with RouteAware {
   /// 현재 선택된 탭의 인덱스입니다.
   int _selectedIndex = 0;
   bool _isCheckingClub = false;
 
   /// 페이지 갱신을 위한 키 (값이 바뀌면 페이지가 재생성됨)
   Key _refreshKey = UniqueKey();
+
+  final GameDraftRepository _draftRepo = GameDraftRepository();
+  final GameSaveService _saveService = GameSaveService();
+
+  @override
+  void initState() {
+    super.initState();
+    // 앱 진입 시 미저장 경기 드래프트 자동 재시도.
+    // UI 완전 렌더 이후 실행해 ScaffoldMessenger에 접근 가능하도록 addPostFrameCallback 사용.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _retryPendingDrafts());
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 전역 RouteObserver 구독. ModalRoute가 반드시 존재하는 시점이라 null 아님.
+    final route = ModalRoute.of(context);
+    if (route is PageRoute) {
+      appRouteObserver.subscribe(this, route);
+    }
+  }
+
+  @override
+  void dispose() {
+    appRouteObserver.unsubscribe(this);
+    super.dispose();
+  }
+
+  /// 위쪽 라우트가 pop되어 MainContainer가 다시 topmost가 되었을 때 호출.
+  ///
+  /// 클럽/개인 게임 저장 후 popUntil로 돌아오는 경우가 대표적.
+  /// (pushReplacement 체인 때문에 _onAddButtonPressed의 await는 게임 시작 시점에 이미 resolve되어
+  ///  그 쪽의 setState 경로로는 최신화 트리거가 안 걸림.)
+  @override
+  void didPopNext() {
+    super.didPopNext();
+    if (!mounted) return;
+    HomeDashboardPage.invalidateCache();
+    setState(() {
+      _refreshKey = UniqueKey();
+    });
+    // 경기 저장 직후 네트워크 일시 단절로 드래프트가 쌓였을 수도 있으므로 재시도.
+    _retryPendingDrafts();
+  }
+
+  /// 저장 실패로 로컬에 보관된 드래프트들을 순차 재시도.
+  /// 성공한 건은 저장소에서 제거하고 총 성공 건수를 스낵바로 알림.
+  Future<void> _retryPendingDrafts() async {
+    final drafts = await _draftRepo.getAllDrafts();
+    if (drafts.isEmpty || !mounted) return;
+
+    int successCount = 0;
+    for (final draft in drafts) {
+      final result = await _saveService.saveGame(payload: draft.payload);
+      if (result.success) {
+        await _draftRepo.removeDraft(draft.id);
+        successCount++;
+      }
+      if (!mounted) return;
+    }
+
+    if (!mounted) return;
+    if (successCount > 0) {
+      // 자동 저장 후 대시보드 캐시도 갱신해 홈 통계에 즉시 반영
+      HomeDashboardPage.invalidateCache();
+      setState(() {
+        _refreshKey = UniqueKey();
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            successCount == drafts.length
+                ? '미저장 경기 $successCount개를 자동 저장했습니다.'
+                : '미저장 경기 $successCount/${drafts.length}개를 저장했습니다. 나머지는 다음에 다시 시도합니다.',
+          ),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+  }
 
   /// 각 탭에 해당하는 페이지 위젯 리스트입니다.
   List<Widget> get _pages => [
@@ -41,17 +124,16 @@ class _MainContainerState extends State<MainContainer> {
   Future<void> _startIndividualGame() async {
     final location = await showLocationInputDialog(context);
     if (location != null && mounted) {
+      // 게임 종료 후 대시보드 갱신은 RouteAware.didPopNext가 처리
+      // (pushReplacement 체인 환경에서는 await가 너무 이르게 resolve되므로
+      //  여기서 refresh 콜백을 걸면 실제 저장 전에 stale 데이터로 리프레시됨)
       await Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => FrameEntryPage(isClubGame: false, location: location)),
+        MaterialPageRoute(
+          builder: (context) =>
+              FrameEntryPage(isClubGame: false, location: location),
+        ),
       );
-      // 게임 화면에서 돌아오면 캐시 무효화 후 대시보드 및 기록 갱신
-      if (mounted) {
-        HomeDashboardPage.invalidateCache();
-        setState(() {
-          _refreshKey = UniqueKey();
-        });
-      }
     }
   }
 
@@ -78,16 +160,11 @@ class _MainContainerState extends State<MainContainer> {
         setState(() { _isCheckingClub = false; });
         if (groups is List && groups.isNotEmpty) {
           // 클럽(그룹)이 있는 경우 게임 모드 선택 페이지로 이동
+          // (저장 후 대시보드 갱신은 RouteAware.didPopNext가 담당)
           await Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const GameModePage()),
           );
-          if (mounted) {
-            HomeDashboardPage.invalidateCache();
-            setState(() {
-              _refreshKey = UniqueKey();
-            });
-          }
         } else {
           // 클럽이 없는 경우 개인 게임 바로 시작
           await _startIndividualGame();

@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
-import '../../../../core/services/api_client.dart';
+import '../../data/services/game_draft_repository.dart';
+import '../../data/services/game_save_service.dart';
 import 'package:intl/intl.dart';
 
 /// 볼링 게임 종료 후 결과를 보여주는 요약 페이지입니다.
@@ -20,6 +21,9 @@ class GameSummaryPage extends StatefulWidget {
   final int spareCount;
   final int openCount;
   final String? location;
+  // 실제 게임 시작 시각. play_date로 사용해 저장 시각 왜곡을 방지.
+  // 생략되면 DateTime.now() 사용 (backward compat).
+  final DateTime? gameStartedAt;
 
   const GameSummaryPage({
     super.key,
@@ -30,6 +34,7 @@ class GameSummaryPage extends StatefulWidget {
     required this.spareCount,
     required this.openCount,
     this.location,
+    this.gameStartedAt,
   });
 
   @override
@@ -37,6 +42,8 @@ class GameSummaryPage extends StatefulWidget {
 }
 
 class _GameSummaryPageState extends State<GameSummaryPage> {
+  final GameSaveService _saveService = GameSaveService();
+  final GameDraftRepository _draftRepo = GameDraftRepository();
   bool _isSaving = false;
   bool _isSaved = false;
 
@@ -70,67 +77,207 @@ class _GameSummaryPageState extends State<GameSummaryPage> {
     return pins == 0 ? '-' : '$pins';
   }
 
+  /// 게임 저장: GameSaveService를 통해 재시도·에러 분류 포함하여 POST.
+  /// 실패 시 스낵바가 아닌 재시도 시트를 띄워 데이터 유실을 방지.
   Future<void> _saveGame() async {
-    setState(() {
-      _isSaving = true;
-    });
+    if (_isSaving) return; // 중복 제출 방어
+    setState(() => _isSaving = true);
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      final userId = prefs.getString('user_id'); 
-
+      final userId = prefs.getString('user_id');
       if (userId == null) {
-        throw Exception('로그인된 사용자 정보가 없습니다.');
+        if (mounted) {
+          await _showFailureSheet('로그인된 사용자 정보가 없습니다. 다시 로그인 후 시도해주세요.');
+        }
+        return;
       }
 
-      // API가 요구하는 형식에 맞게 프레임 데이터 매핑
-      final mappedFrames = [];
+      final mappedFrames = <Map<String, dynamic>>[];
       for (int i = 0; i < widget.frames.length; i++) {
         final frame = widget.frames[i];
-        if (frame.isNotEmpty) {
-          mappedFrames.add({
-            'frame_number': i + 1,
-            'first_roll': frame.isNotEmpty ? frame[0] : null,
-            'second_roll': frame.length > 1 ? frame[1] : null,
-            'third_roll': frame.length > 2 ? frame[2] : null,
-            'score': widget.cumulativeScores[i] ?? 0,
-          });
-        }
+        if (frame.isEmpty) continue;
+        mappedFrames.add({
+          'frame_number': i + 1,
+          'first_roll': frame[0],
+          if (frame.length > 1) 'second_roll': frame[1],
+          if (frame.length > 2) 'third_roll': frame[2],
+          'score': widget.cumulativeScores[i] ?? 0,
+        });
       }
 
-      // API 호출
-      final response = await ApiClient().dio.post('/games', data: {
+      // DB의 play_date 컬럼이 MySQL DATE 타입(시간/타임존 없음)이라
+      // 사용자의 로컬 날짜를 yyyy-MM-dd 문자열로 보내는 게 가장 안전 (자정 경계 왜곡 방지)
+      final playDate = DateFormat('yyyy-MM-dd')
+          .format(widget.gameStartedAt ?? DateTime.now());
+
+      final payload = <String, dynamic>{
         'user_id': userId,
         'total_score': widget.totalScore,
-        'play_date': DateTime.now().toIso8601String(),
-        if (widget.location != null && widget.location!.isNotEmpty) 'location': widget.location,
+        'play_date': playDate,
+        if (widget.location != null && widget.location!.isNotEmpty)
+          'location': widget.location,
         'frames': mappedFrames,
-      });
+      };
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        if (mounted) {
+      // 재시도 루프: 자동 재시도 3회까지, 최종 실패 시 사용자에게 재시도 기회 제공
+      while (true) {
+        final result = await _saveService.saveGame(payload: payload);
+        if (!mounted) return;
+
+        if (result.success) {
           _isSaved = true;
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('게임이 성공적으로 저장되었습니다.')),
           );
           Navigator.of(context).popUntil((route) => route.isFirst);
+          return;
         }
-      } else {
-        throw Exception('Failed to save game');
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('저장 실패: $e')),
+
+        final shouldRetry = await _showFailureSheet(
+          result.errorMessage ?? '저장에 실패했습니다.',
+          showRetry: true,
         );
+        if (!mounted) return;
+        if (!shouldRetry) {
+          // 사용자가 "취소"를 선택한 경우에도 데이터 유실 방지:
+          // 로컬 드래프트에 보관 → 다음 앱 실행/홈 진입 시 자동 재시도됨.
+          await _draftRepo.addDraft(payload);
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('임시 저장했습니다. 네트워크 복구 후 자동으로 재시도됩니다.'),
+              duration: Duration(seconds: 3),
+            ),
+          );
+          Navigator.of(context).popUntil((route) => route.isFirst);
+          return;
+        }
       }
     } finally {
       if (mounted) {
-        setState(() {
-          _isSaving = false;
-        });
+        setState(() => _isSaving = false);
       }
     }
+  }
+
+  /// 저장 실패 시트. [showRetry]면 "다시 시도" 버튼 포함.
+  /// 반환값은 사용자가 재시도를 선택했는지 여부.
+  Future<bool> _showFailureSheet(String message, {bool showRetry = false}) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final result = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isDismissible: false,
+      enableDrag: false,
+      builder: (context) => Container(
+        padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.surfaceDark : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 24),
+              decoration: BoxDecoration(
+                color: isDark ? Colors.white24 : Colors.black12,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: Colors.red.withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: const Center(
+                child: Icon(Symbols.cloud_off, color: Colors.red, size: 28),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              '저장에 실패했습니다',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : AppColors.textPrimaryLight,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                height: 1.5,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 50,
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(
+                            color: isDark ? Colors.white24 : Colors.black12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      child: Text(
+                        showRetry ? '취소' : '확인',
+                        style: TextStyle(
+                          color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                if (showRetry) ...[
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: SizedBox(
+                      height: 50,
+                      child: ElevatedButton.icon(
+                        onPressed: () => Navigator.of(context).pop(true),
+                        icon: const Icon(Symbols.refresh,
+                            color: Colors.white, size: 20),
+                        label: const Text(
+                          '다시 시도',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+    return result ?? false;
   }
 
   Future<bool> _showExitConfirmDialog() async {
@@ -255,6 +402,8 @@ class _GameSummaryPageState extends State<GameSummaryPage> {
       canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
+        // 저장 중일 땐 race condition 방지 위해 back 동작 차단
+        if (_isSaving) return;
         final shouldLeave = await _showExitConfirmDialog();
         if (shouldLeave && mounted) {
           Navigator.of(context).popUntil((route) => route.isFirst);
@@ -268,12 +417,14 @@ class _GameSummaryPageState extends State<GameSummaryPage> {
         scrolledUnderElevation: 0,
         leading: IconButton(
           icon: Icon(Symbols.arrow_back, color: textColor),
-          onPressed: () async {
-            final shouldLeave = await _showExitConfirmDialog();
-            if (shouldLeave && mounted) {
-              Navigator.of(context).popUntil((route) => route.isFirst);
-            }
-          },
+          onPressed: _isSaving
+              ? null
+              : () async {
+                  final shouldLeave = await _showExitConfirmDialog();
+                  if (shouldLeave && mounted) {
+                    Navigator.of(context).popUntil((route) => route.isFirst);
+                  }
+                },
         ),
         title: Text(
           '경기 요약',

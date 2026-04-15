@@ -27,6 +27,10 @@ class _GameRoomPageState extends State<GameRoomPage> {
   bool _isHost = false;
   bool _isInRoom = false;
   bool _isConnecting = false;
+  // 게임이 시작되어 FrameEntryPage로 전환 중인지 여부.
+  // true면 dispose에서 leaveRoom/off/disconnect를 호출하지 않음
+  // (다음 화면이 소켓과 참가자 리스트를 그대로 이어서 사용)
+  bool _isGameStarted = false;
   final List<Map<String, String>> _participants = [];
 
   @override
@@ -58,8 +62,18 @@ class _GameRoomPageState extends State<GameRoomPage> {
   }
 
   void _setupSocketListeners() {
+    // 중복 등록 방지: SocketService는 싱글톤이라 off 없이 on을 반복하면 리스너가 누적되어
+    // 한 이벤트에 여러 번 setState가 발생(이전 widget instance 포함)하고 dispose 후 setState 오류로 이어진다.
+    _socketService.off('roomCreated');
+    _socketService.off('roomStateUpdated');
+    _socketService.off('gameStarted');
+    _socketService.off('createRoomResponse');
+    _socketService.off('joinRoomResponse');
+    _socketService.off('error');
+
     // 방 생성 응답 (메타데이터만 설정, 참가자 목록은 roomStateUpdated에서 관리)
     _socketService.on('roomCreated', (data) {
+      if (!mounted) return;
       setState(() {
         _roomId = data['roomId'];
         _isInRoom = true;
@@ -84,6 +98,9 @@ class _GameRoomPageState extends State<GameRoomPage> {
     // 게임 시작
     _socketService.on('gameStarted', (data) {
       if (!mounted) return;
+      // dispose에서 leaveRoom/off/disconnect가 호출되지 않도록 플래그 설정
+      // (이 방은 게임 중에도 서버에서 유지되어야 하고, 소켓 리스너는 다음 화면이 이어 받음)
+      _isGameStarted = true;
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -98,34 +115,31 @@ class _GameRoomPageState extends State<GameRoomPage> {
 
     // 방 생성/참가 응답 (에러 처리)
     _socketService.on('createRoomResponse', (data) {
+      if (!mounted) return;
       if (data['success'] == false) {
         setState(() => _isConnecting = false);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(data['data']?['message'] ?? data['message'] ?? '방 생성에 실패했습니다.')),
-          );
-        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(data['data']?['message'] ?? data['message'] ?? '방 생성에 실패했습니다.')),
+        );
       }
     });
 
     _socketService.on('joinRoomResponse', (data) {
+      if (!mounted) return;
       if (data['success'] == false) {
         setState(() => _isConnecting = false);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(data['data']?['message'] ?? data['message'] ?? '방 참가에 실패했습니다.')),
-          );
-        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(data['data']?['message'] ?? data['message'] ?? '방 참가에 실패했습니다.')),
+        );
       }
     });
 
     _socketService.on('error', (data) {
+      if (!mounted) return;
       setState(() => _isConnecting = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(data['message'] ?? '오류가 발생했습니다.')),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(data['message'] ?? '오류가 발생했습니다.')),
+      );
     });
   }
 
@@ -190,6 +204,15 @@ class _GameRoomPageState extends State<GameRoomPage> {
     _socketService.off('error');
     _socketService.disconnect();
 
+    // dispose에서 호출된 경우 setState 금지 (setState after dispose 에러 방지)
+    if (!mounted) {
+      _isInRoom = false;
+      _isHost = false;
+      _roomId = null;
+      _participants.clear();
+      return;
+    }
+
     setState(() {
       _isInRoom = false;
       _isHost = false;
@@ -201,7 +224,28 @@ class _GameRoomPageState extends State<GameRoomPage> {
   @override
   void dispose() {
     _roomCodeController.dispose();
-    if (_isInRoom) _leaveRoom();
+    if (_isGameStarted) {
+      // 게임 전환 중: 소켓과 roomStateUpdated 리스너는 FrameEntryPage가 이어받음.
+      // GameRoomPage가 등록한 자체 리스너만 선별 제거.
+      _socketService.off('roomCreated');
+      _socketService.off('gameStarted');
+      _socketService.off('createRoomResponse');
+      _socketService.off('joinRoomResponse');
+      _socketService.off('error');
+    } else if (_isInRoom) {
+      // 방 안에 있었다면 정상적으로 방 나가기 + 소켓 정리
+      _leaveRoom();
+    } else {
+      // 방에 들어가지 못한 상태 (연결 시도 후 실패 등)로 나갈 때도
+      // setup에서 등록한 리스너는 반드시 정리 (누락 시 setState after dispose 발생)
+      _socketService.off('roomCreated');
+      _socketService.off('roomStateUpdated');
+      _socketService.off('gameStarted');
+      _socketService.off('createRoomResponse');
+      _socketService.off('joinRoomResponse');
+      _socketService.off('error');
+      _socketService.disconnect();
+    }
     super.dispose();
   }
 

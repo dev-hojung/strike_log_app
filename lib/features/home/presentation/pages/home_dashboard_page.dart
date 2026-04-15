@@ -609,9 +609,14 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                             color: isDark ? Colors.white : Colors.black)),
-                    Text(DateFormat('MM월 dd일 a h:mm').format(game.playDate),
-                        style:
-                            const TextStyle(color: Colors.grey, fontSize: 12)),
+                    Text(
+                      // createdAt(시간 포함)이 있으면 시:분까지, 없으면 날짜만
+                      // (play_date는 MySQL DATE 컬럼이라 시간 정보가 없음)
+                      game.createdAt != null
+                          ? DateFormat('MM월 dd일 a h:mm').format(game.createdAt!)
+                          : DateFormat('MM월 dd일').format(game.playDate),
+                      style: const TextStyle(color: Colors.grey, fontSize: 12),
+                    ),
                   ],
                 ),
               ),

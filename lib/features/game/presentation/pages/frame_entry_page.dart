@@ -3,6 +3,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/socket_service.dart';
+import 'club_game_summary_page.dart';
 import 'game_summary_page.dart';
 
 /// 볼링 게임의 점수를 입력하는 페이지입니다.
@@ -44,11 +45,23 @@ class _FrameEntryPageState extends State<FrameEntryPage> {
   // 키패드 표시 여부
   bool _showKeypad = false;
 
+  // 실제 플레이 시작 시각 (저장 시 play_date로 사용해 저장 시각 왜곡 방지)
+  final DateTime _gameStartedAt = DateTime.now();
+
   // 클럽 게임: 소켓 서비스 및 다른 참가자 점수
   final SocketService _socketService = SocketService();
   String _userId = '';
   // 참가자별 총점 {userId: totalScore}
   final Map<String, int> _participantScores = {};
+  // 참가자별 통계 {userId: (strikes, spares, opens)} - 순위표 라이브 표시용
+  final Map<String, ({int strikes, int spares, int opens})> _participantStats = {};
+  // widget.participants를 방어적으로 deep copy하여 보관.
+  // (game_room_page의 원본 리스트가 라이프사이클 이벤트로 비워지더라도 영향받지 않도록)
+  late final List<Map<String, dynamic>> _participants = widget.participants == null
+      ? <Map<String, dynamic>>[]
+      : widget.participants!
+          .map((p) => Map<String, dynamic>.from(p))
+          .toList();
 
   @override
   void initState() {
@@ -63,13 +76,11 @@ class _FrameEntryPageState extends State<FrameEntryPage> {
     _userId = prefs.getString('user_id') ?? '';
 
     // 참가자 초기 점수 설정
-    if (widget.participants != null) {
-      for (final p in widget.participants!) {
-        _participantScores[p['userId'] ?? ''] = 0;
-      }
+    for (final p in _participants) {
+      _participantScores[p['userId']?.toString() ?? ''] = 0;
     }
 
-    // 방 상태 업데이트 수신 (점수 변경 포함)
+    // 방 상태 업데이트 수신 (점수/통계 변경 포함)
     _socketService.on('roomStateUpdated', (data) {
       if (!mounted) return;
       if (data['participants'] != null) {
@@ -78,28 +89,80 @@ class _FrameEntryPageState extends State<FrameEntryPage> {
           for (final userId in participants.keys) {
             if (userId == _userId) continue;
             final p = participants[userId];
-            _participantScores[userId] = p?['score'] ?? 0;
+            _participantScores[userId] = (p?['score'] as int?) ?? 0;
+            _participantStats[userId] = (
+              strikes: (p?['strikes'] as int?) ?? 0,
+              spares: (p?['spares'] as int?) ?? 0,
+              opens: (p?['opens'] as int?) ?? 0,
+            );
           }
         });
       }
     });
   }
 
+  /// 현재 프레임 데이터로 스트라이크/스페어/오픈 개수 계산
+  /// (_navigateToSummary와 _emitScoreUpdate에서 공유)
+  ({int strikes, int spares, int opens}) _computeStats() {
+    int strikes = 0;
+    int spares = 0;
+    int opens = 0;
+
+    for (int i = 0; i < 10; i++) {
+      final frame = _frames[i];
+      if (frame.isEmpty) continue;
+
+      if (i < 9) {
+        if (frame[0] == 10) {
+          strikes++;
+        } else if (frame.length >= 2 && frame[0] + frame[1] == 10) {
+          spares++;
+        } else if (frame.length >= 2) {
+          opens++;
+        }
+      } else {
+        // 10프레임 특수 처리
+        if (frame[0] == 10) strikes++;
+        if (frame.length >= 2) {
+          if (frame[0] != 10 && frame[0] + frame[1] == 10) spares++;
+          if (frame[0] == 10 && frame[1] == 10) strikes++;
+          if (frame[0] != 10 && frame[0] + frame[1] < 10) opens++;
+        }
+        if (frame.length >= 3) {
+          if (frame[2] == 10) strikes++;
+          if (frame[1] != 10 && frame[1] + frame[2] == 10) spares++;
+        }
+      }
+    }
+
+    return (strikes: strikes, spares: spares, opens: opens);
+  }
+
   @override
   void dispose() {
     if (widget.isClubGame) {
       _socketService.off('roomStateUpdated');
+      // 클럽 게임 생명주기 종료 시 서버의 방에서 나가고 소켓 연결을 정리.
+      // (ClubGameSummaryPage는 이미 dispose된 상태. popUntil의 마지막 단계)
+      if (widget.roomId != null && _userId.isNotEmpty) {
+        _socketService.leaveRoom(roomId: widget.roomId!, userId: _userId);
+      }
+      _socketService.disconnect();
     }
     super.dispose();
   }
 
-  /// 소켓으로 점수 업데이트 전송
+  /// 소켓으로 점수 + 통계 업데이트 전송
   void _emitScoreUpdate() {
     if (!widget.isClubGame || widget.roomId == null) return;
+    final stats = _computeStats();
     _socketService.sendScoreUpdate(
       roomId: widget.roomId!,
       userId: _userId,
       score: _totalScore,
+      strikes: stats.strikes,
+      spares: stats.spares,
+      opens: stats.opens,
     );
   }
 
@@ -372,51 +435,48 @@ class _FrameEntryPageState extends State<FrameEntryPage> {
   }
 
   void _navigateToSummary() {
-    int strikeCount = 0;
-    int spareCount = 0;
-    int openCount = 0;
+    final stats = _computeStats();
 
-    for (int i = 0; i < 10; i++) {
-      final frame = _frames[i];
-      if (frame.isEmpty) continue;
-      
-      if (i < 9) {
-        if (frame[0] == 10) {
-          strikeCount++;
-        } else if (frame.length >= 2 && frame[0] + frame[1] == 10) {
-          spareCount++;
-        } else if (frame.length >= 2) {
-          openCount++;
-        }
-      } else {
-        // 10th frame
-        if (frame[0] == 10) strikeCount++;
-        if (frame.length >= 2) {
-          if (frame[0] != 10 && frame[0] + frame[1] == 10) spareCount++;
-          if (frame[0] == 10 && frame[1] == 10) strikeCount++;
-          if (frame[0] != 10 && frame[0] + frame[1] < 10) openCount++;
-        }
-        if (frame.length >= 3) {
-          if (frame[2] == 10) strikeCount++;
-          if (frame[1] != 10 && frame[1] + frame[2] == 10) spareCount++;
-        }
-      }
-    }
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => GameSummaryPage(
-          frames: _frames,
-          cumulativeScores: _cumulativeScores,
-          totalScore: _totalScore,
-          strikeCount: strikeCount,
-          spareCount: spareCount,
-          openCount: openCount,
-          location: widget.location,
+    if (widget.isClubGame && _participants.isNotEmpty) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ClubGameSummaryPage(
+            frames: _frames,
+            cumulativeScores: _cumulativeScores,
+            totalScore: _totalScore,
+            strikeCount: stats.strikes,
+            spareCount: stats.spares,
+            openCount: stats.opens,
+            location: widget.location,
+            roomId: widget.roomId,
+            userId: _userId,
+            participants: _participants,
+            participantScores: Map<String, int>.from(_participantScores),
+            participantStats: Map<String, ({int strikes, int spares, int opens})>.from(
+              _participantStats,
+            ),
+            gameStartedAt: _gameStartedAt,
+          ),
         ),
-      ),
-    );
+      );
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => GameSummaryPage(
+            frames: _frames,
+            cumulativeScores: _cumulativeScores,
+            totalScore: _totalScore,
+            strikeCount: stats.strikes,
+            spareCount: stats.spares,
+            openCount: stats.opens,
+            location: widget.location,
+            gameStartedAt: _gameStartedAt,
+          ),
+        ),
+      );
+    }
   }
 
   /// 프레임 탭 시 해당 프레임으로 이동 (수정 모드)
@@ -640,8 +700,7 @@ class _FrameEntryPageState extends State<FrameEntryPage> {
               ),
             )
           else if (_showKeypad)
-            Flexible(
-              child: SafeArea(
+            SafeArea(
               top: false,
               child: Container(
                 padding: const EdgeInsets.fromLTRB(24, 16, 24, 4),
@@ -704,7 +763,6 @@ class _FrameEntryPageState extends State<FrameEntryPage> {
                   ],
                 ),
               ),
-            ),
             )
           else
             SafeArea(

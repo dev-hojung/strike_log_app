@@ -215,7 +215,11 @@ class _GameHistoryPageState extends State<GameHistoryPage> {
     }
 
     final diffText = diff >= 0 ? '+$diff AVG' : '$diff AVG';
-    final formattedDate = DateFormat('yyyy년 MM월 dd일').format(game.playDate);
+    // createdAt이 있으면 시:분까지, 없으면 기존처럼 날짜만 표시
+    // (play_date는 MySQL DATE 컬럼이라 시간 정보가 없음 → created_at 사용)
+    final formattedDate = game.createdAt != null
+        ? DateFormat('yyyy년 MM월 dd일 HH:mm').format(game.createdAt!)
+        : DateFormat('yyyy년 MM월 dd일').format(game.playDate);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 16),
