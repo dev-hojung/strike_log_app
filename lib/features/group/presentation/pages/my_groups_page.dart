@@ -5,6 +5,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/api_client.dart';
 import 'create_club_page.dart';
 import 'explore_clubs_page.dart';
+import 'member_stats_page.dart';
 
 /// 사용자가 소속된 클럽의 멤버 목록을 보여주는 페이지입니다.
 class MyGroupsPage extends StatefulWidget {
@@ -501,55 +502,55 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
               ),
             ),
             // 통계 버튼
-            _buildStatsButton(isMe),
+            _buildStatsButton(userId, nickname, isMe),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildStatsButton(bool isMe) {
-    if (isMe) {
-      return Container(
+  Widget _buildStatsButton(String userId, String nickname, bool isMe) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => MemberStatsPage(
+              userId: userId,
+              nickname: nickname,
+              isMe: isMe,
+            ),
+          ),
+        );
+      },
+      child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: AppColors.primary,
+          color: isMe
+              ? AppColors.primary
+              : AppColors.primary.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(8),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.primary.withValues(alpha: 0.2),
-              blurRadius: 15,
-              offset: const Offset(0, 10),
-              spreadRadius: -3,
-            ),
-          ],
+          border: isMe
+              ? null
+              : Border.all(color: AppColors.primary.withValues(alpha: 0.4)),
+          boxShadow: isMe
+              ? [
+                  BoxShadow(
+                    color: AppColors.primary.withValues(alpha: 0.2),
+                    blurRadius: 15,
+                    offset: const Offset(0, 10),
+                    spreadRadius: -3,
+                  ),
+                ]
+              : null,
         ),
-        child: const Text(
-          '통계',
+        child: Text(
+          isMe ? '통계' : '통계 보기',
           style: TextStyle(
-            color: Colors.white,
+            color: isMe ? Colors.white : AppColors.primary,
             fontSize: 12,
             fontWeight: FontWeight.w500,
           ),
-        ),
-      );
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: AppColors.primary.withValues(alpha: 0.4),
-        ),
-      ),
-      child: const Text(
-        '통계 보기',
-        style: TextStyle(
-          color: AppColors.primary,
-          fontSize: 12,
-          fontWeight: FontWeight.w500,
         ),
       ),
     );

@@ -118,6 +118,10 @@ class _GameSummaryPageState extends State<GameSummaryPage> {
         if (widget.location != null && widget.location!.isNotEmpty)
           'location': widget.location,
         'frames': mappedFrames,
+        // 실제 플레이 시작·종료 시각 (UTC ISO). 소요 시간 통계에 활용.
+        if (widget.gameStartedAt != null)
+          'started_at': widget.gameStartedAt!.toUtc().toIso8601String(),
+        'ended_at': DateTime.now().toUtc().toIso8601String(),
       };
 
       // 재시도 루프: 자동 재시도 3회까지, 최종 실패 시 사용자에게 재시도 기회 제공

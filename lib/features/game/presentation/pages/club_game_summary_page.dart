@@ -187,6 +187,10 @@ class _ClubGameSummaryPageState extends State<ClubGameSummaryPage> {
         'is_club_game': true,
         if (widget.roomId != null) 'room_id': widget.roomId,
         if (myRank > 0) 'club_rank': myRank,
+        // 실제 플레이 시작·종료 시각 (UTC ISO). 소요 시간 통계에 활용.
+        if (widget.gameStartedAt != null)
+          'started_at': widget.gameStartedAt!.toUtc().toIso8601String(),
+        'ended_at': DateTime.now().toUtc().toIso8601String(),
       };
 
       // 재시도 루프: GameSaveService 내부 3회 자동 재시도 후,

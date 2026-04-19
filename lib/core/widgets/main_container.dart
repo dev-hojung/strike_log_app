@@ -78,7 +78,7 @@ class _MainContainerState extends State<MainContainer> with RouteAware {
   }
 
   /// 저장 실패로 로컬에 보관된 드래프트들을 순차 재시도.
-  /// 성공한 건은 저장소에서 제거하고 총 성공 건수를 스낵바로 알림.
+  /// 성공한 건은 저장소에서 제거하고, 결과를 MaterialBanner로 안내.
   Future<void> _retryPendingDrafts() async {
     final drafts = await _draftRepo.getAllDrafts();
     if (drafts.isEmpty || !mounted) return;
@@ -94,23 +94,105 @@ class _MainContainerState extends State<MainContainer> with RouteAware {
     }
 
     if (!mounted) return;
+
     if (successCount > 0) {
-      // 자동 저장 후 대시보드 캐시도 갱신해 홈 통계에 즉시 반영
       HomeDashboardPage.invalidateCache();
       setState(() {
         _refreshKey = UniqueKey();
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            successCount == drafts.length
-                ? '미저장 경기 $successCount개를 자동 저장했습니다.'
-                : '미저장 경기 $successCount/${drafts.length}개를 저장했습니다. 나머지는 다음에 다시 시도합니다.',
-          ),
-          duration: const Duration(seconds: 3),
-        ),
-      );
     }
+
+    final failCount = drafts.length - successCount;
+    _showDraftResultBanner(
+      totalCount: drafts.length,
+      successCount: successCount,
+      failCount: failCount,
+    );
+  }
+
+  /// 드래프트 재시도 결과를 화면 상단 MaterialBanner로 표시.
+  /// - 전부 성공: 초록 체크 + "닫기"
+  /// - 부분 성공: 주황 경고 + "다시 시도" + "닫기"
+  /// - 전부 실패: 빨강 경고 + "다시 시도" + "닫기"
+  void _showDraftResultBanner({
+    required int totalCount,
+    required int successCount,
+    required int failCount,
+  }) {
+    if (totalCount == 0 || !mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.clearMaterialBanners();
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final String message;
+    final Color accentColor;
+    final IconData icon;
+    final bool showRetry;
+
+    if (failCount == 0) {
+      message = '미저장 경기 $successCount개를 자동 저장했습니다.';
+      accentColor = const Color(0xFF4CAF50);
+      icon = Symbols.check_circle;
+      showRetry = false;
+    } else if (successCount > 0) {
+      message = '미저장 경기 중 $successCount개 저장 완료, $failCount개 실패';
+      accentColor = Colors.orange;
+      icon = Symbols.warning;
+      showRetry = true;
+    } else {
+      message = '미저장 경기 $totalCount개 저장에 실패했습니다.';
+      accentColor = Colors.red;
+      icon = Symbols.cloud_off;
+      showRetry = true;
+    }
+
+    messenger.showMaterialBanner(
+      MaterialBanner(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
+        elevation: 2,
+        leading: Icon(icon, color: accentColor, size: 24),
+        content: Text(
+          message,
+          style: TextStyle(
+            color: isDark ? Colors.white : AppColors.textPrimaryLight,
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        actions: [
+          if (showRetry)
+            TextButton(
+              onPressed: () {
+                messenger.clearMaterialBanners();
+                _retryPendingDrafts();
+              },
+              child: const Text(
+                '다시 시도',
+                style: TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          TextButton(
+            onPressed: () => messenger.clearMaterialBanners(),
+            child: Text(
+              '닫기',
+              style: TextStyle(
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   /// 각 탭에 해당하는 페이지 위젯 리스트입니다.
