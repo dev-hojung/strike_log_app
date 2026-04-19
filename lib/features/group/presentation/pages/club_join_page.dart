@@ -48,21 +48,40 @@ class _ClubJoinPageState extends State<ClubJoinPage> {
         return;
       }
 
-      await ApiClient().dio.post('/groups/${widget.clubId}/join', data: {
-        'user_id': userId,
-      });
+      // 가입 신청 생성. 클럽장이 승인해야 실제 가입이 완료됩니다.
+      // 기대 엔드포인트: POST /groups/:clubId/join-requests
+      //   body: { user_id, message }
+      //   201 Created → 신청 생성 / 409 Conflict → 이미 신청/가입 상태
+      await ApiClient().dio.post(
+        '/groups/${widget.clubId}/join-requests',
+        data: {
+          'user_id': userId,
+          'message': _messageController.text.trim(),
+        },
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('클럽 가입이 완료되었습니다!')),
+          const SnackBar(
+            content: Text('가입 신청이 전송되었습니다. 클럽장의 승인을 기다려주세요.'),
+          ),
         );
         Navigator.pop(context, true);
       }
     } catch (e) {
       if (mounted) {
-        String message = '가입에 실패했습니다.';
-        if (e is DioException && e.response?.data != null) {
-          message = e.response?.data['message'] ?? message;
+        String message = '가입 신청에 실패했습니다.';
+        if (e is DioException) {
+          if (e.response?.statusCode == 409) {
+            message = '이미 신청했거나 가입된 클럽입니다.';
+          } else if (e.response?.data != null) {
+            final serverMessage = e.response?.data is Map
+                ? e.response?.data['message']
+                : null;
+            if (serverMessage is String && serverMessage.isNotEmpty) {
+              message = serverMessage;
+            }
+          }
         }
         _showError(message);
       }

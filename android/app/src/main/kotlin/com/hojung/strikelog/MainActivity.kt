@@ -1,4 +1,4 @@
-package com.stitch.flutter_bowling
+package com.hojung.strikelog
 
 import io.flutter.embedding.android.FlutterActivity
 

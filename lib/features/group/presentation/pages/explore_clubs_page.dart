@@ -245,7 +245,7 @@ class _ExploreClubsPageState extends State<ExploreClubsPage> {
               ),
             ),
             const SizedBox(width: 12),
-            // 가입하기 버튼
+            // 가입 신청 버튼
             GestureDetector(
               onTap: () => _navigateToJoin(club),
               child: Container(
@@ -255,7 +255,7 @@ class _ExploreClubsPageState extends State<ExploreClubsPage> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Text(
-                  '가입하기',
+                  '가입 신청',
                   style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
                 ),
               ),

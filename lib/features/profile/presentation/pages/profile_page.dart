@@ -4,6 +4,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/api_client.dart';
+import '../../../../core/services/fcm_service.dart';
 import '../../../auth/presentation/pages/login_page.dart';
 import 'account_settings_page.dart';
 
@@ -39,6 +40,10 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<void> _logout() async {
     final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString('user_id');
+    if (userId != null) {
+      await FcmService.instance.clearTokenOnServer(userId);
+    }
     await prefs.remove('user_id');
 
     if (mounted) {

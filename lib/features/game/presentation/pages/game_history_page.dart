@@ -108,12 +108,6 @@ class _GameHistoryPageState extends State<GameHistoryPage> {
           ),
         ),
         centerTitle: true,
-        actions: [
-          IconButton(
-            icon: Icon(Symbols.tune, color: isDark ? Colors.white : AppColors.textPrimaryLight),
-            onPressed: () {},
-          ),
-        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

@@ -1,5 +1,7 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'core/services/fcm_service.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/presentation/pages/login_page.dart';
 
@@ -19,6 +21,10 @@ void main() async {
 
   // 환경변수(.env) 로드
   await dotenv.load(fileName: ".env");
+
+  // Firebase 초기화 + FCM 준비 (Android: google-services.json 기반)
+  await Firebase.initializeApp();
+  await FcmService.instance.init();
 
   runApp(const BowlingApp());
 }

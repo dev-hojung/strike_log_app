@@ -3,6 +3,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/api_client.dart';
+import 'club_join_requests_page.dart';
 import 'create_club_page.dart';
 import 'explore_clubs_page.dart';
 import 'member_stats_page.dart';
@@ -35,6 +36,37 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  /// 현재 사용자가 클럽장인지 판별.
+  /// 백엔드 필드명이 환경마다 달라질 수 있어 알려진 후보들을 모두 확인.
+  bool _isClubLeader() {
+    final club = _club;
+    final userId = _currentUserId;
+    if (club == null || userId == null) return false;
+    for (final key in ['leader_id', 'owner_id', 'creator_id', 'created_by']) {
+      final value = club[key];
+      if (value != null && value.toString() == userId) return true;
+    }
+    return false;
+  }
+
+  Future<void> _openJoinRequests() async {
+    final club = _club;
+    if (club == null) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ClubJoinRequestsPage(
+          clubId: club['id'] is int
+              ? club['id']
+              : int.tryParse(club['id'].toString()) ?? 0,
+          clubName: club['name']?.toString() ?? '',
+        ),
+      ),
+    );
+    // 승인 처리 후 멤버 목록 새로고침
+    _fetchData();
   }
 
   Future<void> _fetchData() async {
@@ -163,9 +195,6 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 children: [
                   const SizedBox(height: 16),
-                  // 주변 게임 찾기 배너
-                  _buildFindGameBanner(),
-                  const SizedBox(height: 16),
                   // 멤버 검색
                   _buildSearchBar(isDark),
                   const SizedBox(height: 12),
@@ -241,62 +270,16 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
               ],
             ),
           ),
-          IconButton(
-            icon: Icon(
-              Symbols.settings,
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-              size: 20,
-            ),
-            onPressed: () {
-              // TODO: 클럽 설정 페이지
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFindGameBanner() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
-      decoration: BoxDecoration(
-        color: AppColors.primary,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.3),
-            blurRadius: 15,
-            offset: const Offset(0, 10),
-            spreadRadius: -3,
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 49,
-            height: 49,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(Symbols.sports_score, color: Colors.white, size: 20),
-          ),
-          const SizedBox(width: 16),
-          const Expanded(
-            child: Text(
-              '주변 게임 찾기',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.w500,
+          if (_isClubLeader())
+            IconButton(
+              icon: Icon(
+                Symbols.person_add,
+                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                size: 20,
               ),
+              tooltip: '가입 신청 관리',
+              onPressed: _openJoinRequests,
             ),
-          ),
-          Opacity(
-            opacity: 0.8,
-            child: const Icon(Symbols.chevron_right, color: Colors.white, size: 16),
-          ),
         ],
       ),
     );

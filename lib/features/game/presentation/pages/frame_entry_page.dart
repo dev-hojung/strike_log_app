@@ -573,10 +573,6 @@ class _FrameEntryPageState extends State<FrameEntryPage> {
                 Navigator.pop(context);
               },
             ),
-          IconButton(
-            icon: const Icon(Symbols.more_vert, color: Colors.white),
-            onPressed: () {},
-          ),
         ],
       ),
       body: Column(

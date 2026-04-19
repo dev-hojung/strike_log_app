@@ -5,6 +5,8 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../notifications/data/services/notifications_api_service.dart';
+import '../../../notifications/presentation/pages/notifications_page.dart';
 import '../../data/models/home_dashboard_data.dart';
 import '../../data/services/home_api_service.dart';
 
@@ -23,12 +25,14 @@ class HomeDashboardPage extends StatefulWidget {
 
 class _HomeDashboardPageState extends State<HomeDashboardPage> {
   final HomeApiService _apiService = HomeApiService();
+  final NotificationsApiService _notificationsApi = NotificationsApiService();
 
   /// 캐싱된 대시보드 데이터 (페이지 재생성 시에도 유지)
   static HomeDashboardData? _cachedData;
 
   HomeDashboardData? _data;
   bool _isLoading = true;
+  int _unreadNotificationCount = 0;
 
   @override
   void initState() {
@@ -36,6 +40,7 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
     _data = _cachedData;
     _isLoading = _cachedData == null;
     _fetchData();
+    _fetchUnreadNotifications();
   }
 
   Future<void> _fetchData() async {
@@ -49,6 +54,23 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
         _isLoading = false;
       });
     }
+  }
+
+  Future<void> _fetchUnreadNotifications() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString('user_id');
+    if (userId == null) return;
+    final count = await _notificationsApi.fetchUnreadCount(userId);
+    if (!mounted) return;
+    setState(() => _unreadNotificationCount = count);
+  }
+
+  Future<void> _openNotifications() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const NotificationsPage()),
+    );
+    _fetchUnreadNotifications();
   }
 
   @override
@@ -86,12 +108,6 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 16),
-            // 주변 게임 찾기 배너 (클럽 소속 유저에게만 노출)
-            if (data.hasGroup == true) ...[
-              _buildNearbyBanner(),
-              const SizedBox(height: 24),
-            ],
-
             Text('나의 에버리지',
                 style: TextStyle(
                   fontSize: 32,
@@ -145,12 +161,6 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
             if (data.recentGame != null)
               _buildLatestGame(context, isDark, data.recentGame!),
 
-            // 나의 클럽 섹션
-            if (data.clubs.isNotEmpty) ...[
-              const SizedBox(height: 24),
-              _buildMyClubs(isDark, data.clubs),
-            ],
-
             const SizedBox(height: 140), // 하단 여백 (네비게이션 + FAB 영역)
           ],
         ),
@@ -198,54 +208,50 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
       ),
       actions: [
         IconButton(
-          icon: Icon(Symbols.notifications,
-              color: isDark ? Colors.white : AppColors.textPrimaryLight,
-              size: 24),
-          onPressed: () {},
+          icon: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Icon(Symbols.notifications,
+                  color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                  size: 24),
+              if (_unreadNotificationCount > 0)
+                Positioned(
+                  right: -4,
+                  top: -2,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 4, vertical: 1),
+                    constraints: const BoxConstraints(
+                        minWidth: 16, minHeight: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.redAccent,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: isDark
+                            ? AppColors.backgroundDark
+                            : AppColors.backgroundLight,
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Text(
+                      _unreadNotificationCount > 99
+                          ? '99+'
+                          : '$_unreadNotificationCount',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          onPressed: _openNotifications,
         ),
         const SizedBox(width: 8),
       ],
-    );
-  }
-
-  Widget _buildNearbyBanner() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.primary,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.2),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          )
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Symbols.explore, color: Colors.white, size: 28),
-          ),
-          const SizedBox(width: 16),
-          const Text(
-            '주변 게임 찾기',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const Spacer(),
-          Icon(Symbols.chevron_right,
-              color: Colors.white.withValues(alpha: 0.5)),
-        ],
-      ),
     );
   }
 
@@ -655,101 +661,4 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
     );
   }
 
-  Widget _buildMyClubs(bool isDark, List<ClubInfo> clubs) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text('나의 클럽',
-                style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : Colors.black)),
-            Icon(Symbols.add, color: AppColors.primary, size: 20),
-          ],
-        ),
-        const SizedBox(height: 12),
-        ...clubs.map((club) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: isDark ? AppColors.surfaceDark : Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                      color: isDark ? Colors.white10 : Colors.black12),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: isDark
-                            ? const Color(0xFF32343E)
-                            : Colors.grey[200],
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: club.coverImageUrl != null
-                          ? ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: Image.network(club.coverImageUrl!,
-                                  fit: BoxFit.cover),
-                            )
-                          : Icon(Symbols.groups,
-                              color: AppColors.primary, size: 24),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            club.name,
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: isDark ? Colors.white : Colors.black,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Row(
-                            children: [
-                              Icon(Symbols.person,
-                                  color: Colors.grey, size: 14),
-                              const SizedBox(width: 4),
-                              Text(
-                                '${club.memberCount}명',
-                                style: const TextStyle(
-                                    color: Colors.grey, fontSize: 12),
-                              ),
-                              if (club.description != null &&
-                                  club.description!.isNotEmpty) ...[
-                                const SizedBox(width: 8),
-                                Flexible(
-                                  child: Text(
-                                    club.description!,
-                                    style: const TextStyle(
-                                        color: Colors.grey, fontSize: 12),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    Icon(Symbols.chevron_right,
-                        color: Colors.grey[600], size: 20),
-                  ],
-                ),
-              ),
-            )),
-      ],
-    );
-  }
 }

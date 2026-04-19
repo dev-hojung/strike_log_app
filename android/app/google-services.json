@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "482906166961",
+    "project_id": "strike-log-app",
+    "storage_bucket": "strike-log-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:482906166961:android:4e1e1cd283cebb41f6f490",
+        "android_client_info": {
+          "package_name": "com.hojung.strikelog"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB8-bcV-eAuJmEYyiw8y19r8PBIHz3geyQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
