@@ -3,6 +3,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/api_client.dart';
+import '../../data/services/group_creation_requests_service.dart';
 import 'club_join_requests_page.dart';
 import 'create_club_page.dart';
 import 'explore_clubs_page.dart';
@@ -20,10 +21,13 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
   Map<String, dynamic>? _club;
   List<dynamic> _members = [];
   List<dynamic> _filteredMembers = [];
+  List<Map<String, dynamic>> _pendingCreationRequests = [];
   String? _currentUserId;
   bool _isLoading = true;
   bool _sortByScore = true;
   final _searchController = TextEditingController();
+  final GroupCreationRequestsService _creationRequestsService =
+      GroupCreationRequestsService();
 
   @override
   void initState() {
@@ -79,11 +83,27 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
       }
       _currentUserId = userId;
 
-      final groupsResponse = await ApiClient().dio.get('/groups/me/$userId');
+      // 클럽 목록과 생성 신청 목록을 병렬 조회
+      final results = await Future.wait([
+        ApiClient().dio.get('/groups/me/$userId'),
+        _creationRequestsService.listMyRequests(userId),
+      ]);
+      final groupsResponse = results[0] as dynamic;
+      final myRequests = results[1] as List<Map<String, dynamic>>;
+
+      final pending = myRequests
+          .where((r) => (r['status']?.toString() ?? '') == 'pending')
+          .toList();
+
       final groups = groupsResponse.data is List ? groupsResponse.data : [];
 
       if (groups.isEmpty) {
-        if (mounted) setState(() => _isLoading = false);
+        if (mounted) {
+          setState(() {
+            _pendingCreationRequests = pending;
+            _isLoading = false;
+          });
+        }
         return;
       }
 
@@ -98,6 +118,7 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
           _club = club;
           _members = members;
           _filteredMembers = List.from(members);
+          _pendingCreationRequests = pending;
           _isLoading = false;
           _applySorting();
         });
@@ -105,6 +126,39 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _cancelCreationRequest(int requestId) async {
+    final userId = _currentUserId;
+    if (userId == null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('신청을 취소할까요?'),
+        content: const Text('취소 후에는 다시 신청해야 합니다.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('닫기'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('취소하기'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    final ok = await _creationRequestsService.cancel(
+      requestId: requestId,
+      userId: userId,
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(ok ? '신청을 취소했습니다.' : '취소에 실패했습니다.')),
+    );
+    if (ok) _fetchData();
   }
 
   void _filterMembers() {
@@ -171,8 +225,173 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _club == null
-              ? _buildEmptyState(isDark)
+              ? (_pendingCreationRequests.isNotEmpty
+                  ? _buildPendingView(isDark)
+                  : _buildEmptyState(isDark))
               : _buildClubContent(isDark),
+    );
+  }
+
+  /// 클럽 생성 신청 심사 중 전용 화면.
+  /// 가입된 클럽이 없고 pending 신청이 하나 이상 있을 때 노출.
+  Widget _buildPendingView(bool isDark) {
+    final textPrimary = isDark ? Colors.white : AppColors.textPrimaryLight;
+    final textSecondary =
+        isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final surface = isDark ? AppColors.surfaceDark : Colors.white;
+
+    return LayoutBuilder(
+      builder: (context, constraints) => RefreshIndicator(
+        onRefresh: _fetchData,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Padding(
+              padding:
+                  const EdgeInsets.fromLTRB(20, 24, 20, 160),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 120,
+                      height: 120,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                      ),
+                      child: const Icon(
+                        Symbols.hourglass_top,
+                        size: 56,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    '클럽 생성 승인 대기 중',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '관리자 승인 후 클럽이 생성됩니다.\n결과는 알림으로 알려드려요.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      height: 1.5,
+                      color: textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  ..._pendingCreationRequests.map((req) => _buildPendingCard(
+                        req,
+                        surface: surface,
+                        textPrimary: textPrimary,
+                        textSecondary: textSecondary,
+                      )),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPendingCard(
+    Map<String, dynamic> req, {
+    required Color surface,
+    required Color textPrimary,
+    required Color textSecondary,
+  }) {
+    final name = req['name']?.toString() ?? '';
+    final description = req['description']?.toString();
+    final createdAtRaw = req['created_at']?.toString();
+    final createdAt = createdAtRaw != null && createdAtRaw.isNotEmpty
+        ? DateTime.tryParse(createdAtRaw)
+        : null;
+    final createdLabel = createdAt == null
+        ? ''
+        : '${createdAt.year}-${createdAt.month.toString().padLeft(2, '0')}-${createdAt.day.toString().padLeft(2, '0')}';
+    final id = req['id'] is int
+        ? req['id'] as int
+        : int.tryParse(req['id']?.toString() ?? '') ?? 0;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: const Text(
+                  '심사 중',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              if (createdLabel.isNotEmpty)
+                Text(
+                  createdLabel,
+                  style: TextStyle(fontSize: 12, color: textSecondary),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            name,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: textPrimary,
+            ),
+          ),
+          if (description != null && description.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              description,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 13, color: textSecondary, height: 1.5),
+            ),
+          ],
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: id == 0 ? null : () => _cancelCreationRequest(id),
+              icon: Icon(Symbols.close, size: 18, color: textSecondary),
+              label: Text(
+                '신청 취소',
+                style: TextStyle(color: textSecondary),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -540,12 +759,18 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
   }
 
   Widget _buildEmptyState(bool isDark) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.only(left: 24, right: 24, bottom: 100),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.only(left: 24, right: 24, top: 24, bottom: 160),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
             Container(
               width: 200,
               height: 200,
@@ -634,7 +859,10 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
                 ),
               ),
             ),
-          ],
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );

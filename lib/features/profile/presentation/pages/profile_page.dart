@@ -6,6 +6,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/api_client.dart';
 import '../../../../core/services/fcm_service.dart';
 import '../../../auth/presentation/pages/login_page.dart';
+import '../../../group/presentation/pages/admin_creation_requests_page.dart';
 import 'account_settings_page.dart';
 
 /// 프로필 화면을 나타내는 페이지입니다.
@@ -197,9 +198,47 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Widget _buildSettingsList(
       Color surfaceColor, Color textColor, Color secondaryTextColor, Color borderColor) {
+    final isAdmin = _profile?['is_platform_admin'] == true;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (isAdmin) ...[
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 8),
+            child: Text(
+              '관리자 도구',
+              style: TextStyle(
+                color: secondaryTextColor,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Container(
+            decoration: BoxDecoration(
+              color: surfaceColor,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: borderColor),
+            ),
+            child: _buildSettingsTile(
+              '클럽 생성 신청 관리',
+              Symbols.admin_panel_settings,
+              textColor,
+              secondaryTextColor,
+              borderColor,
+              isLast: true,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const AdminCreationRequestsPage(),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
         Container(
           decoration: BoxDecoration(
             color: surfaceColor,

@@ -257,14 +257,18 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
 
   /// 데이터가 없을 때 표시되는 빈 화면
   Widget _buildEmptyState(bool isDark) {
-    return SingleChildScrollView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.only(left: 24, right: 24, top: 80, bottom: 100),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.only(left: 24, right: 24, top: 40, bottom: 100),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
               Container(
                 width: 100,
                 height: 100,
@@ -311,7 +315,9 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
                   height: 1.5,
                 ),
               ),
-            ],
+                ],
+              ),
+            ),
           ),
         ),
       ),

@@ -4,7 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
-import '../../../../core/services/api_client.dart';
+import '../../data/services/group_creation_requests_service.dart';
 
 /// 새로운 클럽(그룹)을 생성하는 페이지입니다.
 class CreateClubPage extends StatefulWidget {
@@ -75,23 +75,45 @@ class _CreateClubPageState extends State<CreateClubPage> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final userId = prefs.getString('user_id');
-
-      await ApiClient().dio.post('/groups', data: {
-        'name': _nameController.text.trim(),
-        'description': _descController.text.trim(),
-        'user_id': userId,
-      });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('클럽이 성공적으로 생성되었습니다.')),
-        );
-        Navigator.pop(context);
+      if (userId == null) {
+        throw StateError('로그인이 필요합니다.');
       }
+
+      final result = await GroupCreationRequestsService().createRequest(
+        userId: userId,
+        name: _nameController.text.trim(),
+        description: _descController.text.trim(),
+      );
+
+      if (!mounted) return;
+
+      if (result == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('이미 심사 중인 신청이 있거나 요청이 실패했습니다.')),
+        );
+        return;
+      }
+
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('신청이 접수되었습니다'),
+          content: const Text(
+            '관리자 승인 후 클럽이 생성됩니다.\n승인 결과는 알림으로 받아보실 수 있어요.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('확인'),
+            ),
+          ],
+        ),
+      );
+      if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('클럽 생성에 실패했습니다. 다시 시도해주세요.')),
+          const SnackBar(content: Text('클럽 생성 신청에 실패했습니다. 다시 시도해주세요.')),
         );
       }
     } finally {
@@ -201,7 +223,7 @@ class _CreateClubPageState extends State<CreateClubPage> {
                           child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                         )
                       : const Text(
-                          '생성하기',
+                          '생성 신청하기',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 16,

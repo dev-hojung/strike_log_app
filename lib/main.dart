@@ -15,6 +15,10 @@ import 'features/auth/presentation/pages/login_page.dart';
 final RouteObserver<PageRoute<dynamic>> appRouteObserver =
     RouteObserver<PageRoute<dynamic>>();
 
+/// 전역 Navigator 키.
+/// context 없이 푸시 알림 탭 이벤트에서 라우팅하기 위해 사용.
+final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
+
 void main() async {
   // Flutter 엔진 초기화 보장 (비동기 처리 시 필수)
   WidgetsFlutterBinding.ensureInitialized();
@@ -45,6 +49,7 @@ class BowlingApp extends StatelessWidget {
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.dark,
       home: const LoginPage(),
+      navigatorKey: appNavigatorKey,
       navigatorObservers: [appRouteObserver],
     );
   }
