@@ -30,9 +30,16 @@ void main() async {
   // 프로필 캐시를 메모리로 미리 로드 (페이지 initState에서 동기 접근)
   await UserProfileCache.init();
 
-  // Firebase 초기화 + FCM 준비 (Android: google-services.json 기반)
-  await Firebase.initializeApp();
-  await FcmService.instance.init();
+  // Firebase 초기화 + FCM 준비.
+  // iOS는 GoogleService-Info.plist, Android는 google-services.json이 있어야 동작.
+  // 구성 파일이 없는 플랫폼(예: iOS 시뮬레이터 임시 구동)에서는 조용히 건너뛴다.
+  try {
+    await Firebase.initializeApp();
+    await FcmService.instance.init();
+  } catch (e, st) {
+    debugPrint('[Firebase] init skipped: $e');
+    debugPrintStack(stackTrace: st, label: 'Firebase init');
+  }
 
   runApp(const BowlingApp());
 }

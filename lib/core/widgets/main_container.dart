@@ -19,7 +19,8 @@ import '../services/api_client.dart';
 /// [BottomAppBar]를 사용하여 하단 탭 내비게이션을 제공하며,
 /// 중앙의 [FloatingActionButton]을 통해 게임 점수 입력 화면으로 이동할 수 있습니다.
 class MainContainer extends StatefulWidget {
-  const MainContainer({super.key});
+  final int initialTabIndex;
+  const MainContainer({super.key, this.initialTabIndex = 0});
 
   @override
   State<MainContainer> createState() => _MainContainerState();
@@ -27,7 +28,7 @@ class MainContainer extends StatefulWidget {
 
 class _MainContainerState extends State<MainContainer> with RouteAware {
   /// 현재 선택된 탭의 인덱스입니다.
-  int _selectedIndex = 0;
+  late int _selectedIndex = widget.initialTabIndex;
   bool _isCheckingClub = false;
 
   /// 페이지 갱신을 위한 키 (값이 바뀌면 페이지가 재생성됨)

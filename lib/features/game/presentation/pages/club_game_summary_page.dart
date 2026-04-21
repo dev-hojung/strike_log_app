@@ -208,6 +208,14 @@ class _ClubGameSummaryPageState extends State<ClubGameSummaryPage> {
           return;
         }
 
+        // 체험판 만료는 재시도/드래프트 무의미 → 전용 모달 후 복귀
+        if (result.errorType == GameSaveErrorType.trialExpired) {
+          await _showTrialExpiredDialog(result.errorMessage);
+          if (!mounted) return;
+          Navigator.of(context).popUntil((route) => route.isFirst);
+          return;
+        }
+
         final shouldRetry = await _showFailureSheet(
           result.errorMessage ?? '저장에 실패했습니다.',
           showRetry: true,
@@ -233,6 +241,26 @@ class _ClubGameSummaryPageState extends State<ClubGameSummaryPage> {
         setState(() => _isSaving = false);
       }
     }
+  }
+
+  /// 체험판 만료 전용 안내 다이얼로그. 드래프트 저장/재시도 없이 홈으로 복귀시킨다.
+  Future<void> _showTrialExpiredDialog(String? message) {
+    return showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('체험판이 만료되었습니다'),
+        content: Text(
+          message ??
+              '클럽 체험판이 만료되어 새 클럽 게임을 저장할 수 없습니다.\n관리자 문의 후 다시 시도해주세요.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('확인'),
+          ),
+        ],
+      ),
+    );
   }
 
   /// 저장 실패 시트. [showRetry]면 "다시 시도" 버튼 포함.

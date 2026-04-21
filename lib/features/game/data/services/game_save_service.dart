@@ -15,6 +15,9 @@ enum GameSaveErrorType {
   /// 인증 실패 (401/403)
   unauthorized,
 
+  /// 클럽 체험판 만료 (410 Gone) — 클럽 게임 생성 불가
+  trialExpired,
+
   /// 기타 4xx (클라이언트 요청 문제)
   client,
 
@@ -101,6 +104,15 @@ class GameSaveService {
     return lastFailure;
   }
 
+  String? _extractServerMessage(dynamic data) {
+    if (data is Map) {
+      final msg = data['message'];
+      if (msg is String && msg.isNotEmpty) return msg;
+      if (msg is List && msg.isNotEmpty) return msg.join(', ');
+    }
+    return null;
+  }
+
   GameSaveResult _classify(DioException e) {
     final status = e.response?.statusCode;
     switch (e.type) {
@@ -121,6 +133,15 @@ class GameSaveService {
           return GameSaveResult.failure(
             errorType: GameSaveErrorType.unauthorized,
             errorMessage: '인증이 만료되었습니다. 다시 로그인 후 시도해주세요.',
+            statusCode: status,
+          );
+        }
+        if (status == 410) {
+          final serverMessage = _extractServerMessage(e.response?.data);
+          return GameSaveResult.failure(
+            errorType: GameSaveErrorType.trialExpired,
+            errorMessage:
+                serverMessage ?? '클럽 체험판이 만료되어 게임을 생성할 수 없습니다.',
             statusCode: status,
           );
         }
