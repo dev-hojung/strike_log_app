@@ -3,6 +3,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/api_client.dart';
+import '../../../../core/services/user_profile_cache.dart';
 import 'edit_nickname_page.dart';
 import 'change_password_page.dart';
 
@@ -20,6 +21,7 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
   @override
   void initState() {
     super.initState();
+    _profile = UserProfileCache.cached;
     _fetchProfile();
   }
 
@@ -30,8 +32,13 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
       if (userId == null) return;
 
       final response = await ApiClient().dio.get('/users/$userId');
-      if (mounted) {
-        setState(() => _profile = response.data);
+      final data = response.data;
+      if (data is Map) {
+        final profile = Map<String, dynamic>.from(data);
+        await UserProfileCache.save(profile);
+        if (mounted) {
+          setState(() => _profile = profile);
+        }
       }
     } catch (_) {}
   }

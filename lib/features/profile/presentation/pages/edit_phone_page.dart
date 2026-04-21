@@ -4,6 +4,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/api_client.dart';
+import '../../../../core/services/user_profile_cache.dart';
 
 /// 전화번호 변경 페이지
 class EditPhonePage extends StatefulWidget {
@@ -89,6 +90,7 @@ class _EditPhonePageState extends State<EditPhonePage> {
       await ApiClient().dio.patch('/users/$userId', data: {
         'phone': _phoneController.text.trim(),
       });
+      await UserProfileCache.refresh();
 
       if (mounted) {
         setState(() => _isLoading = false);

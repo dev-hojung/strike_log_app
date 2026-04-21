@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/api_client.dart';
 import '../../../../core/services/fcm_service.dart';
+import '../../../../core/services/user_profile_cache.dart';
 import '../../../auth/presentation/pages/login_page.dart';
 import '../../../group/presentation/pages/admin_creation_requests_page.dart';
 import 'account_settings_page.dart';
@@ -23,6 +24,9 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   void initState() {
     super.initState();
+    // 메모리 캐시에서 동기 즉시 로드 → 첫 build부터 값 표시
+    _profile = UserProfileCache.cached;
+    // 백그라운드에서 최신화
     _fetchProfile();
   }
 
@@ -33,8 +37,13 @@ class _ProfilePageState extends State<ProfilePage> {
       if (userId == null) return;
 
       final response = await ApiClient().dio.get('/users/$userId');
-      if (mounted) {
-        setState(() => _profile = response.data);
+      final data = response.data;
+      if (data is Map) {
+        final profile = Map<String, dynamic>.from(data);
+        await UserProfileCache.save(profile);
+        if (mounted) {
+          setState(() => _profile = profile);
+        }
       }
     } catch (_) {}
   }
@@ -46,6 +55,7 @@ class _ProfilePageState extends State<ProfilePage> {
       await FcmService.instance.clearTokenOnServer(userId);
     }
     await prefs.remove('user_id');
+    await UserProfileCache.clear();
 
     if (mounted) {
       Navigator.pushAndRemoveUntil(

@@ -8,6 +8,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/widgets/main_container.dart';
 import '../../../../core/services/api_client.dart';
 import '../../../../core/services/fcm_service.dart';
+import '../../../../core/services/user_profile_cache.dart';
 import 'signup_page.dart';
 
 /// 앱의 로그인 화면을 담당하는 페이지입니다.
@@ -35,6 +36,18 @@ class _LoginPageState extends State<LoginPage> {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  /// 로그인 직후 프로필을 가져와 로컬 캐시에 저장.
+  /// 네트워크 실패해도 로그인 흐름을 방해하지 않도록 조용히 흡수.
+  Future<void> _prefetchProfile(String userId) async {
+    try {
+      final res = await ApiClient().dio.get('/users/$userId');
+      final data = res.data;
+      if (data is Map) {
+        await UserProfileCache.save(Map<String, dynamic>.from(data));
+      }
+    } catch (_) {}
   }
 
   /// 이메일/비밀번호 로그인 API 호출
@@ -73,6 +86,8 @@ class _LoginPageState extends State<LoginPage> {
           }
           // FCM 토큰 서버 등록 (실패해도 로그인 흐름은 계속)
           unawaited(FcmService.instance.syncTokenToServer(userId.toString()));
+          // 프로필 프리페치 — is_platform_admin 포함. 첫 프로필 탭 진입 시 즉시 렌더.
+          unawaited(_prefetchProfile(userId.toString()));
         }
 
         if (mounted) {

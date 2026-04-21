@@ -3,6 +3,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/api_client.dart';
+import '../../../../core/services/user_profile_cache.dart';
 
 /// 닉네임 변경 페이지
 class EditNicknamePage extends StatefulWidget {
@@ -42,6 +43,7 @@ class _EditNicknamePageState extends State<EditNicknamePage> {
       if (userId == null) return;
 
       await ApiClient().dio.patch('/users/$userId', data: {'nickname': newNickname});
+      await UserProfileCache.refresh();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

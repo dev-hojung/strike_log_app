@@ -414,6 +414,11 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 children: [
                   const SizedBox(height: 16),
+                  // 체험판 상태 배너
+                  if (_buildTrialBanner(isDark) != null) ...[
+                    _buildTrialBanner(isDark)!,
+                    const SizedBox(height: 12),
+                  ],
                   // 멤버 검색
                   _buildSearchBar(isDark),
                   const SizedBox(height: 12),
@@ -428,6 +433,92 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
                   const SizedBox(height: 100),
                 ],
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 체험판/만료 상태 배너. active(정식)면 null 반환해 표시하지 않음.
+  Widget? _buildTrialBanner(bool isDark) {
+    final status = _club?['subscription_status']?.toString();
+    if (status == null || status == 'active') return null;
+
+    final expiresRaw = _club?['trial_expires_at']?.toString();
+    final expires = expiresRaw != null && expiresRaw.isNotEmpty
+        ? DateTime.tryParse(expiresRaw)
+        : null;
+
+    if (status == 'expired') {
+      return _trialBannerCard(
+        isDark: isDark,
+        icon: Symbols.lock_clock,
+        accent: Colors.redAccent,
+        title: '체험판이 만료되었습니다',
+        subtitle: '일부 기능(새 게임 생성 등)이 제한됩니다.',
+      );
+    }
+
+    // trial
+    int daysRemaining = 0;
+    if (expires != null) {
+      final diff = expires.difference(DateTime.now());
+      daysRemaining = diff.inDays;
+      if (daysRemaining <= 0 && diff.inSeconds > 0) daysRemaining = 1;
+    }
+
+    return _trialBannerCard(
+      isDark: isDark,
+      icon: Symbols.hourglass_top,
+      accent: AppColors.primary,
+      title: '체험판 이용 중',
+      subtitle: daysRemaining > 0
+          ? '$daysRemaining일 남았습니다.'
+          : '곧 만료됩니다.',
+    );
+  }
+
+  Widget _trialBannerCard({
+    required bool isDark,
+    required IconData icon,
+    required Color accent,
+    required String title,
+    required String subtitle,
+  }) {
+    final bg = accent.withValues(alpha: 0.12);
+    final textColor = isDark ? Colors.white : AppColors.textPrimaryLight;
+    final subColor =
+        isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: accent.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: accent, size: 22),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: textColor,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: TextStyle(color: subColor, fontSize: 12),
+                ),
+              ],
             ),
           ),
         ],
