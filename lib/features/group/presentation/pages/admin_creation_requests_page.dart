@@ -367,7 +367,7 @@ class _RejectReasonSheetState extends State<_RejectReasonSheet> {
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -385,6 +385,8 @@ class _RejectReasonSheetState extends State<_RejectReasonSheet> {
                   value: r.$1,
                   groupValue: _selected,
                   title: Text(r.$2),
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
                   onChanged: (v) => setState(() => _selected = v!),
                 )),
             const SizedBox(height: 8),

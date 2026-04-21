@@ -5,8 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/api_client.dart';
 import '../../../../core/services/app_logger.dart';
-import '../../../../core/services/auth_token_storage.dart';
 import '../../../../core/services/fcm_service.dart';
+import '../../../../core/services/session_manager.dart';
 import '../../../../core/services/user_profile_cache.dart';
 import '../../../auth/presentation/pages/login_page.dart';
 import '../../../group/presentation/pages/admin_creation_requests_page.dart';
@@ -65,9 +65,8 @@ class _ProfilePageState extends State<ProfilePage> {
     if (userId != null) {
       await FcmService.instance.clearTokenOnServer(userId);
     }
-    await prefs.remove('user_id');
-    await UserProfileCache.clear();
-    await AuthTokenStorage.clear();
+    // 세션 관련 모든 로컬 상태를 일괄 정리 (대시보드 static 캐시 포함)
+    await SessionManager.clearAll();
 
     if (mounted) {
       Navigator.pushAndRemoveUntil(

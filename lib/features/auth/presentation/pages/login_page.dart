@@ -10,6 +10,7 @@ import '../../../../core/services/api_client.dart';
 import '../../../../core/services/app_logger.dart';
 import '../../../../core/services/auth_token_storage.dart';
 import '../../../../core/services/fcm_service.dart';
+import '../../../../core/services/session_manager.dart';
 import '../../../../core/services/unread_notifications_service.dart';
 import '../../../../core/services/user_profile_cache.dart';
 import 'signup_page.dart';
@@ -73,6 +74,9 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     try {
+      // 이전 세션 잔여물 제거 (static 캐시·토큰·프로필)
+      await SessionManager.clearAll();
+
       final dio = ApiClient().dio;
       final response = await dio.post('/users/login', data: {
         'email': email,
@@ -81,12 +85,16 @@ class _LoginPageState extends State<LoginPage> {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         // 응답 스키마: { access_token, user: { id, email, nickname, ... } }
-        // 레거시 호환: 구 서버는 user 객체를 루트에 바로 돌려준다.
-        final data = response.data as Map<String, dynamic>;
+        // 서버 재시작/구버전 등으로 Map이 아닌 응답이 오면 실패로 간주.
+        final raw = response.data;
+        if (raw is! Map) {
+          throw Exception('예상치 못한 응답 형식입니다. 서버를 확인해주세요.');
+        }
+        final data = Map<String, dynamic>.from(raw);
         final accessToken = data['access_token'] as String?;
         final userMap = data['user'] is Map
             ? Map<String, dynamic>.from(data['user'] as Map)
-            : data; // fallback
+            : data; // 레거시 호환: user 객체를 루트에 바로 돌려주는 경우
 
         final userId = userMap['id'];
         final nickname = userMap['nickname'];
@@ -119,8 +127,11 @@ class _LoginPageState extends State<LoginPage> {
     } catch (e) {
       if (mounted) {
         String errorMessage = '로그인에 실패했습니다. 이메일 또는 비밀번호를 확인해주세요.';
-        if (e is DioException && e.response?.data != null) {
-           errorMessage = e.response?.data['message'] ?? errorMessage;
+        if (e is DioException) {
+          final data = e.response?.data;
+          if (data is Map && data['message'] is String) {
+            errorMessage = data['message'] as String;
+          }
         }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(errorMessage)),

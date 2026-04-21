@@ -6,7 +6,7 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 import 'core/services/api_client.dart';
 import 'core/services/auth_token_storage.dart';
 import 'core/services/fcm_service.dart';
-import 'core/services/unread_notifications_service.dart';
+import 'core/services/session_manager.dart';
 import 'core/services/user_profile_cache.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/presentation/pages/login_page.dart';
@@ -39,9 +39,7 @@ void main() async {
 
   // 401 수신 시 강제 로그아웃 후 로그인 화면으로 이동
   ApiClient.onUnauthorized = () async {
-    await AuthTokenStorage.clear();
-    await UserProfileCache.clear();
-    UnreadNotificationsService.instance.reset();
+    await SessionManager.clearAll();
     final nav = appNavigatorKey.currentState;
     nav?.pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const LoginPage()),
