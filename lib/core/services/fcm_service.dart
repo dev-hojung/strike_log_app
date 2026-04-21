@@ -13,6 +13,7 @@ import '../../features/notifications/data/services/notifications_api_service.dar
 import '../../features/notifications/presentation/pages/notifications_page.dart';
 import '../../main.dart' show appNavigatorKey;
 import '../widgets/main_container.dart';
+import 'app_logger.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseBackgroundHandler(RemoteMessage message) async {
@@ -106,7 +107,12 @@ class FcmService {
         try {
           final data = Map<String, dynamic>.from(jsonDecode(payload));
           _routeByData(data.map((k, v) => MapEntry(k, v?.toString() ?? '')));
-        } catch (_) {}
+        } catch (e, st) {
+          AppLogger.captureError(e,
+              stackTrace: st,
+              context: 'fcm.localNotification.parsePayload',
+              extra: {'payload': payload});
+        }
       },
     );
 

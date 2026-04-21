@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../../core/services/app_logger.dart';
 
 /// 네트워크 실패로 저장되지 못한 게임 payload를 로컬에 보관하는 저장소.
 ///
@@ -18,9 +19,19 @@ class GameDraftRepository {
           .whereType<Map<String, dynamic>>()
           .map((e) => GameDraft.fromJson(e))
           .toList();
-    } catch (_) {
-      // JSON 손상 시 안전하게 초기화
+    } catch (e, st) {
+      // JSON 손상 시: 덮어쓰기 대신 백업 키로 옮겨 원본 보존.
+      // 이후 사용자/개발자가 직접 복구할 수 있도록.
+      final backupKey =
+          '${_key}__corrupt_${DateTime.now().millisecondsSinceEpoch}';
+      await prefs.setString(backupKey, raw);
       await prefs.remove(_key);
+      AppLogger.captureError(
+        e,
+        stackTrace: st,
+        context: 'gameDraftRepository.parseCorrupt',
+        extra: {'backupKey': backupKey, 'rawLength': raw.length},
+      );
       return [];
     }
   }

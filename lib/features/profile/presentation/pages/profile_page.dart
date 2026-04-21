@@ -4,6 +4,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/api_client.dart';
+import '../../../../core/services/app_logger.dart';
 import '../../../../core/services/fcm_service.dart';
 import '../../../../core/services/user_profile_cache.dart';
 import '../../../auth/presentation/pages/login_page.dart';
@@ -20,6 +21,7 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   Map<String, dynamic>? _profile;
+  bool _fetchFailed = false;
 
   @override
   void initState() {
@@ -42,10 +44,18 @@ class _ProfilePageState extends State<ProfilePage> {
         final profile = Map<String, dynamic>.from(data);
         await UserProfileCache.save(profile);
         if (mounted) {
-          setState(() => _profile = profile);
+          setState(() {
+            _profile = profile;
+            _fetchFailed = false;
+          });
         }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.captureError(e, stackTrace: st, context: 'profile.fetch');
+      if (mounted && _profile == null) {
+        setState(() => _fetchFailed = true);
+      }
+    }
   }
 
   Future<void> _logout() async {
@@ -102,26 +112,66 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
         ),
       ),
-      body: SingleChildScrollView(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 448),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _buildProfileSection(
-                    nickname, email, profileImageUrl, createdAt,
-                    textColor, secondaryTextColor, surfaceColor,
+      body: _fetchFailed && _profile == null
+          ? _buildErrorRetry(textColor, secondaryTextColor)
+          : SingleChildScrollView(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 448),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _buildProfileSection(
+                          nickname, email, profileImageUrl, createdAt,
+                          textColor, secondaryTextColor, surfaceColor,
+                        ),
+                        const SizedBox(height: 32),
+                        _buildSettingsList(surfaceColor, textColor, secondaryTextColor, borderColor),
+                        const SizedBox(height: 100),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 32),
-                  _buildSettingsList(surfaceColor, textColor, secondaryTextColor, borderColor),
-                  const SizedBox(height: 100),
-                ],
+                ),
               ),
             ),
-          ),
+    );
+  }
+
+  /// 프로필 로드 실패 + 캐시 없을 때의 빈 상태.
+  Widget _buildErrorRetry(Color textColor, Color secondaryColor) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Symbols.cloud_off, size: 64, color: secondaryColor),
+            const SizedBox(height: 16),
+            Text(
+              '프로필을 불러오지 못했습니다',
+              style: TextStyle(
+                color: textColor,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '네트워크 상태를 확인한 뒤 다시 시도해주세요.',
+              style: TextStyle(color: secondaryColor, fontSize: 13),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: () {
+                setState(() => _fetchFailed = false);
+                _fetchProfile();
+              },
+              icon: const Icon(Symbols.refresh),
+              label: const Text('다시 시도'),
+            ),
+          ],
         ),
       ),
     );

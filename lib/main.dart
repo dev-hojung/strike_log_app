@@ -1,6 +1,8 @@
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'core/services/fcm_service.dart';
 import 'core/services/user_profile_cache.dart';
 import 'core/theme/app_theme.dart';
@@ -30,18 +32,34 @@ void main() async {
   // 프로필 캐시를 메모리로 미리 로드 (페이지 initState에서 동기 접근)
   await UserProfileCache.init();
 
-  // Firebase 초기화 + FCM 준비.
-  // iOS는 GoogleService-Info.plist, Android는 google-services.json이 있어야 동작.
-  // 구성 파일이 없는 플랫폼(예: iOS 시뮬레이터 임시 구동)에서는 조용히 건너뛴다.
-  try {
-    await Firebase.initializeApp();
-    await FcmService.instance.init();
-  } catch (e, st) {
-    debugPrint('[Firebase] init skipped: $e');
-    debugPrintStack(stackTrace: st, label: 'Firebase init');
+  final sentryDsn = dotenv.env['SENTRY_DSN'];
+  Future<void> runAppWithSentry() async {
+    // Firebase 초기화 + FCM 준비.
+    // iOS는 GoogleService-Info.plist, Android는 google-services.json이 있어야 동작.
+    // 구성 파일이 없는 플랫폼(예: iOS 시뮬레이터 임시 구동)에서는 조용히 건너뛴다.
+    try {
+      await Firebase.initializeApp();
+      await FcmService.instance.init();
+    } catch (e, st) {
+      debugPrint('[Firebase] init skipped: $e');
+      debugPrintStack(stackTrace: st, label: 'Firebase init');
+    }
+    runApp(const BowlingApp());
   }
 
-  runApp(const BowlingApp());
+  if (sentryDsn != null && sentryDsn.isNotEmpty) {
+    await SentryFlutter.init(
+      (options) {
+        options.dsn = sentryDsn;
+        // 개발 환경은 전송 비율 낮추고, 릴리즈에서 풀로 수집.
+        options.tracesSampleRate = kReleaseMode ? 1.0 : 0.2;
+        options.environment = kReleaseMode ? 'production' : 'development';
+      },
+      appRunner: runAppWithSentry,
+    );
+  } else {
+    await runAppWithSentry();
+  }
 }
 
 /// 플러터 볼링 앱의 진입점입니다.

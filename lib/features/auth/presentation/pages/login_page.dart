@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/widgets/main_container.dart';
 import '../../../../core/services/api_client.dart';
+import '../../../../core/services/app_logger.dart';
 import '../../../../core/services/fcm_service.dart';
 import '../../../../core/services/user_profile_cache.dart';
 import 'signup_page.dart';
@@ -47,7 +48,10 @@ class _LoginPageState extends State<LoginPage> {
       if (data is Map) {
         await UserProfileCache.save(Map<String, dynamic>.from(data));
       }
-    } catch (_) {}
+    } catch (e, st) {
+      // 로그인 흐름은 막지 않지만 실패는 관측 가능하게.
+      AppLogger.captureError(e, stackTrace: st, context: 'login.prefetchProfile');
+    }
   }
 
   /// 이메일/비밀번호 로그인 API 호출

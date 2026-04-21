@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api_client.dart';
+import 'app_logger.dart';
 
 /// 프로필 정보를 로컬에 캐시해 네트워크 응답 전에도 즉시 UI를 그리게 한다.
 /// (stale-while-revalidate: 캐시로 즉시 렌더 → 백그라운드 fetch → 갱신)
@@ -28,7 +29,15 @@ class UserProfileCache {
     try {
       final decoded = jsonDecode(raw);
       if (decoded is Map) return Map<String, dynamic>.from(decoded);
-    } catch (_) {}
+    } catch (e, st) {
+      // 파싱 실패 시 손상된 캐시는 제거 (재fetch로 복구됨)
+      AppLogger.captureError(
+        e,
+        stackTrace: st,
+        context: 'userProfileCache.readFromDisk.parse',
+      );
+      await prefs.remove(_key);
+    }
     return null;
   }
 
@@ -63,6 +72,9 @@ class UserProfileCache {
       if (data is Map) {
         await save(Map<String, dynamic>.from(data));
       }
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.captureError(e,
+          stackTrace: st, context: 'userProfileCache.refresh');
+    }
   }
 }

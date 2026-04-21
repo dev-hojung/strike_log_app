@@ -3,6 +3,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/api_client.dart';
+import '../../../../core/services/app_logger.dart';
 import '../../../../core/services/user_profile_cache.dart';
 import 'edit_nickname_page.dart';
 import 'change_password_page.dart';
@@ -40,7 +41,10 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
           setState(() => _profile = profile);
         }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.captureError(e,
+          stackTrace: st, context: 'accountSettings.fetch');
+    }
   }
 
   @override
