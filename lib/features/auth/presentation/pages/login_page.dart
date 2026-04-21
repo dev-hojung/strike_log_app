@@ -9,6 +9,7 @@ import '../../../../core/widgets/main_container.dart';
 import '../../../../core/services/api_client.dart';
 import '../../../../core/services/app_logger.dart';
 import '../../../../core/services/fcm_service.dart';
+import '../../../../core/services/unread_notifications_service.dart';
 import '../../../../core/services/user_profile_cache.dart';
 import 'signup_page.dart';
 
@@ -92,6 +93,8 @@ class _LoginPageState extends State<LoginPage> {
           unawaited(FcmService.instance.syncTokenToServer(userId.toString()));
           // 프로필 프리페치 — is_platform_admin 포함. 첫 프로필 탭 진입 시 즉시 렌더.
           unawaited(_prefetchProfile(userId.toString()));
+          // 미읽음 알림 카운트 동기화 (홈 배지에 즉시 반영)
+          unawaited(UnreadNotificationsService.instance.refresh());
         }
 
         if (mounted) {

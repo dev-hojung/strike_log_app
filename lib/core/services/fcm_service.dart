@@ -14,6 +14,7 @@ import '../../features/notifications/presentation/pages/notifications_page.dart'
 import '../../main.dart' show appNavigatorKey;
 import '../widgets/main_container.dart';
 import 'app_logger.dart';
+import 'unread_notifications_service.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseBackgroundHandler(RemoteMessage message) async {
@@ -80,6 +81,7 @@ class FcmService {
 
     FirebaseMessaging.onMessage.listen((msg) async {
       debugPrint('[FCM][foreground] ${msg.notification?.title} / ${msg.notification?.body}');
+      UnreadNotificationsService.instance.increment();
       await _showForegroundNotification(msg);
     });
 
@@ -199,6 +201,7 @@ class FcmService {
 
     if (notificationId != null && notificationId.isNotEmpty) {
       _api.markAsRead(notificationId);
+      UnreadNotificationsService.instance.decrement();
     }
   }
 

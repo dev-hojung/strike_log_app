@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/services/unread_notifications_service.dart';
 import '../../data/models/notification_item.dart';
 import '../../data/services/notifications_api_service.dart';
 
@@ -55,6 +56,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
     setState(() {
       _items = _items.map((n) => n.copyWith(isRead: true)).toList();
     });
+    UnreadNotificationsService.instance.reset();
   }
 
   Future<void> _onTapItem(NotificationItem item) async {
@@ -65,6 +67,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
           final idx = _items.indexWhere((n) => n.id == item.id);
           if (idx >= 0) _items[idx] = item.copyWith(isRead: true);
         });
+        UnreadNotificationsService.instance.decrement();
       }
     }
     // TODO: 타입별 네비게이션 (게임 상세 / 클럽 관리 페이지)

@@ -240,7 +240,7 @@ class _AdminCreationRequestsPageState extends State<AdminCreationRequestsPage>
             ),
           ],
           const SizedBox(height: 8),
-          Text('신청자: ${req['requester_id']}',
+          Text('신청자: ${_requesterLabel(req)}',
               style: TextStyle(color: sub, fontSize: 12)),
           if (rejectReason != null && rejectReason.isNotEmpty) ...[
             const SizedBox(height: 4),
@@ -312,6 +312,23 @@ class _AdminCreationRequestsPageState extends State<AdminCreationRequestsPage>
           style: TextStyle(
               color: color, fontSize: 12, fontWeight: FontWeight.w600)),
     );
+  }
+
+  /// 신청자 표시 라벨: "닉네임 (이메일)". requester가 없으면 UUID 일부만.
+  String _requesterLabel(Map<String, dynamic> req) {
+    final requester = req['requester'];
+    if (requester is Map) {
+      final nickname = requester['nickname']?.toString();
+      final email = requester['email']?.toString();
+      if (nickname != null && nickname.isNotEmpty) {
+        return email != null && email.isNotEmpty
+            ? '$nickname ($email)'
+            : nickname;
+      }
+      if (email != null && email.isNotEmpty) return email;
+    }
+    final uid = req['requester_id']?.toString() ?? '';
+    return uid.length > 12 ? '${uid.substring(0, 8)}…' : uid;
   }
 
   String _rejectReasonLabel(String key) {

@@ -5,7 +5,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
-import '../../../notifications/data/services/notifications_api_service.dart';
+import '../../../../core/services/unread_notifications_service.dart';
 import '../../../notifications/presentation/pages/notifications_page.dart';
 import '../../data/models/home_dashboard_data.dart';
 import '../../data/services/home_api_service.dart';
@@ -25,14 +25,12 @@ class HomeDashboardPage extends StatefulWidget {
 
 class _HomeDashboardPageState extends State<HomeDashboardPage> {
   final HomeApiService _apiService = HomeApiService();
-  final NotificationsApiService _notificationsApi = NotificationsApiService();
 
   /// 캐싱된 대시보드 데이터 (페이지 재생성 시에도 유지)
   static HomeDashboardData? _cachedData;
 
   HomeDashboardData? _data;
   bool _isLoading = true;
-  int _unreadNotificationCount = 0;
 
   @override
   void initState() {
@@ -40,7 +38,8 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
     _data = _cachedData;
     _isLoading = _cachedData == null;
     _fetchData();
-    _fetchUnreadNotifications();
+    // 미읽음 알림 수는 전역 싱글톤이 관리. 대시보드 진입마다 동기화.
+    UnreadNotificationsService.instance.refresh();
   }
 
   Future<void> _fetchData() async {
@@ -56,21 +55,13 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
     }
   }
 
-  Future<void> _fetchUnreadNotifications() async {
-    final prefs = await SharedPreferences.getInstance();
-    final userId = prefs.getString('user_id');
-    if (userId == null) return;
-    final count = await _notificationsApi.fetchUnreadCount(userId);
-    if (!mounted) return;
-    setState(() => _unreadNotificationCount = count);
-  }
-
   Future<void> _openNotifications() async {
     await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const NotificationsPage()),
     );
-    _fetchUnreadNotifications();
+    // 복귀 시 혹시 모를 서버-클라 불일치 대비 재동기화
+    UnreadNotificationsService.instance.refresh();
   }
 
   @override
@@ -207,48 +198,49 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
         ],
       ),
       actions: [
-        IconButton(
-          icon: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Icon(Symbols.notifications,
-                  color: isDark ? Colors.white : AppColors.textPrimaryLight,
-                  size: 24),
-              if (_unreadNotificationCount > 0)
-                Positioned(
-                  right: -4,
-                  top: -2,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 4, vertical: 1),
-                    constraints: const BoxConstraints(
-                        minWidth: 16, minHeight: 16),
-                    decoration: BoxDecoration(
-                      color: Colors.redAccent,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: isDark
-                            ? AppColors.backgroundDark
-                            : AppColors.backgroundLight,
-                        width: 1.5,
+        ValueListenableBuilder<int>(
+          valueListenable: UnreadNotificationsService.instance.unreadCount,
+          builder: (context, count, _) => IconButton(
+            icon: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Icon(Symbols.notifications,
+                    color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                    size: 24),
+                if (count > 0)
+                  Positioned(
+                    right: -4,
+                    top: -2,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 4, vertical: 1),
+                      constraints: const BoxConstraints(
+                          minWidth: 16, minHeight: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.redAccent,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isDark
+                              ? AppColors.backgroundDark
+                              : AppColors.backgroundLight,
+                          width: 1.5,
+                        ),
                       ),
-                    ),
-                    child: Text(
-                      _unreadNotificationCount > 99
-                          ? '99+'
-                          : '$_unreadNotificationCount',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
+                      child: Text(
+                        count > 99 ? '99+' : '$count',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
+            onPressed: _openNotifications,
           ),
-          onPressed: _openNotifications,
         ),
         const SizedBox(width: 8),
       ],
