@@ -3,7 +3,10 @@ import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
+import 'core/services/api_client.dart';
+import 'core/services/auth_token_storage.dart';
 import 'core/services/fcm_service.dart';
+import 'core/services/unread_notifications_service.dart';
 import 'core/services/user_profile_cache.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/presentation/pages/login_page.dart';
@@ -29,8 +32,22 @@ void main() async {
   // 환경변수(.env) 로드
   await dotenv.load(fileName: ".env");
 
+  // 인증 토큰을 메모리로 미리 로드 (Dio 인터셉터가 동기 접근)
+  await AuthTokenStorage.init();
   // 프로필 캐시를 메모리로 미리 로드 (페이지 initState에서 동기 접근)
   await UserProfileCache.init();
+
+  // 401 수신 시 강제 로그아웃 후 로그인 화면으로 이동
+  ApiClient.onUnauthorized = () async {
+    await AuthTokenStorage.clear();
+    await UserProfileCache.clear();
+    UnreadNotificationsService.instance.reset();
+    final nav = appNavigatorKey.currentState;
+    nav?.pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginPage()),
+      (_) => false,
+    );
+  };
 
   final sentryDsn = dotenv.env['SENTRY_DSN'];
   Future<void> runAppWithSentry() async {

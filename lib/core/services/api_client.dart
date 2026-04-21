@@ -1,18 +1,23 @@
 import 'package:dio/dio.dart';
 import 'dart:io' show Platform;
+import 'auth_token_storage.dart';
 
-/// API 통신을 위한 Dio 클라이언트 싱글톤 클래스
+/// API 통신을 위한 Dio 클라이언트 싱글톤 클래스.
+///
+/// - `Authorization: Bearer <token>` 자동 부착
+/// - 401 수신 시 [onUnauthorized] 콜백 호출 (메인에서 로그아웃 처리에 연결)
 class ApiClient {
   static final ApiClient _instance = ApiClient._internal();
   late Dio dio;
 
-  // 개발 환경에 맞춰 기본 BaseUrl 설정
-  // Android 에뮬레이터는 10.0.2.2, iOS 시뮬레이터는 127.0.0.1 또는 localhost를 사용합니다.
+  /// 401 수신 시 실행할 콜백. main.dart에서 강제 로그아웃 구현에 사용.
+  static void Function()? onUnauthorized;
+
   static String get baseUrl {
     if (Platform.isAndroid) {
       return 'http://10.0.2.2:3000';
     } else {
-      return 'http://127.0.0.1:3000'; // 실기기의 경우 PC의 내부 IP(예: 192.168.x.x)로 변경해야 합니다.
+      return 'http://127.0.0.1:3000';
     }
   }
 
@@ -31,7 +36,24 @@ class ApiClient {
       },
     ));
 
-    // 요청 및 응답 로깅 (개발용)
+    // Authorization 헤더 자동 부착
+    dio.interceptors.add(InterceptorsWrapper(
+      onRequest: (options, handler) {
+        final token = AuthTokenStorage.current;
+        if (token != null && token.isNotEmpty) {
+          options.headers['Authorization'] = 'Bearer $token';
+        }
+        handler.next(options);
+      },
+      onError: (e, handler) {
+        if (e.response?.statusCode == 401) {
+          // 세션 만료/잘못된 토큰 → 콜백으로 위임
+          onUnauthorized?.call();
+        }
+        handler.next(e);
+      },
+    ));
+
     dio.interceptors.add(LogInterceptor(
       requestBody: true,
       responseBody: true,

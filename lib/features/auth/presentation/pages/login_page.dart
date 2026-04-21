@@ -8,6 +8,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/widgets/main_container.dart';
 import '../../../../core/services/api_client.dart';
 import '../../../../core/services/app_logger.dart';
+import '../../../../core/services/auth_token_storage.dart';
 import '../../../../core/services/fcm_service.dart';
 import '../../../../core/services/unread_notifications_service.dart';
 import '../../../../core/services/user_profile_cache.dart';
@@ -79,9 +80,21 @@ class _LoginPageState extends State<LoginPage> {
       });
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        // 로그인 성공: 유저 정보를 받음
-        final userId = response.data['id'];
-        final nickname = response.data['nickname'];
+        // 응답 스키마: { access_token, user: { id, email, nickname, ... } }
+        // 레거시 호환: 구 서버는 user 객체를 루트에 바로 돌려준다.
+        final data = response.data as Map<String, dynamic>;
+        final accessToken = data['access_token'] as String?;
+        final userMap = data['user'] is Map
+            ? Map<String, dynamic>.from(data['user'] as Map)
+            : data; // fallback
+
+        final userId = userMap['id'];
+        final nickname = userMap['nickname'];
+
+        // JWT 먼저 저장해야 이후 요청에 Authorization 헤더가 부착됨
+        if (accessToken != null && accessToken.isNotEmpty) {
+          await AuthTokenStorage.save(accessToken);
+        }
 
         if (userId != null) {
           final prefs = await SharedPreferences.getInstance();
@@ -89,11 +102,8 @@ class _LoginPageState extends State<LoginPage> {
           if (nickname != null) {
             await prefs.setString('nickname', nickname.toString());
           }
-          // FCM 토큰 서버 등록 (실패해도 로그인 흐름은 계속)
           unawaited(FcmService.instance.syncTokenToServer(userId.toString()));
-          // 프로필 프리페치 — is_platform_admin 포함. 첫 프로필 탭 진입 시 즉시 렌더.
           unawaited(_prefetchProfile(userId.toString()));
-          // 미읽음 알림 카운트 동기화 (홈 배지에 즉시 반영)
           unawaited(UnreadNotificationsService.instance.refresh());
         }
 

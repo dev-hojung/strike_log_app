@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/api_client.dart';
 import '../../../../core/services/app_logger.dart';
+import '../../../../core/services/auth_token_storage.dart';
 import '../../../../core/services/fcm_service.dart';
 import '../../../../core/services/user_profile_cache.dart';
 import '../../../auth/presentation/pages/login_page.dart';
@@ -66,6 +67,7 @@ class _ProfilePageState extends State<ProfilePage> {
     }
     await prefs.remove('user_id');
     await UserProfileCache.clear();
+    await AuthTokenStorage.clear();
 
     if (mounted) {
       Navigator.pushAndRemoveUntil(
