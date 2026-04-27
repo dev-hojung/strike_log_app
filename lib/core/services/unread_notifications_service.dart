@@ -28,7 +28,8 @@ class UnreadNotificationsService {
         _count.value = 0;
         return;
       }
-      final count = await _api.fetchUnreadCount(userId);
+      // JWT 토큰으로 본인 자원 조회 → user_id 인자 불필요
+      final count = await _api.fetchUnreadCount();
       _count.value = count;
     } catch (e, st) {
       AppLogger.captureError(e,

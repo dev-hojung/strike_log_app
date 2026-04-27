@@ -111,8 +111,8 @@ class _GameSummaryPageState extends State<GameSummaryPage> {
       final playDate = DateFormat('yyyy-MM-dd')
           .format(widget.gameStartedAt ?? DateTime.now());
 
+      // 서버는 JWT 토큰의 user.id로 식별. user_id 동봉 불필요.
       final payload = <String, dynamic>{
-        'user_id': userId,
         'total_score': widget.totalScore,
         'play_date': playDate,
         if (widget.location != null && widget.location!.isNotEmpty)

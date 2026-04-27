@@ -16,7 +16,6 @@ class AdminCreationRequestsPage extends StatefulWidget {
 class _AdminCreationRequestsPageState extends State<AdminCreationRequestsPage>
     with SingleTickerProviderStateMixin {
   final _service = GroupCreationRequestsService();
-  String? _adminUserId;
   late TabController _tabController;
 
   List<Map<String, dynamic>> _pending = [];
@@ -41,18 +40,18 @@ class _AdminCreationRequestsPageState extends State<AdminCreationRequestsPage>
   Future<void> _fetchAll() async {
     if (!mounted) return;
     setState(() => _isLoading = true);
+    // 서버는 JWT의 user.id로 관리자 여부를 판단. 클라이언트는 토큰 보유만 확인.
     final prefs = await SharedPreferences.getInstance();
     final uid = prefs.getString('user_id');
     if (uid == null) {
       if (mounted) setState(() => _isLoading = false);
       return;
     }
-    _adminUserId = uid;
 
     final results = await Future.wait([
-      _service.listForAdmin(adminUserId: uid, status: 'pending'),
-      _service.listForAdmin(adminUserId: uid, status: 'approved'),
-      _service.listForAdmin(adminUserId: uid, status: 'rejected'),
+      _service.listForAdmin(status: 'pending'),
+      _service.listForAdmin(status: 'approved'),
+      _service.listForAdmin(status: 'rejected'),
     ]);
     if (!mounted) return;
     setState(() {
@@ -65,10 +64,10 @@ class _AdminCreationRequestsPageState extends State<AdminCreationRequestsPage>
 
   Future<void> _approve(Map<String, dynamic> req) async {
     final id = _idOf(req);
-    if (id == 0 || _adminUserId == null) return;
+    if (id == 0) return;
     final confirmed = await _confirm('신청 승인', '"${req['name']}" 클럽을 생성합니다.');
     if (confirmed != true) return;
-    final ok = await _service.approve(requestId: id, adminUserId: _adminUserId!);
+    final ok = await _service.approve(requestId: id);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(ok ? '승인 완료' : '승인 실패')),
@@ -78,7 +77,7 @@ class _AdminCreationRequestsPageState extends State<AdminCreationRequestsPage>
 
   Future<void> _reject(Map<String, dynamic> req) async {
     final id = _idOf(req);
-    if (id == 0 || _adminUserId == null) return;
+    if (id == 0) return;
 
     final reason = await showModalBottomSheet<String>(
       context: context,
@@ -87,11 +86,7 @@ class _AdminCreationRequestsPageState extends State<AdminCreationRequestsPage>
     );
     if (reason == null) return;
 
-    final ok = await _service.reject(
-      requestId: id,
-      adminUserId: _adminUserId!,
-      reason: reason,
-    );
+    final ok = await _service.reject(requestId: id, reason: reason);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(ok ? '반려 완료' : '반려 실패')),

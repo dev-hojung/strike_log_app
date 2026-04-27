@@ -229,14 +229,13 @@ class _MainContainerState extends State<MainContainer> with RouteAware {
     try {
       final prefs = await SharedPreferences.getInstance();
       final userId = prefs.getString('user_id');
-
       if (userId == null) {
         setState(() { _isCheckingClub = false; });
         await _startIndividualGame();
         return;
       }
 
-      final response = await ApiClient().dio.get('/groups/me/$userId');
+      final response = await ApiClient().dio.get('/groups/me');
       final groups = response.data;
 
       if (mounted) {

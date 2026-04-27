@@ -80,7 +80,6 @@ class _CreateClubPageState extends State<CreateClubPage> {
       }
 
       final result = await GroupCreationRequestsService().createRequest(
-        userId: userId,
         name: _nameController.text.trim(),
         description: _descController.text.trim(),
       );

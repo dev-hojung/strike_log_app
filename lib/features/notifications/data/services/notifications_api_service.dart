@@ -1,21 +1,21 @@
 import '../../../../core/services/api_client.dart';
 import '../models/notification_item.dart';
 
-/// 알림 REST API 래퍼.
+/// 알림 REST 래퍼.
 ///
-/// 기대하는 백엔드 엔드포인트:
-/// - `GET  /notifications/:userId`            → `List<NotificationItem JSON>`
-/// - `GET  /notifications/:userId/unread-count` → `{ "count": int }`
-/// - `POST /notifications/:id/read`            → `{ "ok": true }`
-/// - `POST /notifications/:userId/read-all`    → `{ "ok": true }`
-///
-/// 백엔드가 아직 없는 동안에는 네트워크/404 에러를 조용히 삼켜 빈 결과를 반환합니다.
+/// 백엔드 엔드포인트 (JWT 인증 기준 — 서버가 토큰의 user.id로 식별):
+/// - `GET    /notifications/me`                 → `List<NotificationItem JSON>`
+/// - `GET    /notifications/me/unread-count`    → `{ count }`
+/// - `POST   /notifications/:id/read`           → `{ ok }`
+/// - `POST   /notifications/me/read-all`        → `{ ok }`
+/// - `POST   /notifications/me/fcm-token`       → `{ ok }`
+/// - `DELETE /notifications/me/fcm-token`       → `{ ok }`
 class NotificationsApiService {
   final ApiClient _apiClient = ApiClient();
 
-  Future<List<NotificationItem>> fetchList(String userId) async {
+  Future<List<NotificationItem>> fetchList() async {
     try {
-      final res = await _apiClient.dio.get('/notifications/$userId');
+      final res = await _apiClient.dio.get('/notifications/me');
       final data = res.data;
       if (data is List) {
         return data
@@ -28,9 +28,9 @@ class NotificationsApiService {
     }
   }
 
-  Future<int> fetchUnreadCount(String userId) async {
+  Future<int> fetchUnreadCount() async {
     try {
-      final res = await _apiClient.dio.get('/notifications/$userId/unread-count');
+      final res = await _apiClient.dio.get('/notifications/me/unread-count');
       final count = res.data is Map ? res.data['count'] : null;
       if (count is int) return count;
       if (count is num) return count.toInt();
@@ -49,26 +49,23 @@ class NotificationsApiService {
     }
   }
 
-  Future<bool> markAllAsRead(String userId) async {
+  Future<bool> markAllAsRead() async {
     try {
-      await _apiClient.dio.post('/notifications/$userId/read-all');
+      await _apiClient.dio.post('/notifications/me/read-all');
       return true;
     } catch (_) {
       return false;
     }
   }
 
-  /// FCM 디바이스 토큰 등록.
-  /// 기대 엔드포인트: `POST /notifications/:userId/fcm-token`
-  /// body: `{ "token": "...", "platform": "android" | "ios" }`
+  /// FCM 디바이스 토큰 등록. JWT의 user로 인식되므로 user_id 불필요.
   Future<bool> registerFcmToken({
-    required String userId,
     required String token,
     required String platform,
   }) async {
     try {
       await _apiClient.dio.post(
-        '/notifications/$userId/fcm-token',
+        '/notifications/me/fcm-token',
         data: {'token': token, 'platform': platform},
       );
       return true;
@@ -77,13 +74,10 @@ class NotificationsApiService {
     }
   }
 
-  Future<bool> deleteFcmToken({
-    required String userId,
-    required String token,
-  }) async {
+  Future<bool> deleteFcmToken({required String token}) async {
     try {
       await _apiClient.dio.delete(
-        '/notifications/$userId/fcm-token',
+        '/notifications/me/fcm-token',
         data: {'token': token},
       );
       return true;

@@ -68,14 +68,11 @@ class FcmService {
     _messaging.onTokenRefresh.listen((t) async {
       _token = t;
       debugPrint('[FCM] token refreshed: $t');
+      // 로그인 상태이면 서버에 갱신 요청. JWT 토큰이 있어야 인증 통과.
       final prefs = await SharedPreferences.getInstance();
       final userId = prefs.getString('user_id');
       if (userId != null) {
-        await _api.registerFcmToken(
-          userId: userId,
-          token: t,
-          platform: _platform(),
-        );
+        await _api.registerFcmToken(token: t, platform: _platform());
       }
     });
 
@@ -227,20 +224,17 @@ class FcmService {
       return;
     }
     _token = t;
-    final ok = await _api.registerFcmToken(
-      userId: userId,
-      token: t,
-      platform: _platform(),
-    );
+    final ok = await _api.registerFcmToken(token: t, platform: _platform());
     debugPrint('[FCM] register token for user=$userId ok=$ok');
   }
 
   /// 로그아웃 시 호출. 서버에서 토큰 제거 후 로컬 토큰 삭제.
+  /// 호출 시점에 아직 토큰이 유효하다면 서버 측에서도 즉시 정리.
   Future<void> clearTokenOnServer(String userId) async {
     if (!_initialized) return;
     final t = _token;
     if (t != null) {
-      await _api.deleteFcmToken(userId: userId, token: t);
+      await _api.deleteFcmToken(token: t);
     }
     await _messaging.deleteToken();
     _token = null;

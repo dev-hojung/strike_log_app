@@ -83,10 +83,10 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
       }
       _currentUserId = userId;
 
-      // 클럽 목록과 생성 신청 목록을 병렬 조회
+      // 클럽 목록과 생성 신청 목록을 병렬 조회 (서버는 JWT로 식별)
       final results = await Future.wait([
-        ApiClient().dio.get('/groups/me/$userId'),
-        _creationRequestsService.listMyRequests(userId),
+        ApiClient().dio.get('/groups/me'),
+        _creationRequestsService.listMyRequests(),
       ]);
       final groupsResponse = results[0] as dynamic;
       final myRequests = results[1] as List<Map<String, dynamic>>;
@@ -129,8 +129,7 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
   }
 
   Future<void> _cancelCreationRequest(int requestId) async {
-    final userId = _currentUserId;
-    if (userId == null) return;
+    if (_currentUserId == null) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -150,10 +149,7 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
     );
     if (confirmed != true) return;
 
-    final ok = await _creationRequestsService.cancel(
-      requestId: requestId,
-      userId: userId,
-    );
+    final ok = await _creationRequestsService.cancel(requestId: requestId);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(ok ? '신청을 취소했습니다.' : '취소에 실패했습니다.')),

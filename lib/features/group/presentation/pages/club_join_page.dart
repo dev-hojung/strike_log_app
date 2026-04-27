@@ -42,20 +42,18 @@ class _ClubJoinPageState extends State<ClubJoinPage> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final userId = prefs.getString('user_id');
-
       if (userId == null) {
         _showError('로그인 정보를 찾을 수 없습니다.');
         return;
       }
 
       // 가입 신청 생성. 클럽장이 승인해야 실제 가입이 완료됩니다.
-      // 기대 엔드포인트: POST /groups/:clubId/join-requests
-      //   body: { user_id, message }
-      //   201 Created → 신청 생성 / 409 Conflict → 이미 신청/가입 상태
+      // 서버 엔드포인트: POST /groups/:clubId/join-requests
+      //   body: { message }
+      //   서버가 JWT의 user.id를 식별. 201 Created / 409 Conflict.
       await ApiClient().dio.post(
         '/groups/${widget.clubId}/join-requests',
         data: {
-          'user_id': userId,
           'message': _messageController.text.trim(),
         },
       );

@@ -13,7 +13,7 @@ class HomeApiService {
       final profileFuture = dio.get('/users/$userId');
       final statsFuture = dio.get('/games/users/$userId/statistics');
       final recentFuture = dio.get('/games/users/$userId/recent').then((r) => r.data).catchError((_) => null);
-      final groupsFuture = dio.get('/groups/me/$userId').then((r) => r.data).catchError((_) => null);
+      final groupsFuture = dio.get('/groups/me').then((r) => r.data).catchError((_) => null);
 
       final profileRes = await profileFuture;
       final statsRes = await statsFuture;

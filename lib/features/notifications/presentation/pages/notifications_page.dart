@@ -38,7 +38,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
       if (mounted) setState(() => _isLoading = false);
       return;
     }
-    final list = await _api.fetchList(userId);
+    final list = await _api.fetchList();
     list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     if (!mounted) return;
     setState(() {
@@ -49,9 +49,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
   }
 
   Future<void> _markAllAsRead() async {
-    final userId = _userId;
-    if (userId == null || _items.every((n) => n.isRead)) return;
-    final ok = await _api.markAllAsRead(userId);
+    if (_userId == null || _items.every((n) => n.isRead)) return;
+    final ok = await _api.markAllAsRead();
     if (!ok || !mounted) return;
     setState(() {
       _items = _items.map((n) => n.copyWith(isRead: true)).toList();

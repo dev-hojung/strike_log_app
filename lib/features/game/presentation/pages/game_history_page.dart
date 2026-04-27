@@ -43,7 +43,7 @@ class _GameHistoryPageState extends State<GameHistoryPage> {
       }
 
       final dio = ApiClient().dio;
-      final gamesFuture = _apiService.fetchGameHistory(userId);
+      final gamesFuture = _apiService.fetchGameHistory();
       final statsFuture = dio.get('/games/users/$userId/statistics');
       final frameStatsFuture = dio.get('/games/users/$userId/monthly-frame-stats');
 
