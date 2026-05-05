@@ -22,8 +22,12 @@ class NotificationsApiService {
             .map((e) => NotificationItem.fromJson(Map<String, dynamic>.from(e)))
             .toList();
       }
+      // ignore: avoid_print
+      print('[notifications.fetchList] unexpected payload type: ${data.runtimeType}');
       return [];
-    } catch (_) {
+    } catch (e) {
+      // ignore: avoid_print
+      print('[notifications.fetchList] failed: $e');
       return [];
     }
   }
@@ -35,7 +39,9 @@ class NotificationsApiService {
       if (count is int) return count;
       if (count is num) return count.toInt();
       return 0;
-    } catch (_) {
+    } catch (e) {
+      // ignore: avoid_print
+      print('[notifications.fetchUnreadCount] failed: $e');
       return 0;
     }
   }

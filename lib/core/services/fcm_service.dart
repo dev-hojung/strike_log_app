@@ -148,7 +148,11 @@ class FcmService {
     final payload = jsonEncode(msg.data);
     try {
       await _localNotifications.show(
-        id: notification.hashCode,
+        // 고정 ID로 들어와 신규 알림이 기존 알림을 대체.
+        // 서로 다른 ID로 4건 이상 누적되면 Android가 자동 그룹화하면서 SILENT을 강제해
+        // heads-up이 안 뜨는 현상이 생긴다. 알림 이력은 DB(/notifications/me)에 남으므로
+        // 트레이엔 항상 최신 1건만 보이는 정책.
+        id: 1,
         title: notification.title,
         body: notification.body,
         notificationDetails: NotificationDetails(
@@ -162,6 +166,12 @@ class FcmService {
             playSound: true,
             enableVibration: true,
             icon: '@mipmap/ic_launcher',
+            // Android는 같은 앱의 알림이 4개 이상 쌓이면 자동 그룹화하면서
+            // 개별 알림에 SILENT 플래그를 붙여 heads-up/소리를 다 죽인다.
+            // 우리만의 group key로 묶고, 그룹 내 모든 알림이 alert하도록 명시.
+            groupKey: 'com.hojung.strikelog.foreground',
+            setAsGroupSummary: false,
+            groupAlertBehavior: GroupAlertBehavior.all,
           ),
           iOS: const DarwinNotificationDetails(
             presentAlert: true,
