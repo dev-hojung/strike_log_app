@@ -27,6 +27,12 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- 백그라운드 FCM 메시지가 사용할 기본 알림 채널.
+             서버 페이로드에 channel_id가 빠져있을 때 시스템이 만드는 폴백 채널은
+             importance가 낮아 heads-up이 안 뜨므로, 우리 high-importance 채널을 박아둔다. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="strike_log_default_v2" />
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

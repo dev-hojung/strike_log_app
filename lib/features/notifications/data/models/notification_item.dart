@@ -1,16 +1,52 @@
 /// 알림 타입.
 ///
-/// 백엔드 계약:
+/// 백엔드 계약 (`strike_log_api/notification.entity.ts`와 동일하게 유지):
 /// - `club_game_created`: 내가 속한 클럽에서 새 게임이 생성됨 (`targetId` = gameId)
 /// - `club_join_request`: 내 클럽에 가입 신청이 옴 (`targetId` = clubId, `actorId` = 신청자)
 /// - `club_join_approved`: 내 가입 신청이 승인됨 (`targetId` = clubId)
 /// - `club_join_rejected`: 내 가입 신청이 거절됨 (`targetId` = clubId)
+/// - `club_creation_request`: 신규 클럽 생성 신청이 접수됨 (관리자 전용)
+/// - `club_creation_approved`: 내 클럽 생성 신청이 승인됨 (`targetId` = groupId)
+/// - `club_creation_rejected`: 내 클럽 생성 신청이 거절됨
+/// - `club_trial_expiring_soon`: 체험판 만료 임박
+/// - `club_trial_expired`: 체험판 만료
 enum NotificationType {
   clubGameCreated,
   clubJoinRequest,
   clubJoinApproved,
   clubJoinRejected,
+  clubCreationRequest,
+  clubCreationApproved,
+  clubCreationRejected,
+  clubTrialExpiringSoon,
+  clubTrialExpired,
   unknown;
+
+  /// 백엔드에서 내려오는 문자열 값.
+  String get wireValue {
+    switch (this) {
+      case NotificationType.clubGameCreated:
+        return 'club_game_created';
+      case NotificationType.clubJoinRequest:
+        return 'club_join_request';
+      case NotificationType.clubJoinApproved:
+        return 'club_join_approved';
+      case NotificationType.clubJoinRejected:
+        return 'club_join_rejected';
+      case NotificationType.clubCreationRequest:
+        return 'club_creation_request';
+      case NotificationType.clubCreationApproved:
+        return 'club_creation_approved';
+      case NotificationType.clubCreationRejected:
+        return 'club_creation_rejected';
+      case NotificationType.clubTrialExpiringSoon:
+        return 'club_trial_expiring_soon';
+      case NotificationType.clubTrialExpired:
+        return 'club_trial_expired';
+      case NotificationType.unknown:
+        return '';
+    }
+  }
 
   static NotificationType fromString(String? raw) {
     switch (raw) {
@@ -22,6 +58,16 @@ enum NotificationType {
         return NotificationType.clubJoinApproved;
       case 'club_join_rejected':
         return NotificationType.clubJoinRejected;
+      case 'club_creation_request':
+        return NotificationType.clubCreationRequest;
+      case 'club_creation_approved':
+        return NotificationType.clubCreationApproved;
+      case 'club_creation_rejected':
+        return NotificationType.clubCreationRejected;
+      case 'club_trial_expiring_soon':
+        return NotificationType.clubTrialExpiringSoon;
+      case 'club_trial_expired':
+        return NotificationType.clubTrialExpired;
       default:
         return NotificationType.unknown;
     }

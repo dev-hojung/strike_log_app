@@ -1,4 +1,22 @@
+import 'package:dio/dio.dart';
+
 import '../../../../core/services/api_client.dart';
+
+/// 동일 유저가 이미 심사 중인 신청을 갖고 있을 때(409 Conflict).
+class CreationRequestConflictException implements Exception {
+  final String message;
+  const CreationRequestConflictException(this.message);
+  @override
+  String toString() => message;
+}
+
+/// 그 외 사유로 신청 생성에 실패했을 때.
+class CreationRequestFailedException implements Exception {
+  final String message;
+  const CreationRequestFailedException(this.message);
+  @override
+  String toString() => message;
+}
 
 /// 클럽 생성 신청 REST 래퍼.
 ///
@@ -12,7 +30,11 @@ import '../../../../core/services/api_client.dart';
 class GroupCreationRequestsService {
   final ApiClient _apiClient = ApiClient();
 
-  Future<Map<String, dynamic>?> createRequest({
+  /// 클럽 생성 신청.
+  /// - 성공: 생성된 신청 row(Map) 반환
+  /// - 동일 유저의 PENDING 신청이 이미 존재(409): [CreationRequestConflictException]
+  /// - 그 외 모든 실패: [CreationRequestFailedException] (사유 포함)
+  Future<Map<String, dynamic>> createRequest({
     required String name,
     String? description,
     String? coverImageUrl,
@@ -30,10 +52,23 @@ class GroupCreationRequestsService {
       if (res.data is Map) {
         return Map<String, dynamic>.from(res.data);
       }
-      return null;
-    } catch (_) {
-      return null;
+      throw const CreationRequestFailedException(
+          '서버 응답 형식이 예상과 다릅니다.');
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 409) {
+        final msg = _extractMessage(e.response?.data) ?? '이미 심사 중인 신청이 있습니다.';
+        throw CreationRequestConflictException(msg);
+      }
+      final msg = _extractMessage(e.response?.data) ?? e.message ?? '네트워크 오류';
+      throw CreationRequestFailedException(msg);
     }
+  }
+
+  String? _extractMessage(dynamic data) {
+    if (data is Map && data['message'] is String) {
+      return data['message'] as String;
+    }
+    return null;
   }
 
   Future<List<Map<String, dynamic>>> listMyRequests() async {
@@ -45,7 +80,9 @@ class GroupCreationRequestsService {
             .toList();
       }
       return [];
-    } catch (_) {
+    } catch (e) {
+      // ignore: avoid_print
+      print('[listMyRequests] failed: $e');
       return [];
     }
   }
@@ -63,8 +100,13 @@ class GroupCreationRequestsService {
             .map((e) => Map<String, dynamic>.from(e))
             .toList();
       }
+      // ignore: avoid_print
+      print('[listForAdmin] unexpected payload type: ${res.data.runtimeType}');
       return [];
-    } catch (_) {
+    } catch (e) {
+      // 진단: silent catch 대신 사유 노출. (401/403/네트워크 등)
+      // ignore: avoid_print
+      print('[listForAdmin] status=$status failed: $e');
       return [];
     }
   }

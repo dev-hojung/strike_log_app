@@ -69,7 +69,10 @@ class NotificationsApiService {
         data: {'token': token, 'platform': platform},
       );
       return true;
-    } catch (_) {
+    } catch (e) {
+      // 진단 가능하도록 실패 사유를 그대로 노출. (LogInterceptor가 4xx/5xx 응답 본문도 출력)
+      // ignore: avoid_print
+      print('[FCM][registerFcmToken] failed: $e');
       return false;
     }
   }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/services/fcm_service.dart';
 import '../../../../core/services/unread_notifications_service.dart';
 import '../../data/models/notification_item.dart';
 import '../../data/services/notifications_api_service.dart';
@@ -69,7 +70,14 @@ class _NotificationsPageState extends State<NotificationsPage> {
         UnreadNotificationsService.instance.decrement();
       }
     }
-    // TODO: 타입별 네비게이션 (게임 상세 / 클럽 관리 페이지)
+    // 종착지가 없는 타입(거절/알 수 없음)은 push하지 않아 히스토리를 깨끗하게 유지.
+    final wire = item.type.wireValue;
+    if (!FcmService.hasDestination(wire)) return;
+    FcmService.instance.navigateForType(
+      type: wire,
+      targetId: item.targetId,
+      fromInAppList: true,
+    );
   }
 
   @override
@@ -282,6 +290,16 @@ class _NotificationsPageState extends State<NotificationsPage> {
         return Symbols.check_circle;
       case NotificationType.clubJoinRejected:
         return Symbols.cancel;
+      case NotificationType.clubCreationRequest:
+        return Symbols.group_add;
+      case NotificationType.clubCreationApproved:
+        return Symbols.verified;
+      case NotificationType.clubCreationRejected:
+        return Symbols.do_not_disturb_on;
+      case NotificationType.clubTrialExpiringSoon:
+        return Symbols.schedule;
+      case NotificationType.clubTrialExpired:
+        return Symbols.warning;
       case NotificationType.unknown:
         return Symbols.notifications;
     }
@@ -296,6 +314,16 @@ class _NotificationsPageState extends State<NotificationsPage> {
       case NotificationType.clubJoinApproved:
         return Colors.green;
       case NotificationType.clubJoinRejected:
+        return Colors.redAccent;
+      case NotificationType.clubCreationRequest:
+        return Colors.orange;
+      case NotificationType.clubCreationApproved:
+        return Colors.green;
+      case NotificationType.clubCreationRejected:
+        return Colors.redAccent;
+      case NotificationType.clubTrialExpiringSoon:
+        return Colors.orange;
+      case NotificationType.clubTrialExpired:
         return Colors.redAccent;
       case NotificationType.unknown:
         return Colors.grey;

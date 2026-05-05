@@ -79,19 +79,12 @@ class _CreateClubPageState extends State<CreateClubPage> {
         throw StateError('로그인이 필요합니다.');
       }
 
-      final result = await GroupCreationRequestsService().createRequest(
+      await GroupCreationRequestsService().createRequest(
         name: _nameController.text.trim(),
         description: _descController.text.trim(),
       );
 
       if (!mounted) return;
-
-      if (result == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('이미 심사 중인 신청이 있거나 요청이 실패했습니다.')),
-        );
-        return;
-      }
 
       await showDialog<void>(
         context: context,
@@ -109,10 +102,24 @@ class _CreateClubPageState extends State<CreateClubPage> {
         ),
       );
       if (mounted) Navigator.pop(context);
-    } catch (e) {
+    } on CreationRequestConflictException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('클럽 생성 신청에 실패했습니다. 다시 시도해주세요.')),
+          SnackBar(content: Text(e.message)),
+        );
+      }
+    } on CreationRequestFailedException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('신청 실패: ${e.message}')),
+        );
+      }
+    } catch (e, st) {
+      // ignore: avoid_print
+      print('[createClub] unexpected error: $e\n$st');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('클럽 생성 신청에 실패했습니다: $e')),
         );
       }
     } finally {

@@ -15,9 +15,9 @@ flutter test test/widget_test.dart  # Run single test
 ## Environment Setup
 
 - `.env` file required at project root (loaded via flutter_dotenv at startup)
-- Backend API: local server on port 3000
-  - Android emulator: `http://10.0.2.2:3000`
-  - iOS simulator: `http://127.0.0.1:3000`
+- Backend API: local server on port 3001
+  - Android emulator: `http://10.0.2.2:3001`
+  - iOS simulator: `http://127.0.0.1:3001`
   - Platform detection is handled automatically in `core/services/api_client.dart`
 
 ## Architecture

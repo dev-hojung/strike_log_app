@@ -1,12 +1,16 @@
+import 'dart:async';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'core/services/api_client.dart';
 import 'core/services/auth_token_storage.dart';
 import 'core/services/fcm_service.dart';
 import 'core/services/session_manager.dart';
+import 'core/services/unread_notifications_service.dart';
 import 'core/services/user_profile_cache.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/presentation/pages/login_page.dart';
@@ -55,6 +59,17 @@ void main() async {
     try {
       await Firebase.initializeApp();
       await FcmService.instance.init();
+      // 저장된 JWT가 있으면 매 앱 시작마다 FCM 토큰을 서버에 재동기화.
+      // (로그인 직후만 등록되면, watch 모드 재빌드/토큰 회전/서버 다운 시에 누락됨)
+      final storedToken = AuthTokenStorage.current;
+      if (storedToken != null && storedToken.isNotEmpty) {
+        final prefs = await SharedPreferences.getInstance();
+        final userId = prefs.getString('user_id');
+        if (userId != null) {
+          unawaited(FcmService.instance.syncTokenToServer(userId));
+          unawaited(UnreadNotificationsService.instance.refresh());
+        }
+      }
     } catch (e, st) {
       debugPrint('[Firebase] init skipped: $e');
       debugPrintStack(stackTrace: st, label: 'Firebase init');
