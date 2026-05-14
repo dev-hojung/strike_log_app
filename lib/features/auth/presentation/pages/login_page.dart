@@ -102,6 +102,8 @@ class _LoginPageState extends State<LoginPage> {
         // JWT 먼저 저장해야 이후 요청에 Authorization 헤더가 부착됨
         if (accessToken != null && accessToken.isNotEmpty) {
           await AuthTokenStorage.save(accessToken);
+          // 직전 세션의 401 가드를 해제하여 새 세션에서 재무장될 수 있도록 한다.
+          ApiClient.resetUnauthorizedGuard();
         }
 
         if (userId != null) {

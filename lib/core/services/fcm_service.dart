@@ -58,6 +58,11 @@ class FcmService {
   bool get isInitialized => _initialized;
 
   Future<void> init() async {
+    // 핫 리스타트나 다른 진입점에서 init이 또 호출돼도 listener가 중복 등록되지
+    // 않도록 가드. onTokenRefresh/onMessage/onMessageOpenedApp 구독은 핸들이
+    // 저장되지 않아 cancel이 불가하므로, 진입 자체를 막는다.
+    if (_initialized) return;
+
     await _initLocalNotifications();
 
     FirebaseMessaging.onBackgroundMessage(_firebaseBackgroundHandler);
