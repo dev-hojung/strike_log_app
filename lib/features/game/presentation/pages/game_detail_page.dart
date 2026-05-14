@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/services/share_capture.dart';
 import '../../data/bowling_scorer.dart';
 import '../../data/models/game_detail.dart';
 import '../../data/services/game_api_service.dart';
@@ -23,9 +24,32 @@ class GameDetailPage extends StatefulWidget {
 
 class _GameDetailPageState extends State<GameDetailPage> {
   final GameApiService _api = GameApiService();
+  final GlobalKey _shareKey = GlobalKey();
   GameDetail? _detail;
   bool _isLoading = true;
+  bool _isSharing = false;
   String? _error;
+
+  Future<void> _shareResult() async {
+    if (_isSharing || _detail == null) return;
+    setState(() => _isSharing = true);
+    try {
+      final d = _detail!;
+      final ok = await ShareCapture.sharePng(
+        key: _shareKey,
+        filename: 'game-${d.id}',
+        text: '볼링 ${d.totalScore}점 🎳',
+      );
+      if (!mounted) return;
+      if (!ok) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('공유에 실패했습니다.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSharing = false);
+    }
+  }
 
   @override
   void initState() {
@@ -73,6 +97,14 @@ class _GameDetailPageState extends State<GameDetailPage> {
               color: fg,
             )),
         centerTitle: true,
+        actions: [
+          if (_detail != null)
+            IconButton(
+              icon: Icon(Symbols.share, color: fg),
+              tooltip: '결과 공유',
+              onPressed: _isSharing ? null : _shareResult,
+            ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -112,33 +144,43 @@ class _GameDetailPageState extends State<GameDetailPage> {
     final dateStr = DateFormat('yyyy년 MM월 dd일 a h:mm', 'ko_KR')
         .format(d.createdAt ?? d.startedAt ?? d.playDate);
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-      children: [
-        _buildHero(d, dateStr),
-        const SizedBox(height: 24),
-        _buildScorecard(isDark, d),
-        if (streak >= 2) ...[
-          const SizedBox(height: 20),
-          _buildStreakRow(isDark, streak),
-        ],
-        const SizedBox(height: 20),
-        Row(
-          children: [
-            _buildStatBox('${stats.strikes}', '스트라이크', 'X', Colors.blue,
-                isDark),
-            const SizedBox(width: 12),
-            _buildStatBox('${stats.spares}', '스페어', '/', Colors.purple,
-                isDark),
-            const SizedBox(width: 12),
-            _buildStatBox('${stats.opens}', '오픈', '-', Colors.amber, isDark),
-          ],
+    final bg = isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
+    return SingleChildScrollView(
+      child: RepaintBoundary(
+        key: _shareKey,
+        child: Container(
+          color: bg,
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+          child: Column(
+            children: [
+              _buildHero(d, dateStr),
+              const SizedBox(height: 24),
+              _buildScorecard(isDark, d),
+              if (streak >= 2) ...[
+                const SizedBox(height: 20),
+                _buildStreakRow(isDark, streak),
+              ],
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  _buildStatBox('${stats.strikes}', '스트라이크', 'X', Colors.blue,
+                      isDark),
+                  const SizedBox(width: 12),
+                  _buildStatBox('${stats.spares}', '스페어', '/', Colors.purple,
+                      isDark),
+                  const SizedBox(width: 12),
+                  _buildStatBox(
+                      '${stats.opens}', '오픈', '-', Colors.amber, isDark),
+                ],
+              ),
+              if (d.seriesId != null) ...[
+                const SizedBox(height: 20),
+                _buildSeriesLink(isDark, d),
+              ],
+            ],
+          ),
         ),
-        if (d.seriesId != null) ...[
-          const SizedBox(height: 20),
-          _buildSeriesLink(isDark, d),
-        ],
-      ],
+      ),
     );
   }
 
@@ -258,7 +300,8 @@ class _GameDetailPageState extends State<GameDetailPage> {
               crossAxisCount: 5,
               mainAxisSpacing: 8,
               crossAxisSpacing: 8,
-              childAspectRatio: 0.95,
+              // 10프레임은 3슬롯, 누적 점수까지 들어가야 해서 세로를 더 길게 잡는다
+              childAspectRatio: 0.72,
             ),
             itemBuilder: (context, i) {
               return _frameTile(isDark, d, i);
@@ -273,51 +316,61 @@ class _GameDetailPageState extends State<GameDetailPage> {
     final cum = d.cumulativeScores[i];
     final throwSlots = i == 9 ? 3 : 2;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 5),
       decoration: BoxDecoration(
         color: isDark ? Colors.black26 : Colors.black.withValues(alpha: 0.03),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: isDark ? Colors.white10 : Colors.black12),
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Text(
             '${i + 1}',
             style: TextStyle(
-              fontSize: 10,
+              fontSize: 9,
               color: AppColors.textSecondaryDark,
+              height: 1.0,
             ),
           ),
-          const SizedBox(height: 2),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              for (int t = 0; t < throwSlots; t++) ...[
-                if (t > 0) const SizedBox(width: 2),
-                Container(
-                  width: 14,
-                  height: 18,
-                  alignment: Alignment.center,
-                  child: Text(
-                    _throwDisplay(d, i, t),
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color:
-                          isDark ? Colors.white : AppColors.textPrimaryLight,
+          const SizedBox(height: 4),
+          // 10프레임에서 3슬롯이 가로를 넘기지 않도록 FittedBox로 축소 허용
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (int t = 0; t < throwSlots; t++) ...[
+                  if (t > 0) const SizedBox(width: 2),
+                  SizedBox(
+                    width: 12,
+                    height: 16,
+                    child: Center(
+                      child: Text(
+                        _throwDisplay(d, i, t),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: isDark
+                              ? Colors.white
+                              : AppColors.textPrimaryLight,
+                          height: 1.0,
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                ],
               ],
-            ],
+            ),
           ),
-          const Spacer(),
+          const SizedBox(height: 6),
           Text(
             cum != null ? '$cum' : '',
-            style: TextStyle(
-              fontSize: 13,
+            style: const TextStyle(
+              fontSize: 12,
               fontWeight: FontWeight.w600,
               color: AppColors.primary,
+              height: 1.0,
             ),
           ),
         ],

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/services/share_capture.dart';
 import '../../../home/presentation/pages/home_dashboard_page.dart';
 import '../../data/bowling_scorer.dart';
 import '../../data/services/game_draft_repository.dart';
@@ -77,8 +78,30 @@ class GameSummaryPage extends StatefulWidget {
 class _GameSummaryPageState extends State<GameSummaryPage> {
   final GameSaveService _saveService = GameSaveService();
   final GameDraftRepository _draftRepo = GameDraftRepository();
+  final GlobalKey _shareKey = GlobalKey();
   bool _isSaving = false;
   bool _isSaved = false;
+  bool _isSharing = false;
+
+  Future<void> _shareResult() async {
+    if (_isSharing) return;
+    setState(() => _isSharing = true);
+    try {
+      final ok = await ShareCapture.sharePng(
+        key: _shareKey,
+        filename: 'game-${widget.totalScore}',
+        text: '볼링 ${widget.totalScore}점 🎳',
+      );
+      if (!mounted) return;
+      if (!ok) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('공유에 실패했습니다.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSharing = false);
+    }
+  }
 
   // 페이지 진입 시 기준이 되는 "이전 최고 점수" 스냅샷.
   // 진입 시점에 한 번만 캡처해서, 저장으로 캐시가 갱신되어도 배너가 사라지지 않도록 한다.
@@ -570,13 +593,24 @@ class _GameSummaryPageState extends State<GameSummaryPage> {
           ),
         ),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: Icon(Symbols.share, color: textColor),
+            tooltip: '결과 공유',
+            onPressed: _isSharing ? null : _shareResult,
+          ),
+        ],
       ),
       body: Column(
         children: [
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Column(
+              child: RepaintBoundary(
+                key: _shareKey,
+                child: Container(
+                  color: bgColor,
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
                 children: [
                   const SizedBox(height: 16),
                   // 최종 점수 헤더
@@ -654,9 +688,11 @@ class _GameSummaryPageState extends State<GameSummaryPage> {
                   const SizedBox(height: 32),
                 ],
               ),
+                ),
+              ),
             ),
           ),
-          
+
           // 하단 버튼 고정 영역
           SafeArea(
             child: Padding(

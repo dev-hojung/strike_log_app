@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/services/share_capture.dart';
 import '../../data/models/game_series.dart';
 import '../../data/services/series_api_service.dart';
 
@@ -27,9 +28,32 @@ class SeriesSummaryPage extends StatefulWidget {
 
 class _SeriesSummaryPageState extends State<SeriesSummaryPage> {
   final SeriesApiService _api = SeriesApiService();
+  final GlobalKey _shareKey = GlobalKey();
   GameSeries? _series;
   bool _isLoading = true;
+  bool _isSharing = false;
   String? _error;
+
+  Future<void> _shareResult() async {
+    if (_isSharing || _series == null) return;
+    setState(() => _isSharing = true);
+    try {
+      final s = _series!;
+      final ok = await ShareCapture.sharePng(
+        key: _shareKey,
+        filename: 'series-${s.id}',
+        text: '${s.gameCount}게임 시리즈 ${s.totalScore}점 (평균 ${s.averageScore.toStringAsFixed(1)}) 🎳',
+      );
+      if (!mounted) return;
+      if (!ok) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('공유에 실패했습니다.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSharing = false);
+    }
+  }
 
   @override
   void initState() {
@@ -79,6 +103,14 @@ class _SeriesSummaryPageState extends State<SeriesSummaryPage> {
               color: fg,
             )),
         centerTitle: true,
+        actions: [
+          if (_series != null)
+            IconButton(
+              icon: Icon(Symbols.share, color: fg),
+              tooltip: '결과 공유',
+              onPressed: _isSharing ? null : _shareResult,
+            ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -116,39 +148,49 @@ class _SeriesSummaryPageState extends State<SeriesSummaryPage> {
             series.stats.opens +
             series.stats.longestStrikeStreak >
         0;
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-      children: [
-        _buildHeroCard(series),
-        const SizedBox(height: 24),
-        _buildMetaRow(isDark, series),
-        if (hasStats) ...[
-          const SizedBox(height: 24),
-          Text(
-            '시리즈 합계',
-            style: TextStyle(
-              color: AppColors.textSecondaryDark,
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.2,
-            ),
-          ),
-          const SizedBox(height: 12),
-          _buildAggStatsRow(isDark, series.stats),
-        ],
-        const SizedBox(height: 28),
-        Text(
-          '게임별 점수',
-          style: TextStyle(
-            color: AppColors.textSecondaryDark,
-            fontSize: 13,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.2,
+    final bg = isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
+    return SingleChildScrollView(
+      child: RepaintBoundary(
+        key: _shareKey,
+        child: Container(
+          color: bg,
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildHeroCard(series),
+              const SizedBox(height: 24),
+              _buildMetaRow(isDark, series),
+              if (hasStats) ...[
+                const SizedBox(height: 24),
+                Text(
+                  '시리즈 합계',
+                  style: TextStyle(
+                    color: AppColors.textSecondaryDark,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _buildAggStatsRow(isDark, series.stats),
+              ],
+              const SizedBox(height: 28),
+              Text(
+                '게임별 점수',
+                style: TextStyle(
+                  color: AppColors.textSecondaryDark,
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.2,
+                ),
+              ),
+              const SizedBox(height: 12),
+              ..._buildGameList(isDark, series),
+            ],
           ),
         ),
-        const SizedBox(height: 12),
-        ..._buildGameList(isDark, series),
-      ],
+      ),
     );
   }
 
