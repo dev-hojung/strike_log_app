@@ -5,6 +5,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/api_client.dart';
 import '../../data/services/group_creation_requests_service.dart';
 import 'club_join_requests_page.dart';
+import 'club_leaderboard_page.dart';
 import 'create_club_page.dart';
 import 'explore_clubs_page.dart';
 import 'member_stats_page.dart';
@@ -576,6 +577,15 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
               ],
             ),
           ),
+          IconButton(
+            icon: Icon(
+              Symbols.leaderboard,
+              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              size: 20,
+            ),
+            tooltip: '랭킹',
+            onPressed: _openLeaderboard,
+          ),
           if (_isClubLeader())
             IconButton(
               icon: Icon(
@@ -587,6 +597,20 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
               onPressed: _openJoinRequests,
             ),
         ],
+      ),
+    );
+  }
+
+  void _openLeaderboard() {
+    final clubId = _club?['id'];
+    if (clubId == null) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ClubLeaderboardPage(
+          clubId: clubId is int ? clubId : int.parse(clubId.toString()),
+          clubName: _club?['name']?.toString() ?? '',
+        ),
       ),
     );
   }
