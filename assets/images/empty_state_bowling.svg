@@ -1,0 +1,84 @@
+<svg viewBox="0 0 240 240" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="halo" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#135BEC" stop-opacity="0.28"/>
+      <stop offset="60%" stop-color="#135BEC" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#135BEC" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="pinBody" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#D9DFEC"/>
+    </linearGradient>
+    <linearGradient id="ball" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2E6FFF"/>
+      <stop offset="100%" stop-color="#0B3FA8"/>
+    </linearGradient>
+    <filter id="softShadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+      <feOffset dx="0" dy="3" result="off"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.35"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- soft halo -->
+  <circle cx="120" cy="120" r="100" fill="url(#halo)"/>
+
+  <!-- impact burst lines behind pin -->
+  <g stroke="#FFB300" stroke-width="3" stroke-linecap="round" opacity="0.85">
+    <line x1="120" y1="36"  x2="120" y2="22"/>
+    <line x1="62"  y1="58"  x2="52"  y2="48"/>
+    <line x1="178" y1="58"  x2="188" y2="48"/>
+    <line x1="44"  y1="118" x2="30"  y2="118"/>
+    <line x1="196" y1="118" x2="210" y2="118"/>
+  </g>
+  <g stroke="#135BEC" stroke-width="3" stroke-linecap="round" opacity="0.65">
+    <line x1="78"  y1="42"  x2="68"  y2="30"/>
+    <line x1="162" y1="42"  x2="172" y2="30"/>
+  </g>
+
+  <!-- bowling pin (centered) -->
+  <g transform="translate(120 130)" filter="url(#softShadow)">
+    <path d="
+      M 0,-72
+      C 14,-72 21,-60 21,-46
+      C 21,-32 11,-26 11,-14
+      C 11,-2  32,10 32,40
+      C 32,60  14,72 0,72
+      C -14,72 -32,60 -32,40
+      C -32,10 -11,-2 -11,-14
+      C -11,-26 -21,-32 -21,-46
+      C -21,-60 -14,-72 0,-72
+      Z"
+      fill="url(#pinBody)" stroke="#A6B0C6" stroke-width="1.4"/>
+    <!-- red collar stripes -->
+    <ellipse cx="0" cy="-32" rx="16" ry="3.4" fill="#E63946"/>
+    <ellipse cx="0" cy="-22" rx="15" ry="3.4" fill="#E63946"/>
+    <!-- subtle highlight on pin -->
+    <path d="M -10,-58 C -16,-44 -16,-24 -12,-10" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" opacity="0.55" fill="none"/>
+  </g>
+
+  <!-- small bowling ball at bottom-left -->
+  <g transform="translate(54 198)" filter="url(#softShadow)">
+    <circle cx="0" cy="0" r="22" fill="url(#ball)"/>
+    <circle cx="-6" cy="-7" r="2.2" fill="#08234E"/>
+    <circle cx="3"  cy="-9" r="2.2" fill="#08234E"/>
+    <circle cx="-1" cy="-2" r="2.2" fill="#08234E"/>
+    <!-- specular highlight -->
+    <ellipse cx="-9" cy="-12" rx="4" ry="2.5" fill="#FFFFFF" opacity="0.35"/>
+  </g>
+
+  <!-- floating sparkles -->
+  <g fill="#FFB300">
+    <path d="M 200,70 l 2.5,-7 l 2.5,7 l 7,2.5 l -7,2.5 l -2.5,7 l -2.5,-7 l -7,-2.5 z"/>
+  </g>
+  <g fill="#135BEC">
+    <circle cx="38"  cy="74"  r="3"/>
+    <circle cx="205" cy="160" r="3.5"/>
+    <circle cx="170" cy="200" r="2.5"/>
+  </g>
+  <g fill="#FFB300">
+    <circle cx="32"  cy="148" r="2.5"/>
+    <circle cx="190" cy="38"  r="2"/>
+  </g>
+</svg>

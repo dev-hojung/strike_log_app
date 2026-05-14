@@ -16,6 +16,15 @@ class HomeDashboardData {
   /// 이번 달 경기 수
   final int? currentMonthGameCount;
 
+  /// 이번 달 평균 점수
+  final int? currentMonthAvg;
+
+  /// 이번 달 누적 스트라이크/스페어/오픈 + 올커버 게임 수
+  final int monthlyStrikes;
+  final int monthlySpares;
+  final int monthlyOpens;
+  final int monthlyAllCoverGames;
+
   /// 소속 클럽 목록
   final List<ClubInfo> clubs;
 
@@ -30,6 +39,11 @@ class HomeDashboardData {
     this.hasGroup = false,
     this.trendStatus,
     this.currentMonthGameCount,
+    this.currentMonthAvg,
+    this.monthlyStrikes = 0,
+    this.monthlySpares = 0,
+    this.monthlyOpens = 0,
+    this.monthlyAllCoverGames = 0,
     this.clubs = const [],
   });
 
@@ -61,12 +75,20 @@ class RecentGame {
   final DateTime? createdAt;
   final String? location;
 
+  /// 시리즈에 속한 게임이면 시리즈 ID. 단일 게임은 null.
+  final int? seriesId;
+
+  /// 시리즈 내 게임 순번(1-based). 단일 게임은 null.
+  final int? seriesIndex;
+
   RecentGame({
     required this.id,
     required this.totalScore,
     required this.playDate,
     this.createdAt,
     this.location,
+    this.seriesId,
+    this.seriesIndex,
   });
 
   factory RecentGame.fromJson(Map<String, dynamic> json) {
@@ -80,6 +102,8 @@ class RecentGame {
           ? DateTime.parse(createdRaw).toLocal()
           : null,
       location: json['location'],
+      seriesId: (json['series_id'] as num?)?.toInt(),
+      seriesIndex: (json['series_index'] as num?)?.toInt(),
     );
   }
 }

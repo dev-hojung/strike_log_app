@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'core/services/api_client.dart';
@@ -35,6 +36,9 @@ void main() async {
 
   // 환경변수(.env) 로드
   await dotenv.load(fileName: ".env");
+
+  // 한국어 로케일 데이터 초기화. DateFormat(..., 'ko_KR') 호출 전 필수.
+  await initializeDateFormatting('ko_KR');
 
   // 인증 토큰을 메모리로 미리 로드 (Dio 인터셉터가 동기 접근)
   await AuthTokenStorage.init();

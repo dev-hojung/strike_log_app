@@ -6,6 +6,8 @@ import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/unread_notifications_service.dart';
+import '../../../game/data/models/game_series.dart';
+import '../../../game/data/services/series_api_service.dart';
 import '../../../notifications/presentation/pages/notifications_page.dart';
 import '../../data/models/home_dashboard_data.dart';
 import '../../data/services/home_api_service.dart';
@@ -17,7 +19,13 @@ class HomeDashboardPage extends StatefulWidget {
   /// 캐시된 데이터를 무효화합니다 (게임 저장 후 최신 데이터 로드를 위해 사용).
   static void invalidateCache() {
     _HomeDashboardPageState._cachedData = null;
+    _HomeDashboardPageState._cachedBestSeries = null;
   }
+
+  /// 마지막으로 본 최고 점수(캐시 기준). 게임 종료 직후 "베스트 갱신" 판정용.
+  /// 캐시가 비어 있으면 null.
+  static int? get cachedHighestScore =>
+      _HomeDashboardPageState._cachedData?.highestScore;
 
   @override
   State<HomeDashboardPage> createState() => _HomeDashboardPageState();
@@ -25,17 +33,21 @@ class HomeDashboardPage extends StatefulWidget {
 
 class _HomeDashboardPageState extends State<HomeDashboardPage> {
   final HomeApiService _apiService = HomeApiService();
+  final SeriesApiService _seriesService = SeriesApiService();
 
   /// 캐싱된 대시보드 데이터 (페이지 재생성 시에도 유지)
   static HomeDashboardData? _cachedData;
+  static GameSeries? _cachedBestSeries;
 
   HomeDashboardData? _data;
+  GameSeries? _bestSeries;
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
     _data = _cachedData;
+    _bestSeries = _cachedBestSeries;
     _isLoading = _cachedData == null;
     _fetchData();
     // 미읽음 알림 수는 전역 싱글톤이 관리. 대시보드 진입마다 동기화.
@@ -46,10 +58,19 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
     final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getString('user_id') ?? '1';
     final data = await _apiService.fetchDashboardData(userId);
+    // 베스트 시리즈는 실패해도 대시보드 자체에는 영향 없도록 격리.
+    GameSeries? best;
+    try {
+      best = await _seriesService.getBest(userId);
+    } catch (_) {
+      best = null;
+    }
     if (mounted) {
       setState(() {
         _data = data;
+        _bestSeries = best;
         _cachedData = data;
+        _cachedBestSeries = best;
         _isLoading = false;
       });
     }
@@ -145,6 +166,18 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
             // 성적 추이 그래프
             if (data.recentTrend.isNotEmpty)
               _buildTrendChart(context, isDark, data.recentTrend),
+
+            // 이번 달 요약 (이번 달 경기가 있을 때만)
+            if ((data.currentMonthGameCount ?? 0) > 0) ...[
+              const SizedBox(height: 24),
+              _buildMonthlyPerformanceCard(data),
+            ],
+
+            // 베스트 시리즈 카드 (완주된 시리즈가 있을 때만)
+            if (_bestSeries != null) ...[
+              const SizedBox(height: 24),
+              _buildBestSeriesCard(isDark, _bestSeries!),
+            ],
 
             const SizedBox(height: 24),
 
@@ -261,30 +294,10 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-              Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  color:
-                      isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.1),
-                      blurRadius: 30,
-                      spreadRadius: 5,
-                    ),
-                  ],
-                ),
-                child: Center(
-                  child: SvgPicture.asset(
-                    'assets/images/bowling_icon.svg',
-                    width: 50,
-                    height: 50,
-                    colorFilter: const ColorFilter.mode(
-                        AppColors.primary, BlendMode.srcIn),
-                  ),
-                ),
+              SvgPicture.asset(
+                'assets/images/empty_state_bowling.svg',
+                width: 200,
+                height: 200,
               ),
               const SizedBox(height: 32),
               Text(
@@ -484,58 +497,15 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('성과 추이',
-                      style: TextStyle(
-                          color: isDark
-                              ? AppColors.textSecondaryDark
-                              : Colors.grey,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500)),
-                  const SizedBox(height: 4),
-                  Text('최근 ${trend.length}경기',
-                      style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? Colors.white : Colors.black)),
-                ],
-              ),
-              const Icon(Symbols.more_horiz, color: Colors.grey),
-            ],
-          ),
+          Text('최근 ${trend.length}경기',
+              style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : Colors.black)),
           const SizedBox(height: 24),
           SizedBox(
-            height: 160,
-            child: LineChart(
-              LineChartData(
-                gridData: const FlGridData(show: false),
-                titlesData: const FlTitlesData(show: false),
-                borderData: FlBorderData(show: false),
-                lineBarsData: [
-                  LineChartBarData(
-                    spots: trend
-                        .asMap()
-                        .entries
-                        .map((e) =>
-                            FlSpot(e.key.toDouble(), e.value.score.toDouble()))
-                        .toList(),
-                    isCurved: true,
-                    color: AppColors.primary,
-                    barWidth: 3,
-                    isStrokeCapRound: true,
-                    dotData: const FlDotData(show: true),
-                    belowBarData: BarAreaData(
-                        show: true,
-                        color: AppColors.primary.withValues(alpha: 0.1)),
-                  ),
-                ],
-              ),
-            ),
+            height: 180,
+            child: _buildTrendLineChart(isDark, trend),
           ),
           const SizedBox(height: 12),
           Row(
@@ -545,6 +515,329 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
               _buildChartLabel('${(trend.length / 2).floor()}경기'),
               _buildChartLabel('${trend.length}경기'),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 추이 라인 차트.
+  /// - Y축 라벨: 최소/최대 점수
+  /// - 평균 라인: 점선 가이드
+  /// - 최고점 마커: 색상 강조 + 라벨
+  Widget _buildTrendLineChart(bool isDark, List<TrendData> trend) {
+    final scores = trend.map((t) => t.score).toList();
+    final minScore = scores.reduce((a, b) => a < b ? a : b);
+    final maxScore = scores.reduce((a, b) => a > b ? a : b);
+    final avg = scores.reduce((a, b) => a + b) / scores.length;
+
+    // Y축 여백: 최저점 아래 10, 최고점 위 10. 동일 값일 때 division-by-zero 방지.
+    final yMin = (minScore - 10).clamp(0, 300).toDouble();
+    final yMax = (maxScore + 10).clamp(0, 300).toDouble();
+
+    // 최고점 인덱스 (여러 개면 첫 번째). 단일 데이터일 때도 안전.
+    final maxIdx = scores.indexOf(maxScore);
+
+    final axisLabelStyle = TextStyle(
+      color: isDark ? AppColors.textSecondaryDark : Colors.grey,
+      fontSize: 10,
+      fontWeight: FontWeight.w500,
+    );
+
+    return LineChart(
+      LineChartData(
+        minY: yMin,
+        maxY: yMax,
+        gridData: const FlGridData(show: false),
+        borderData: FlBorderData(show: false),
+        titlesData: FlTitlesData(
+          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          bottomTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 32,
+              interval: (yMax - yMin) <= 0 ? 1 : (yMax - yMin),
+              getTitlesWidget: (value, meta) {
+                // 가장자리 값에만 라벨 표시(최저/최고). 중간 값 노이즈 차단.
+                if ((value - yMin).abs() < 0.5 || (value - yMax).abs() < 0.5) {
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: Text(value.toInt().toString(),
+                        style: axisLabelStyle),
+                  );
+                }
+                return const SizedBox.shrink();
+              },
+            ),
+          ),
+        ),
+        // 평균 라인 (점선)
+        extraLinesData: ExtraLinesData(
+          horizontalLines: [
+            HorizontalLine(
+              y: avg,
+              color: Colors.grey.withValues(alpha: 0.5),
+              strokeWidth: 1,
+              dashArray: [4, 4],
+              label: HorizontalLineLabel(
+                show: true,
+                alignment: Alignment.topRight,
+                padding: const EdgeInsets.only(right: 4, bottom: 2),
+                style: axisLabelStyle,
+                labelResolver: (_) => '평균 ${avg.toStringAsFixed(0)}',
+              ),
+            ),
+          ],
+        ),
+        lineBarsData: [
+          LineChartBarData(
+            spots: trend
+                .asMap()
+                .entries
+                .map((e) =>
+                    FlSpot(e.key.toDouble(), e.value.score.toDouble()))
+                .toList(),
+            isCurved: true,
+            color: AppColors.primary,
+            barWidth: 3,
+            isStrokeCapRound: true,
+            dotData: FlDotData(
+              show: true,
+              getDotPainter: (spot, percent, bar, index) {
+                final isMax = index == maxIdx;
+                return FlDotCirclePainter(
+                  radius: isMax ? 6 : 3,
+                  color: isMax ? Colors.amber : AppColors.primary,
+                  strokeWidth: isMax ? 2 : 0,
+                  strokeColor: isDark
+                      ? AppColors.surfaceDark
+                      : Colors.white,
+                );
+              },
+            ),
+            belowBarData: BarAreaData(
+              show: true,
+              color: AppColors.primary.withValues(alpha: 0.1),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 이번 달 요약 카드: 평균, 경기 수, 누적 X/S/-, 올커버 게임 수.
+  Widget _buildMonthlyPerformanceCard(HomeDashboardData data) {
+    final avg = data.currentMonthAvg ?? 0;
+    final games = data.currentMonthGameCount ?? 0;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF135BEC), Color(0xFF0D47C9)],
+        ),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                '이번 달 요약',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  '전체',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              _monthlyStatColumn('평균', avg > 0 ? '$avg' : '-'),
+              const SizedBox(width: 32),
+              _monthlyStatColumn('경기 수', '$games'),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Container(
+            width: double.infinity,
+            height: 1,
+            color: Colors.white.withValues(alpha: 0.15),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _monthlyFrameItem('스트라이크', data.monthlyStrikes,
+                  const Color(0xFFFBBF24)),
+              _monthlyFrameItem('스페어', data.monthlySpares,
+                  const Color(0xFF34D399)),
+              _monthlyFrameItem('오픈', data.monthlyOpens,
+                  const Color(0xFFF87171)),
+              _monthlyFrameItem('올커버', data.monthlyAllCoverGames,
+                  const Color(0xFF60A5FA)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _monthlyStatColumn(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.7),
+            fontSize: 12,
+          ),
+        ),
+        Text(
+          value,
+          style: const TextStyle(color: Colors.white, fontSize: 32),
+        ),
+      ],
+    );
+  }
+
+  Widget _monthlyFrameItem(String label, int count, Color accentColor) {
+    return Column(
+      children: [
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: accentColor.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Center(
+            child: Text(
+              '$count',
+              style: TextStyle(
+                color: accentColor,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          label,
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.7),
+            fontSize: 11,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 베스트 시리즈 카드: 완주된 시리즈 중 총점 최고 기록을 표시.
+  Widget _buildBestSeriesCard(bool isDark, GameSeries series) {
+    final dateStr = DateFormat('yyyy년 MM월 dd일').format(series.startedAt);
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF7B61FF), Color(0xFF135BEC)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.2),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Symbols.workspace_premium,
+                color: Colors.white, size: 30),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '베스트 시리즈',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.85),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Text(
+                      '${series.totalScore}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 30,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '점 · ${series.gameCount}게임',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.85),
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '평균 ${series.averageScore.toStringAsFixed(1)}점 · $dateStr',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.75),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -566,20 +859,11 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text('최근 경기',
-                style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : Colors.black)),
-            Text('기록 보기',
-                style: TextStyle(
-                    fontSize: 14,
-                    color: AppColors.primary)),
-          ],
-        ),
+        Text('최근 경기',
+            style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : Colors.black)),
         const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.all(16),

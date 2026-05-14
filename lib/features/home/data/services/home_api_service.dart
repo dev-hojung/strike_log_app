@@ -9,16 +9,21 @@ class HomeApiService {
     try {
       final dio = _apiClient.dio;
 
-      // 프로필 + 통계는 필수, 최근 경기 + 클럽은 실패해도 무방
+      // 프로필 + 통계는 필수, 최근 경기 + 클럽 + 월간 프레임 통계는 실패해도 무방
       final profileFuture = dio.get('/users/$userId');
       final statsFuture = dio.get('/games/users/$userId/statistics');
       final recentFuture = dio.get('/games/users/$userId/recent').then((r) => r.data).catchError((_) => null);
       final groupsFuture = dio.get('/groups/me').then((r) => r.data).catchError((_) => null);
+      final monthlyFrameFuture = dio
+          .get('/games/users/$userId/monthly-frame-stats')
+          .then((r) => r.data)
+          .catchError((_) => null);
 
       final profileRes = await profileFuture;
       final statsRes = await statsFuture;
       final recentGameData = await recentFuture;
       final groupsData = await groupsFuture;
+      final monthlyFrameData = await monthlyFrameFuture;
 
       final profile = profileRes.data ?? {};
       final stats = statsRes.data ?? {};
@@ -26,6 +31,8 @@ class HomeApiService {
       // 월별 트렌드 파싱
       final monthlyTrend = stats['monthlyTrend'] ?? {};
       final trendStatus = monthlyTrend['status'] ?? 'none';
+      final monthlyFrame =
+          monthlyFrameData is Map ? monthlyFrameData : <String, dynamic>{};
 
       return HomeDashboardData(
         nickname: profile['nickname'] ?? 'Guest',
@@ -37,6 +44,12 @@ class HomeApiService {
         trendPercentage: monthlyTrend['percentage']?.toDouble(),
         trendStatus: trendStatus,
         currentMonthGameCount: monthlyTrend['currentMonthGameCount'],
+        currentMonthAvg: monthlyTrend['currentMonthAvg'],
+        monthlyStrikes: (monthlyFrame['strikes'] as num?)?.toInt() ?? 0,
+        monthlySpares: (monthlyFrame['spares'] as num?)?.toInt() ?? 0,
+        monthlyOpens: (monthlyFrame['opens'] as num?)?.toInt() ?? 0,
+        monthlyAllCoverGames:
+            (monthlyFrame['allCoverGames'] as num?)?.toInt() ?? 0,
         recentTrend: stats['recentTrend'] != null
             ? (stats['recentTrend'] as List)
                 .map((e) => TrendData.fromJson(Map<String, dynamic>.from(e)))
