@@ -1,5 +1,6 @@
 import '../../../../core/services/api_client.dart';
 import '../../../home/data/models/home_dashboard_data.dart';
+import '../models/game_detail.dart';
 
 class GameApiService {
   final ApiClient _apiClient = ApiClient();
@@ -19,5 +20,15 @@ class GameApiService {
     } catch (e) {
       throw Exception('게임 기록을 불러오는데 실패했습니다: $e');
     }
+  }
+
+  /// 게임 단건 상세 조회 (프레임 포함).
+  Future<GameDetail> fetchGameDetail(int gameId) async {
+    final response = await _apiClient.dio.get('/games/$gameId/detail');
+    final data = response.data;
+    if (data is! Map) {
+      throw Exception('게임 상세 응답이 비정상입니다.');
+    }
+    return GameDetail.fromJson(Map<String, dynamic>.from(data));
   }
 }

@@ -1,9 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../home/presentation/pages/home_dashboard_page.dart';
+import '../../data/bowling_scorer.dart';
 import '../../data/services/game_draft_repository.dart';
 import '../../data/services/game_save_service.dart';
+import '../../data/services/series_api_service.dart';
+import 'frame_entry_page.dart';
+import 'series_summary_page.dart';
 import 'package:intl/intl.dart';
 
 /// 볼링 게임 종료 후 결과를 보여주는 요약 페이지입니다.
@@ -25,6 +32,15 @@ class GameSummaryPage extends StatefulWidget {
   // 생략되면 DateTime.now() 사용 (backward compat).
   final DateTime? gameStartedAt;
 
+  /// 시리즈에 속한 게임이면 시리즈 ID. 단일 게임은 null.
+  final int? seriesId;
+
+  /// 시리즈 내 현재 게임 순번(1-based). 단일 게임은 null.
+  final int? seriesIndex;
+
+  /// 시리즈 총 게임 수. 단일 게임은 null.
+  final int? targetGameCount;
+
   const GameSummaryPage({
     super.key,
     required this.frames,
@@ -35,7 +51,24 @@ class GameSummaryPage extends StatefulWidget {
     required this.openCount,
     this.location,
     this.gameStartedAt,
+    this.seriesId,
+    this.seriesIndex,
+    this.targetGameCount,
   });
+
+  /// 시리즈 중간 게임 여부(다음 게임이 남아 있는지).
+  bool get hasNextSeriesGame =>
+      seriesId != null &&
+      seriesIndex != null &&
+      targetGameCount != null &&
+      seriesIndex! < targetGameCount!;
+
+  /// 시리즈의 마지막 게임 여부(저장 후 completeSeries 호출 대상).
+  bool get isFinalSeriesGame =>
+      seriesId != null &&
+      seriesIndex != null &&
+      targetGameCount != null &&
+      seriesIndex! >= targetGameCount!;
 
   @override
   State<GameSummaryPage> createState() => _GameSummaryPageState();
@@ -46,6 +79,20 @@ class _GameSummaryPageState extends State<GameSummaryPage> {
   final GameDraftRepository _draftRepo = GameDraftRepository();
   bool _isSaving = false;
   bool _isSaved = false;
+
+  // 페이지 진입 시 기준이 되는 "이전 최고 점수" 스냅샷.
+  // 진입 시점에 한 번만 캡처해서, 저장으로 캐시가 갱신되어도 배너가 사라지지 않도록 한다.
+  late final int? _previousBest = HomeDashboardPage.cachedHighestScore;
+
+  late final int _streak =
+      BowlingScorer.longestStrikeStreak(widget.frames);
+
+  bool _isNewBest() {
+    final prev = _previousBest;
+    // 캐시 없거나 첫 게임이면 비교 불가
+    if (prev == null || prev <= 0) return false;
+    return widget.totalScore > prev;
+  }
 
   String _getThrowDisplay(int frameIndex, int throwIndex) {
     final frame = widget.frames[frameIndex];
@@ -122,6 +169,9 @@ class _GameSummaryPageState extends State<GameSummaryPage> {
         if (widget.gameStartedAt != null)
           'started_at': widget.gameStartedAt!.toUtc().toIso8601String(),
         'ended_at': DateTime.now().toUtc().toIso8601String(),
+        // 시리즈 게임이면 시리즈 정보 함께 전달
+        if (widget.seriesId != null) 'series_id': widget.seriesId,
+        if (widget.seriesIndex != null) 'series_index': widget.seriesIndex,
       };
 
       // 재시도 루프: 자동 재시도 3회까지, 최종 실패 시 사용자에게 재시도 기회 제공
@@ -131,10 +181,7 @@ class _GameSummaryPageState extends State<GameSummaryPage> {
 
         if (result.success) {
           _isSaved = true;
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('게임이 성공적으로 저장되었습니다.')),
-          );
-          Navigator.of(context).popUntil((route) => route.isFirst);
+          await _afterSaveSuccess();
           return;
         }
 
@@ -163,6 +210,90 @@ class _GameSummaryPageState extends State<GameSummaryPage> {
         setState(() => _isSaving = false);
       }
     }
+  }
+
+  /// 저장 성공 후 흐름 분기.
+  /// - 시리즈 중간 게임이면: "다음 게임 진행" 다이얼로그
+  /// - 시리즈 마지막 게임이면: completeSeries 호출 후 루트로 복귀
+  /// - 단일 게임이면: 그대로 루트로 복귀
+  Future<void> _afterSaveSuccess() async {
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(
+      const SnackBar(content: Text('게임이 성공적으로 저장되었습니다.')),
+    );
+
+    if (widget.hasNextSeriesGame) {
+      final shouldContinue = await _askContinueSeries();
+      if (!mounted) return;
+      if (shouldContinue) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => FrameEntryPage(
+              isClubGame: false,
+              location: widget.location,
+              seriesId: widget.seriesId,
+              seriesIndex: widget.seriesIndex! + 1,
+              targetGameCount: widget.targetGameCount,
+            ),
+          ),
+        );
+        return;
+      }
+      // 중도 종료 선택: 시리즈 명시 종료 후 루트로
+      unawaited(SeriesApiService().completeSeries(widget.seriesId!));
+      if (!mounted) return;
+      Navigator.of(context).popUntil((route) => route.isFirst);
+      return;
+    }
+
+    if (widget.isFinalSeriesGame) {
+      try {
+        await SeriesApiService().completeSeries(widget.seriesId!);
+      } catch (_) {
+        // 종료 실패해도 사용자 흐름 막지 않음 (다음 진입 시 재시도)
+      }
+      if (!mounted) return;
+      messenger.showSnackBar(
+        const SnackBar(content: Text('시리즈가 완료되었습니다.')),
+      );
+      // 시리즈 결과 페이지로 교체 → 뒤로가기 시 루트로 직행
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (_) => SeriesSummaryPage(seriesId: widget.seriesId!),
+        ),
+        (route) => route.isFirst,
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    Navigator.of(context).popUntil((route) => route.isFirst);
+  }
+
+  Future<bool> _askContinueSeries() async {
+    final next = (widget.seriesIndex ?? 0) + 1;
+    final total = widget.targetGameCount ?? 0;
+    final answer = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('다음 게임을 시작할까요?'),
+        content: Text('$next / $total 게임으로 이어집니다.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('나중에'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('계속하기'),
+          ),
+        ],
+      ),
+    );
+    return answer ?? false;
   }
 
   /// 저장 실패 시트. [showRetry]면 "다시 시도" 버튼 포함.
@@ -479,10 +610,22 @@ class _GameSummaryPageState extends State<GameSummaryPage> {
                   ),
                   const SizedBox(height: 40),
                   
+                  // 베스트 갱신 배너 (이전 최고점 대비 갱신 시)
+                  if (_isNewBest()) ...[
+                    _buildBestUpdateBanner(),
+                    const SizedBox(height: 24),
+                  ],
+
                   // 스코어카드 상세
                   _buildScorecard(isDark),
-                  const SizedBox(height: 40),
-                  
+                  const SizedBox(height: 32),
+
+                  // 최장 연속 스트라이크 하이라이트 (2연속 이상일 때만 노출)
+                  if (_streak >= 2) ...[
+                    _buildStreakHighlight(isDark, _streak),
+                    const SizedBox(height: 24),
+                  ],
+
                   // 경기 통계 섹션 제목
                   const Align(
                     alignment: Alignment.centerLeft,
@@ -497,7 +640,7 @@ class _GameSummaryPageState extends State<GameSummaryPage> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  
+
                   // 통계 박스 목록
                   Row(
                     children: [
@@ -639,6 +782,109 @@ class _GameSummaryPageState extends State<GameSummaryPage> {
   }
 
   /// 게임의 주요 통계(스트라이크, 스페어 등)를 박스 형태로 보여주는 위젯입니다.
+  Widget _buildBestUpdateBanner() {
+    final prev = _previousBest ?? 0;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFFFB300), Color(0xFFFF6F00)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFFF6F00).withValues(alpha: 0.25),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          const Icon(Symbols.emoji_events, color: Colors.white, size: 32),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '베스트 게임 갱신!',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '이전 최고 $prev점 → 이번 ${widget.totalScore}점',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.9),
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStreakHighlight(bool isDark, int streak) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surfaceDark : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.deepOrange.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: Colors.deepOrange.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Symbols.local_fire_department,
+                color: Colors.deepOrange, size: 24),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '최장 연속 스트라이크',
+                  style: TextStyle(
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : Colors.grey[700],
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  streak >= 3 ? '$streak연속 🔥' : '$streak연속',
+                  style: TextStyle(
+                    color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildStatBox(String value, String label, String symbol, Color color, bool isDark) {
     return Expanded(
       child: Container(

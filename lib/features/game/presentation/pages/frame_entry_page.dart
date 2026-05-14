@@ -3,6 +3,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/socket_service.dart';
+import '../../data/bowling_scorer.dart';
 import 'club_game_summary_page.dart';
 import 'game_summary_page.dart';
 
@@ -17,12 +18,24 @@ class FrameEntryPage extends StatefulWidget {
   final List<Map<String, dynamic>>? participants;
   final String? location;
 
+  /// 시리즈에 속한 게임인 경우 시리즈 ID. 단일 게임은 null.
+  final int? seriesId;
+
+  /// 시리즈 내 게임 순번 (1-based). 단일 게임은 null.
+  final int? seriesIndex;
+
+  /// 시리즈 총 게임 수. 단일 게임은 null.
+  final int? targetGameCount;
+
   const FrameEntryPage({
     super.key,
     this.isClubGame = false,
     this.roomId,
     this.participants,
     this.location,
+    this.seriesId,
+    this.seriesIndex,
+    this.targetGameCount,
   });
 
   @override
@@ -103,40 +116,8 @@ class _FrameEntryPageState extends State<FrameEntryPage> {
 
   /// 현재 프레임 데이터로 스트라이크/스페어/오픈 개수 계산
   /// (_navigateToSummary와 _emitScoreUpdate에서 공유)
-  ({int strikes, int spares, int opens}) _computeStats() {
-    int strikes = 0;
-    int spares = 0;
-    int opens = 0;
-
-    for (int i = 0; i < 10; i++) {
-      final frame = _frames[i];
-      if (frame.isEmpty) continue;
-
-      if (i < 9) {
-        if (frame[0] == 10) {
-          strikes++;
-        } else if (frame.length >= 2 && frame[0] + frame[1] == 10) {
-          spares++;
-        } else if (frame.length >= 2) {
-          opens++;
-        }
-      } else {
-        // 10프레임 특수 처리
-        if (frame[0] == 10) strikes++;
-        if (frame.length >= 2) {
-          if (frame[0] != 10 && frame[0] + frame[1] == 10) spares++;
-          if (frame[0] == 10 && frame[1] == 10) strikes++;
-          if (frame[0] != 10 && frame[0] + frame[1] < 10) opens++;
-        }
-        if (frame.length >= 3) {
-          if (frame[2] == 10) strikes++;
-          if (frame[1] != 10 && frame[1] + frame[2] == 10) spares++;
-        }
-      }
-    }
-
-    return (strikes: strikes, spares: spares, opens: opens);
-  }
+  ({int strikes, int spares, int opens}) _computeStats() =>
+      BowlingScorer.computeStats(_frames);
 
   @override
   void dispose() {
@@ -191,106 +172,14 @@ class _FrameEntryPageState extends State<FrameEntryPage> {
   }
 
   /// 각 프레임의 누적 점수 계산
-  List<int?> get _cumulativeScores {
-    final scores = List<int?>.filled(10, null);
-    int cumulative = 0;
-
-    for (int i = 0; i < 10; i++) {
-      final frame = _frames[i];
-      if (frame.isEmpty) break;
-
-      if (i < 9) {
-        // 1~9프레임
-        if (_isStrike(i)) {
-          // 스트라이크: 다음 2투구가 필요
-          final bonus = _getNextTwoThrows(i);
-          if (bonus == null) break;
-          cumulative += 10 + bonus;
-          scores[i] = cumulative;
-        } else if (_isSpare(i)) {
-          // 스페어: 다음 1투구가 필요
-          final bonus = _getNextOneThrow(i);
-          if (bonus == null) break;
-          cumulative += 10 + bonus;
-          scores[i] = cumulative;
-        } else if (frame.length >= 2) {
-          // 오픈 프레임
-          cumulative += frame[0] + frame[1];
-          scores[i] = cumulative;
-        }
-      } else {
-        // 10프레임
-        if (!_isFrameComplete(9)) break;
-        int sum = 0;
-        for (final pin in frame) {
-          sum += pin;
-        }
-        cumulative += sum;
-        scores[i] = cumulative;
-      }
-    }
-    return scores;
-  }
+  List<int?> get _cumulativeScores => BowlingScorer.cumulativeScores(_frames);
 
   /// 총점
-  int get _totalScore {
-    final scores = _cumulativeScores;
-    for (int i = 9; i >= 0; i--) {
-      if (scores[i] != null) return scores[i]!;
-    }
-    return 0;
-  }
-
-  bool _isStrike(int frameIndex) {
-    final frame = _frames[frameIndex];
-    if (frame.isEmpty) return false;
-    return frame[0] == 10;
-  }
-
-  bool _isSpare(int frameIndex) {
-    final frame = _frames[frameIndex];
-    if (frame.length < 2) return false;
-    if (frameIndex < 9) return frame[0] + frame[1] == 10 && frame[0] != 10;
-    return false;
-  }
+  int get _totalScore => BowlingScorer.totalScore(_frames);
 
   /// 해당 프레임이 완료되었는지 확인
-  bool _isFrameComplete(int frameIndex) {
-    final frame = _frames[frameIndex];
-    if (frameIndex < 9) {
-      if (frame.isEmpty) return false;
-      if (frame[0] == 10) return true; // 스트라이크
-      return frame.length >= 2;
-    } else {
-      // 10프레임
-      if (frame.length < 2) return false;
-      if (frame[0] == 10 || frame[0] + frame[1] == 10) {
-        return frame.length >= 3; // 스트라이크/스페어면 3투
-      }
-      return frame.length >= 2; // 오픈이면 2투
-    }
-  }
-
-  /// 다음 2투구 합 (스트라이크 보너스 계산용)
-  int? _getNextTwoThrows(int frameIndex) {
-    final throws = <int>[];
-    for (int i = frameIndex + 1; i < 10 && throws.length < 2; i++) {
-      for (final pin in _frames[i]) {
-        throws.add(pin);
-        if (throws.length == 2) break;
-      }
-    }
-    if (throws.length < 2) return null;
-    return throws[0] + throws[1];
-  }
-
-  /// 다음 1투구 (스페어 보너스 계산용)
-  int? _getNextOneThrow(int frameIndex) {
-    for (int i = frameIndex + 1; i < 10; i++) {
-      if (_frames[i].isNotEmpty) return _frames[i][0];
-    }
-    return null;
-  }
+  bool _isFrameComplete(int frameIndex) =>
+      BowlingScorer.isFrameComplete(_frames, frameIndex);
 
   /// 키패드 입력 처리
   void _onKeyPress(String key) {
@@ -473,6 +362,9 @@ class _FrameEntryPageState extends State<FrameEntryPage> {
             openCount: stats.opens,
             location: widget.location,
             gameStartedAt: _gameStartedAt,
+            seriesId: widget.seriesId,
+            seriesIndex: widget.seriesIndex,
+            targetGameCount: widget.targetGameCount,
           ),
         ),
       );
@@ -546,34 +438,93 @@ class _FrameEntryPageState extends State<FrameEntryPage> {
     return frameIndex == 9 ? 3 : 2;
   }
 
+  /// 어느 프레임이라도 1구 이상 입력됐다면 "진행 중"으로 간주.
+  bool get _hasProgress => _frames.any((f) => f.isNotEmpty);
+
+  /// 진행 중인 게임 종료 의사 확인.
+  /// 입력된 점수가 없으면 즉시 true, 있으면 다이얼로그로 확정.
+  Future<bool> _confirmExit() async {
+    if (!_hasProgress) return true;
+    final answer = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('게임을 종료할까요?'),
+        content: const Text(
+          '지금 나가면 입력한 점수가 저장되지 않고 사라집니다.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('계속 진행'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: Colors.redAccent),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('나가기'),
+          ),
+        ],
+      ),
+    );
+    return answer ?? false;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: !_hasProgress,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        final ok = await _confirmExit();
+        if (ok && mounted) Navigator.pop(context);
+      },
+      child: Scaffold(
       backgroundColor: AppColors.backgroundDark,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Symbols.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () async {
+            final ok = await _confirmExit();
+            if (ok && mounted) Navigator.pop(context);
+          },
         ),
-        title: Text(
-            widget.isClubGame ? '클럽 게임' : '개인 게임',
-            style: const TextStyle(
+        title: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              widget.isClubGame ? '클럽 게임' : '개인 게임',
+              style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: Colors.white)),
-        centerTitle: true,
-        actions: [
-          if (_isGameComplete)
-            IconButton(
-              icon: const Icon(Symbols.check, color: Colors.white),
-              onPressed: () {
-                // TODO: 게임 저장 처리
-                Navigator.pop(context);
-              },
+                color: Colors.white,
+              ),
             ),
-        ],
+            if (widget.seriesId != null &&
+                widget.seriesIndex != null &&
+                widget.targetGameCount != null) ...[
+              const SizedBox(height: 2),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF9800).withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '시리즈 ${widget.seriesIndex}/${widget.targetGameCount}',
+                  style: const TextStyle(
+                    color: Color(0xFFFFB74D),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+        centerTitle: true,
       ),
       body: Column(
         children: [
@@ -777,6 +728,7 @@ class _FrameEntryPageState extends State<FrameEntryPage> {
               ),
             ),
         ],
+      ),
       ),
     );
   }

@@ -4,6 +4,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/socket_service.dart';
+import '../../../home/presentation/pages/home_dashboard_page.dart';
+import '../../data/bowling_scorer.dart';
 import '../../data/services/game_draft_repository.dart';
 import '../../data/services/game_save_service.dart';
 
@@ -60,6 +62,18 @@ class _ClubGameSummaryPageState extends State<ClubGameSummaryPage> {
   late Map<String, ({int strikes, int spares, int opens})> _stats;
   bool _isSaving = false;
   bool _isSaved = false;
+
+  // 진입 시점 "이전 최고 점수" 스냅샷 - 저장으로 캐시가 갱신되어도 배너 유지.
+  late final int? _previousBest = HomeDashboardPage.cachedHighestScore;
+
+  late final int _streak =
+      BowlingScorer.longestStrikeStreak(widget.frames);
+
+  bool _isNewBest() {
+    final prev = _previousBest;
+    if (prev == null || prev <= 0) return false;
+    return widget.totalScore > prev;
+  }
 
   @override
   void initState() {
@@ -590,6 +604,10 @@ class _ClubGameSummaryPageState extends State<ClubGameSummaryPage> {
                   children: [
                     const SizedBox(height: 8),
                     if (winner != null) _buildWinnerBanner(winner, isDark),
+                    if (_isNewBest()) ...[
+                      const SizedBox(height: 12),
+                      _buildBestUpdateBanner(),
+                    ],
                     const SizedBox(height: 12),
                     Text(
                       formattedDate,
@@ -615,7 +633,11 @@ class _ClubGameSummaryPageState extends State<ClubGameSummaryPage> {
                     ),
                     const SizedBox(height: 16),
                     _buildScorecard(isDark),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 24),
+                    if (_streak >= 2) ...[
+                      _buildStreakHighlight(isDark, _streak),
+                      const SizedBox(height: 24),
+                    ],
                     const Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
@@ -1124,6 +1146,109 @@ class _ClubGameSummaryPageState extends State<ClubGameSummaryPage> {
                 ),
               );
             },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBestUpdateBanner() {
+    final prev = _previousBest ?? 0;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFFFB300), Color(0xFFFF6F00)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFFF6F00).withValues(alpha: 0.25),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          const Icon(Symbols.emoji_events, color: Colors.white, size: 32),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '베스트 게임 갱신!',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '이전 최고 $prev점 → 이번 ${widget.totalScore}점',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.9),
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStreakHighlight(bool isDark, int streak) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surfaceDark : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.deepOrange.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: Colors.deepOrange.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Symbols.local_fire_department,
+                color: Colors.deepOrange, size: 24),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '최장 연속 스트라이크',
+                  style: TextStyle(
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : Colors.grey[700],
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  streak >= 3 ? '$streak연속 🔥' : '$streak연속',
+                  style: TextStyle(
+                    color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
