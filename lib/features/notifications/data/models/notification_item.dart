@@ -11,6 +11,7 @@
 /// - `club_trial_expiring_soon`: 체험판 만료 임박
 /// - `club_trial_expired`: 체험판 만료
 /// - `new_best_score`: 개인 최고 점수 갱신 (`targetId` = gameId)
+/// - `badge_earned`: 신규 배지 획득 (`targetId` = badge key)
 enum NotificationType {
   clubGameCreated,
   clubJoinRequest,
@@ -22,6 +23,7 @@ enum NotificationType {
   clubTrialExpiringSoon,
   clubTrialExpired,
   newBestScore,
+  badgeEarned,
   unknown;
 
   /// 백엔드에서 내려오는 문자열 값.
@@ -47,6 +49,8 @@ enum NotificationType {
         return 'club_trial_expired';
       case NotificationType.newBestScore:
         return 'new_best_score';
+      case NotificationType.badgeEarned:
+        return 'badge_earned';
       case NotificationType.unknown:
         return '';
     }
@@ -74,6 +78,8 @@ enum NotificationType {
         return NotificationType.clubTrialExpired;
       case 'new_best_score':
         return NotificationType.newBestScore;
+      case 'badge_earned':
+        return NotificationType.badgeEarned;
       default:
         return NotificationType.unknown;
     }

@@ -333,6 +333,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
         return Symbols.warning;
       case NotificationType.newBestScore:
         return Symbols.emoji_events;
+      case NotificationType.badgeEarned:
+        return Symbols.workspace_premium;
       case NotificationType.unknown:
         return Symbols.notifications;
     }
@@ -360,6 +362,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
         return Colors.redAccent;
       case NotificationType.newBestScore:
         return Colors.amber;
+      case NotificationType.badgeEarned:
+        return Colors.deepPurple;
       case NotificationType.unknown:
         return Colors.grey;
     }

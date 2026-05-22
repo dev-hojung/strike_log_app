@@ -10,6 +10,9 @@ import '../../../../core/errors/api_error_classifier.dart';
 import '../../../../core/services/app_logger.dart';
 import '../../../../core/services/unread_notifications_service.dart';
 import '../../../../core/widgets/error_retry_view.dart';
+import '../../../badges/data/models/badge_item.dart';
+import '../../../badges/data/services/badges_api_service.dart';
+import '../../../badges/presentation/pages/badge_list_page.dart';
 import '../../../game/data/models/game_series.dart';
 import '../../../game/data/services/series_api_service.dart';
 import '../../../notifications/presentation/pages/notifications_page.dart';
@@ -38,6 +41,7 @@ class HomeDashboardPage extends StatefulWidget {
 class _HomeDashboardPageState extends State<HomeDashboardPage> {
   final HomeApiService _apiService = HomeApiService();
   final SeriesApiService _seriesService = SeriesApiService();
+  final BadgesApiService _badgesService = BadgesApiService();
 
   /// 캐싱된 대시보드 데이터 (페이지 재생성 시에도 유지)
   static HomeDashboardData? _cachedData;
@@ -45,6 +49,8 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
 
   HomeDashboardData? _data;
   GameSeries? _bestSeries;
+  AttendanceStreak? _streak;
+  BadgeItem? _recentBadge;
   bool _isLoading = true;
   ApiError? _error;
 
@@ -71,10 +77,26 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
       } catch (_) {
         best = null;
       }
+      // 출석 streak / 최근 배지도 격리 (조회 실패는 카드만 숨김).
+      AttendanceStreak? streak;
+      BadgeItem? recentBadge;
+      try {
+        streak = await _badgesService.fetchStreak();
+      } catch (_) {
+        streak = null;
+      }
+      try {
+        final list = await _badgesService.fetchRecent(limit: 1);
+        recentBadge = list.isNotEmpty ? list.first : null;
+      } catch (_) {
+        recentBadge = null;
+      }
       if (mounted) {
         setState(() {
           _data = data;
           _bestSeries = best;
+          _streak = streak;
+          _recentBadge = recentBadge;
           _cachedData = data;
           _cachedBestSeries = best;
           _isLoading = false;
@@ -207,7 +229,14 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
               ],
             ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
+
+            // 출석 streak + 최근 배지 카드 (모든 데이터 로드 후 노출)
+            if (_streak != null || _recentBadge != null) ...[
+              _buildStreakBadgeCard(isDark),
+              const SizedBox(height: 8),
+            ],
+            const SizedBox(height: 16),
 
             // 성적 추이 그래프
             if (data.recentTrend.isNotEmpty)
@@ -323,6 +352,145 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
         ),
         const SizedBox(width: 8),
       ],
+    );
+  }
+
+  /// 출석 streak + 최근 획득 배지 통합 카드.
+  /// 탭하면 BadgeListPage로 이동 (배지가 있으면 해당 배지를 강조).
+  Widget _buildStreakBadgeCard(bool isDark) {
+    final surface = isDark ? AppColors.surfaceDark : Colors.white;
+    final border = isDark ? Colors.white10 : Colors.black12;
+    final textPrimary =
+        isDark ? Colors.white : AppColors.textPrimaryLight;
+    final textSecondary =
+        isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+
+    final current = _streak?.currentStreak ?? 0;
+    final hasBadge = _recentBadge != null;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(20),
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => BadgeListPage(highlightKey: _recentBadge?.key),
+          ),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+        decoration: BoxDecoration(
+          color: surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: border),
+        ),
+        child: Row(
+          children: [
+            // 출석 streak
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: Colors.deepOrange.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Symbols.local_fire_department,
+                color: Colors.deepOrange,
+                size: 24,
+                fill: 1,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '출석 연속',
+                  style: TextStyle(
+                    color: textSecondary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '$current일',
+                  style: TextStyle(
+                    color: textPrimary,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    height: 1.0,
+                  ),
+                ),
+              ],
+            ),
+            // 구분
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              width: 1,
+              height: 32,
+              color: isDark ? Colors.white10 : Colors.black12,
+            ),
+            // 최근 배지
+            Expanded(
+              child: Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: (hasBadge ? Colors.amber : Colors.grey)
+                          .withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Symbols.emoji_events,
+                      color: hasBadge ? Colors.amber : Colors.grey,
+                      size: 20,
+                      fill: hasBadge ? 1 : 0,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          hasBadge ? '최근 획득 배지' : '배지 도전',
+                          style: TextStyle(
+                            color: textSecondary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          hasBadge ? _recentBadge!.name : '아직 없어요',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: textPrimary,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            height: 1.0,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Symbols.chevron_right,
+              color: textSecondary,
+              size: 20,
+            ),
+          ],
+        ),
+      ),
     );
   }
 

@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../features/badges/presentation/pages/badge_list_page.dart';
 import '../../features/game/presentation/pages/game_detail_page.dart';
 import '../../features/group/presentation/pages/admin_creation_requests_page.dart';
 import '../../features/group/presentation/pages/club_join_requests_page.dart';
@@ -224,6 +225,7 @@ class FcmService {
       case 'club_trial_expired':
       case 'club_game_created':
       case 'new_best_score':
+      case 'badge_earned':
         return true;
       default:
         // 거절 / 알 수 없는 타입은 이동 대상 없음.
@@ -286,6 +288,12 @@ class FcmService {
             builder: (_) => GameDetailPage(gameId: gameId),
           ));
         }
+        break;
+      case 'badge_earned':
+        // targetId = badge key. 카드 강조해 해당 배지를 강조 표시.
+        nav.push(MaterialPageRoute(
+          builder: (_) => BadgeListPage(highlightKey: targetId),
+        ));
         break;
       default:
         break;
