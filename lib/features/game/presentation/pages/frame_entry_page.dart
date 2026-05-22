@@ -583,11 +583,11 @@ class _FrameEntryPageState extends State<FrameEntryPage> {
             ),
           ),
 
-          // // 클럽 게임: 참가자 점수 목록 (임시 비활성화)
-          // if (widget.isClubGame && widget.participants != null && !_showKeypad) ...[
-          //   _buildParticipantScores(),
-          //   const SizedBox(height: 8),
-          // ],
+          // 클럽 게임 라이브 순위표 (다른 참가자 점수/통계 실시간 표시)
+          if (widget.isClubGame && _participants.isNotEmpty) ...[
+            _buildParticipantLiveBoard(),
+            const SizedBox(height: 8),
+          ],
 
           // 키패드 또는 결과 확인 버튼 (프레임 선택 시에만 표시)
           if (_isGameComplete)
@@ -865,6 +865,171 @@ class _FrameEntryPageState extends State<FrameEntryPage> {
         ),
       ),
     );
+  }
+
+  /// 클럽 게임 라이브 순위표 (가로 스크롤 컴팩트 카드)
+  /// - 본인은 _totalScore/_computeStats(), 다른 참가자는 소켓 갱신 캐시 사용
+  /// - 점수 내림차순 정렬, 본인 행은 primary 강조 + "나" 배지
+  Widget _buildParticipantLiveBoard() {
+    final myStats = _computeStats();
+    final rows = _participants.map((p) {
+      final uid = p['userId']?.toString() ?? '';
+      final isMe = uid == _userId;
+      final score = isMe ? _totalScore : (_participantScores[uid] ?? 0);
+      final stats = isMe
+          ? (strikes: myStats.strikes, spares: myStats.spares, opens: myStats.opens)
+          : (_participantStats[uid] ??
+              (strikes: 0, spares: 0, opens: 0));
+      return (
+        nickname: (p['nickname'] ?? '?').toString(),
+        score: score,
+        isMe: isMe,
+        strikes: stats.strikes,
+        spares: stats.spares,
+      );
+    }).toList()
+      ..sort((a, b) => b.score.compareTo(a.score));
+
+    return SizedBox(
+      height: 72,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        itemCount: rows.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 10),
+        itemBuilder: (context, index) {
+          final r = rows[index];
+          final rank = index + 1;
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: r.isMe
+                  ? AppColors.primary.withValues(alpha: 0.12)
+                  : AppColors.surfaceDark,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: r.isMe
+                    ? AppColors.primary.withValues(alpha: 0.45)
+                    : Colors.white12,
+                width: r.isMe ? 1.5 : 1,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 22,
+                  height: 22,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: _rankBadgeColor(rank).withValues(alpha: 0.18),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Text(
+                    '$rank',
+                    style: TextStyle(
+                      color: _rankBadgeColor(rank),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          r.nickname,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight:
+                                r.isMe ? FontWeight.w700 : FontWeight.w500,
+                            color: r.isMe ? AppColors.primary : Colors.white,
+                          ),
+                        ),
+                        if (r.isMe) ...[
+                          const SizedBox(width: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 5, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              '나',
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '${r.score}',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: r.isMe ? AppColors.primary : Colors.white,
+                            height: 1.0,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        _liveStatChip('X', r.strikes, Colors.blue),
+                        const SizedBox(width: 4),
+                        _liveStatChip('/', r.spares, Colors.purple),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _liveStatChip(String symbol, int count, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        '$symbol$count',
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.bold,
+          fontSize: 10,
+        ),
+      ),
+    );
+  }
+
+  Color _rankBadgeColor(int rank) {
+    switch (rank) {
+      case 1:
+        return Colors.amber;
+      case 2:
+        return Colors.blueGrey.shade300;
+      case 3:
+        return Colors.brown.shade300;
+      default:
+        return Colors.white60;
+    }
   }
 
   Widget _buildKeypadRow(List<String> keys) {
