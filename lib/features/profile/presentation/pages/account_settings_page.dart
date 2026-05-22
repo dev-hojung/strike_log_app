@@ -5,6 +5,8 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/api_client.dart';
 import '../../../../core/services/app_logger.dart';
 import '../../../../core/services/user_profile_cache.dart';
+import '../../../legal/presentation/pages/privacy_policy_page.dart';
+import '../../../legal/presentation/pages/terms_of_service_page.dart';
 import 'edit_nickname_page.dart';
 import 'change_password_page.dart';
 
@@ -241,6 +243,56 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
                               MaterialPageRoute(builder: (_) => const ChangePasswordPage()),
                             );
                           },
+                        ),
+                      ),
+
+                      const SizedBox(height: 32),
+                      Padding(
+                        padding: const EdgeInsets.only(left: 4, bottom: 12),
+                        child: Text(
+                          '약관 및 정책',
+                          style: TextStyle(
+                            color: textColor,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      Container(
+                        clipBehavior: Clip.antiAlias,
+                        decoration: BoxDecoration(
+                          color: surfaceColor,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: borderColor),
+                        ),
+                        child: Column(
+                          children: [
+                            _buildActionRow(
+                              icon: Symbols.gavel,
+                              label: '이용약관',
+                              textColor: textColor,
+                              secondaryColor: secondaryColor,
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const TermsOfServicePage(),
+                                ),
+                              ),
+                            ),
+                            Divider(height: 1, color: borderColor),
+                            _buildActionRow(
+                              icon: Symbols.shield_person,
+                              label: '개인정보처리방침',
+                              textColor: textColor,
+                              secondaryColor: secondaryColor,
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const PrivacyPolicyPage(),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
 

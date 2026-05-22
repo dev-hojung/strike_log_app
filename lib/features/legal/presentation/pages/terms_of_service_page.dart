@@ -1,0 +1,183 @@
+import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
+
+import '../../../../core/constants/app_colors.dart';
+
+/// 이용약관 정적 페이지.
+///
+/// 운영자 정보 / 서비스명은 `{...}` 플레이스홀더로 표기되어 있으며,
+/// 정식 출시 전 실제 정보로 교체해야 한다.
+class TermsOfServicePage extends StatelessWidget {
+  const TermsOfServicePage({super.key});
+
+  static const String _effectiveDate = '2026-05-22';
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
+    final textPrimary = isDark ? Colors.white : AppColors.textPrimaryLight;
+    final textSecondary =
+        isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+
+    return Scaffold(
+      backgroundColor: bg,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        leading: IconButton(
+          icon: Icon(Symbols.arrow_back, color: textPrimary),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          '이용약관',
+          style: TextStyle(
+            color: textPrimary,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        centerTitle: true,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
+        child: DefaultTextStyle(
+          style: TextStyle(
+            color: textPrimary,
+            fontSize: 14,
+            height: 1.6,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '시행일: $_effectiveDate',
+                style: TextStyle(fontSize: 12, color: textSecondary),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                '본 약관은 김호정(이하 "운영자")가 제공하는 볼링 점수 기록 서비스(이하 "서비스") '
+                '이용과 관련된 권리·의무 및 책임 사항을 규정함을 목적으로 합니다.',
+              ),
+              const SizedBox(height: 24),
+              _article(
+                '제1조 (정의)',
+                const [
+                  '"서비스"란 운영자가 제공하는 볼링 점수 기록·통계·클럽 관리 모바일 애플리케이션을 의미합니다.',
+                  '"회원"이란 본 약관에 동의하고 회원가입을 완료한 자를 말합니다.',
+                  '"클럽"이란 회원이 가입할 수 있는 사용자 그룹을 의미합니다.',
+                ],
+              ),
+              _article(
+                '제2조 (약관의 효력 및 변경)',
+                const [
+                  '본 약관은 회원이 회원가입 시 동의함으로써 효력이 발생합니다.',
+                  '운영자는 관련 법령을 위배하지 않는 범위에서 본 약관을 변경할 수 있으며, 변경 사항은 시행 7일 전(회원에게 불리한 변경의 경우 30일 전)부터 앱 내 공지합니다.',
+                  '회원이 변경된 약관에 동의하지 않을 경우 서비스 이용을 중단하고 탈퇴할 수 있습니다.',
+                ],
+              ),
+              _article(
+                '제3조 (서비스 이용 계약 체결)',
+                const [
+                  '이용 계약은 회원이 본 약관 및 개인정보처리방침에 동의한 후 운영자가 가입을 승낙함으로써 성립합니다.',
+                  '회원은 회원가입 시 실명·정확한 정보를 제공해야 하며, 허위 정보 입력으로 발생하는 불이익은 회원이 부담합니다.',
+                ],
+              ),
+              _article(
+                '제4조 (서비스의 제공 및 변경)',
+                const [
+                  '운영자는 회원에게 다음 서비스를 제공합니다.',
+                  '  - 개인 및 시리즈 게임 점수 기록·통계',
+                  '  - 클럽 가입/관리·랭킹',
+                  '  - 푸시 알림(베스트 갱신, 배지 획득, 클럽 활동 등)',
+                  '운영자는 서비스의 품질 향상을 위해 기능을 추가·변경·중단할 수 있으며, 중요한 변경 사항은 사전 공지합니다.',
+                ],
+              ),
+              _article(
+                '제5조 (회원의 의무)',
+                const [
+                  '회원은 다음 행위를 해서는 안 됩니다.',
+                  '  - 타인의 정보 도용',
+                  '  - 운영자 및 제3자의 권리·명예·신용을 침해하는 행위',
+                  '  - 서비스의 운영을 방해하거나 부정한 방법으로 이용하는 행위',
+                  '  - 자동화된 수단으로 점수·랭킹을 조작하는 행위',
+                  '회원이 본 의무를 위반할 경우 운영자는 사전 통지 없이 서비스 이용을 제한할 수 있습니다.',
+                ],
+              ),
+              _article(
+                '제6조 (회원 탈퇴 및 자격 상실)',
+                const [
+                  '회원은 언제든지 앱 내 설정 또는 운영자에게 요청하여 탈퇴할 수 있습니다.',
+                  '탈퇴 시 회원의 개인정보 및 게임 기록은 운영자의 개인정보처리방침에 따라 처리됩니다.',
+                  '회원이 본 약관을 중대하게 위반한 경우 운영자는 회원 자격을 상실시킬 수 있습니다.',
+                ],
+              ),
+              _article(
+                '제7조 (게시물의 관리)',
+                const [
+                  '회원이 입력한 닉네임·클럽명·메모 등이 다음에 해당하는 경우 운영자는 사전 통지 없이 수정·삭제할 수 있습니다.',
+                  '  - 타인의 권리·명예를 침해하는 경우',
+                  '  - 공공질서 또는 미풍양속에 위반되는 경우',
+                  '  - 법령에 위반되거나 운영 정책에 어긋나는 경우',
+                ],
+              ),
+              _article(
+                '제8조 (운영자의 면책)',
+                const [
+                  '운영자는 천재지변·전쟁·기간통신사업자의 서비스 중지 등 불가항력으로 인한 서비스 제공 불가에 대해 책임을 지지 않습니다.',
+                  '회원의 귀책 사유로 인한 손해에 대해 운영자는 책임을 지지 않습니다.',
+                  '회원 간 또는 회원과 제3자 간 분쟁에 운영자는 개입하지 않으며 손해에 대해 책임을 지지 않습니다.',
+                ],
+              ),
+              _article(
+                '제9조 (지적재산권)',
+                const [
+                  '서비스의 디자인·로고·소스코드 등 모든 지적재산권은 운영자에게 귀속됩니다.',
+                  '회원이 서비스 내에 게시한 콘텐츠의 권리는 회원에게 귀속하되, 운영자는 서비스 운영 및 홍보 목적으로 해당 콘텐츠를 무상으로 이용할 수 있습니다.',
+                ],
+              ),
+              _article(
+                '제10조 (분쟁 해결 및 준거법)',
+                const [
+                  '본 약관에 명시되지 않은 사항은 대한민국 법령 및 상관례에 따릅니다.',
+                  '서비스 이용으로 발생한 분쟁에 대해 회원과 운영자가 합의로 해결하지 못할 경우, 「민사소송법」상 관할법원에서 해결합니다.',
+                ],
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                '부칙\n본 약관은 위 시행일로부터 시행됩니다.',
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _article(String title, List<String> paragraphs) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 22),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 6),
+          ...paragraphs.map(
+            (p) => Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text(p),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

@@ -4,6 +4,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/api_client.dart';
+import '../../../legal/presentation/pages/privacy_policy_page.dart';
+import '../../../legal/presentation/pages/terms_of_service_page.dart';
 
 /// 앱의 회원가입 화면을 담당하는 페이지입니다.
 ///
@@ -39,6 +41,9 @@ class _SignupPageState extends State<SignupPage> {
   // 비밀번호 보이기/숨기기
   bool _isPasswordVisible = false;
   bool _isPasswordConfirmVisible = false;
+
+  // 이용약관 + 개인정보처리방침 동의 (회원가입 필수)
+  bool _agreedToTerms = false;
 
   @override
   void dispose() {
@@ -182,6 +187,13 @@ class _SignupPageState extends State<SignupPage> {
     if (!_isEmailVerified) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('먼저 이메일 인증을 완료해주세요.')),
+      );
+      return;
+    }
+
+    if (!_agreedToTerms) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('이용약관과 개인정보처리방침에 동의해주세요.')),
       );
       return;
     }
@@ -514,15 +526,22 @@ class _SignupPageState extends State<SignupPage> {
                       textColor: textColor,
                       hintColor: subTextColor,
                     ),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 24),
+
+                    // 약관/개인정보 동의 (필수)
+                    _buildTermsAgreement(textColor, subTextColor, primaryColor),
+                    const SizedBox(height: 20),
 
                     // 가입하기 버튼
                     SizedBox(
                       width: double.infinity,
                       height: 52,
                       child: ElevatedButton(
-                        onPressed:
-                            (_isEmailVerified && !_isLoading) ? _signUp : null,
+                        onPressed: (_isEmailVerified &&
+                                _agreedToTerms &&
+                                !_isLoading)
+                            ? _signUp
+                            : null,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: primaryColor,
                           foregroundColor: Colors.white,
@@ -630,6 +649,85 @@ class _SignupPageState extends State<SignupPage> {
           ),
         ),
       ),
+    );
+  }
+
+  /// 약관/개인정보 동의 체크박스 + 인라인 링크.
+  /// 약관/개인정보처리방침 텍스트를 탭하면 해당 페이지로 push.
+  Widget _buildTermsAgreement(
+    Color textColor,
+    Color subColor,
+    Color primaryColor,
+  ) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        SizedBox(
+          width: 24,
+          height: 24,
+          child: Checkbox(
+            value: _agreedToTerms,
+            onChanged: (v) => setState(() => _agreedToTerms = v ?? false),
+            activeColor: primaryColor,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(
+                '(필수) ',
+                style: TextStyle(color: subColor, fontSize: 12),
+              ),
+              GestureDetector(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const TermsOfServicePage(),
+                  ),
+                ),
+                child: Text(
+                  '이용약관',
+                  style: TextStyle(
+                    color: primaryColor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    decoration: TextDecoration.underline,
+                    decorationColor: primaryColor,
+                  ),
+                ),
+              ),
+              Text(' 및 ', style: TextStyle(color: subColor, fontSize: 12)),
+              GestureDetector(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const PrivacyPolicyPage(),
+                  ),
+                ),
+                child: Text(
+                  '개인정보처리방침',
+                  style: TextStyle(
+                    color: primaryColor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    decoration: TextDecoration.underline,
+                    decorationColor: primaryColor,
+                  ),
+                ),
+              ),
+              Text(
+                '에 동의합니다.',
+                style: TextStyle(color: subColor, fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
