@@ -150,7 +150,6 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    print("=== _LoginPageState build ===");
     return Scaffold(
       backgroundColor: AppColors.backgroundDark,
       body: SafeArea(

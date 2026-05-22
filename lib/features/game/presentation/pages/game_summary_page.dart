@@ -563,7 +563,7 @@ class _GameSummaryPageState extends State<GameSummaryPage> {
         // 저장 중일 땐 race condition 방지 위해 back 동작 차단
         if (_isSaving) return;
         final shouldLeave = await _showExitConfirmDialog();
-        if (shouldLeave && mounted) {
+        if (shouldLeave && context.mounted) {
           Navigator.of(context).popUntil((route) => route.isFirst);
         }
       },
@@ -579,7 +579,7 @@ class _GameSummaryPageState extends State<GameSummaryPage> {
               ? null
               : () async {
                   final shouldLeave = await _showExitConfirmDialog();
-                  if (shouldLeave && mounted) {
+                  if (shouldLeave && context.mounted) {
                     Navigator.of(context).popUntil((route) => route.isFirst);
                   }
                 },

@@ -114,6 +114,17 @@ class _ClubGameSummaryPageState extends State<ClubGameSummaryPage> {
     });
   }
 
+  @override
+  void dispose() {
+    // 클럽 게임 요약 화면 이탈 시 소켓 리스너 정리 (메모리 누수 방지).
+    // SocketService는 싱글톤이므로 다른 페이지로 이동해도 인스턴스가 살아있어,
+    // 등록한 리스너가 누적되어 setState 호출/leak으로 이어질 수 있다.
+    if (widget.roomId != null) {
+      _socketService.off('roomStateUpdated');
+    }
+    super.dispose();
+  }
+
   /// 동일 프레임 내 투구 표시 문자열 (X, /, -, 숫자)
   String _getThrowDisplay(int frameIndex, int throwIndex) {
     final frame = widget.frames[frameIndex];
@@ -564,7 +575,7 @@ class _ClubGameSummaryPageState extends State<ClubGameSummaryPage> {
         // 저장 중일 땐 race condition 방지 위해 back 동작 차단
         if (_isSaving) return;
         final shouldLeave = await _showExitConfirmDialog();
-        if (shouldLeave && mounted) {
+        if (shouldLeave && context.mounted) {
           Navigator.of(context).popUntil((route) => route.isFirst);
         }
       },
@@ -580,7 +591,7 @@ class _ClubGameSummaryPageState extends State<ClubGameSummaryPage> {
                 ? null
                 : () async {
               final shouldLeave = await _showExitConfirmDialog();
-              if (shouldLeave && mounted) {
+              if (shouldLeave && context.mounted) {
                 Navigator.of(context).popUntil((route) => route.isFirst);
               }
             },

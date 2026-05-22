@@ -1,7 +1,9 @@
 import 'dart:async';
 
+// ignore: library_prefixes
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'api_client.dart';
+import 'app_logger.dart';
 
 /// Socket.IO 클라이언트 싱글톤 서비스
 ///
@@ -42,20 +44,20 @@ class SocketService {
     });
 
     _socket!.onConnect((_) {
-      print('[Socket] Connected: ${_socket!.id}');
+      AppLogger.info('[Socket] Connected: ${_socket!.id}');
       if (!completer.isCompleted) completer.complete();
     });
 
     _socket!.onAny((event, data) {
-      print('[Socket] Event: $event, Data: $data');
+      AppLogger.info('[Socket] Event: $event, Data: $data');
     });
 
     _socket!.onDisconnect((_) {
-      print('[Socket] Disconnected');
+      AppLogger.info('[Socket] Disconnected');
     });
 
     _socket!.onConnectError((err) {
-      print('[Socket] Connection Error: $err');
+      AppLogger.info('[Socket] Connection Error: $err');
       if (!completer.isCompleted) completer.completeError(err);
     });
 

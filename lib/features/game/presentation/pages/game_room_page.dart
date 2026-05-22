@@ -655,7 +655,7 @@ class _GameRoomPageState extends State<GameRoomPage> {
               width: double.infinity,
               height: 56,
               child: ElevatedButton.icon(
-                onPressed: _participants.length >= 1 && _roomId != null
+                onPressed: _participants.isNotEmpty && _roomId != null
                     ? () => _socketService.startGame(_roomId!)
                     : null,
                 icon: const Icon(Symbols.play_arrow, color: Colors.white),

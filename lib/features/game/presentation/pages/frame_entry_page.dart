@@ -476,7 +476,7 @@ class _FrameEntryPageState extends State<FrameEntryPage> {
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
         final ok = await _confirmExit();
-        if (ok && mounted) Navigator.pop(context);
+        if (ok && context.mounted) Navigator.pop(context);
       },
       child: Scaffold(
       backgroundColor: AppColors.backgroundDark,
@@ -487,7 +487,7 @@ class _FrameEntryPageState extends State<FrameEntryPage> {
           icon: const Icon(Symbols.arrow_back, color: Colors.white),
           onPressed: () async {
             final ok = await _confirmExit();
-            if (ok && mounted) Navigator.pop(context);
+            if (ok && context.mounted) Navigator.pop(context);
           },
         ),
         title: Column(
@@ -863,83 +863,6 @@ class _FrameEntryPageState extends State<FrameEntryPage> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  /// 클럽 게임 참가자 점수 목록 (가로 스크롤 컴팩트)
-  Widget _buildParticipantScores() {
-    final participants = widget.participants ?? [];
-    return SizedBox(
-      height: 56,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        itemCount: participants.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final p = participants[index];
-          final isMe = p['userId'] == _userId;
-          final score = isMe
-              ? _totalScore
-              : (_participantScores[p['userId']] ?? 0);
-          return Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(
-              color: isMe
-                  ? AppColors.primary.withValues(alpha: 0.1)
-                  : AppColors.surfaceDark,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: isMe
-                    ? AppColors.primary.withValues(alpha: 0.3)
-                    : Colors.white10,
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircleAvatar(
-                  radius: 14,
-                  backgroundColor: isMe
-                      ? AppColors.primary.withValues(alpha: 0.2)
-                      : Colors.white10,
-                  child: Text(
-                    (p['nickname'] ?? '?')[0],
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: isMe ? AppColors.primary : Colors.white70,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${p['nickname']}${isMe ? ' (나)' : ''}',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: isMe ? Colors.white : Colors.white70,
-                        fontWeight: isMe ? FontWeight.bold : FontWeight.normal,
-                      ),
-                    ),
-                    Text(
-                      '$score',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: isMe ? AppColors.primary : Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          );
-        },
       ),
     );
   }

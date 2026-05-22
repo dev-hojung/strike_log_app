@@ -376,14 +376,20 @@ class _RejectReasonSheetState extends State<_RejectReasonSheet> {
                 textAlign: TextAlign.center,
               ),
             ),
-            ..._reasons.map((r) => RadioListTile<String>(
-                  value: r.$1,
-                  groupValue: _selected,
-                  title: Text(r.$2),
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  onChanged: (v) => setState(() => _selected = v!),
-                )),
+            RadioGroup<String>(
+              groupValue: _selected,
+              onChanged: (v) => setState(() => _selected = v!),
+              child: Column(
+                children: _reasons
+                    .map((r) => RadioListTile<String>(
+                          value: r.$1,
+                          title: Text(r.$2),
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                        ))
+                    .toList(),
+              ),
+            ),
             const SizedBox(height: 8),
             ElevatedButton(
               onPressed: () => Navigator.pop(context, _selected),
