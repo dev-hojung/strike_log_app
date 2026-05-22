@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/errors/api_error.dart';
+import '../../../../core/errors/api_error_classifier.dart';
+import '../../../../core/services/app_logger.dart';
 import '../../../../core/services/fcm_service.dart';
 import '../../../../core/services/unread_notifications_service.dart';
+import '../../../../core/widgets/error_retry_view.dart';
 import '../../data/models/notification_item.dart';
 import '../../data/services/notifications_api_service.dart';
 
@@ -25,6 +29,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
   List<NotificationItem> _items = [];
   bool _isLoading = true;
   String? _userId;
+  ApiError? _error;
 
   @override
   void initState() {
@@ -33,20 +38,41 @@ class _NotificationsPageState extends State<NotificationsPage> {
   }
 
   Future<void> _load() async {
-    final prefs = await SharedPreferences.getInstance();
-    final userId = prefs.getString('user_id');
-    if (userId == null) {
-      if (mounted) setState(() => _isLoading = false);
-      return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('user_id');
+      if (userId == null) {
+        if (mounted) setState(() => _isLoading = false);
+        return;
+      }
+      final list = await _api.fetchList();
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      if (!mounted) return;
+      setState(() {
+        _userId = userId;
+        _items = list;
+        _isLoading = false;
+        _error = null;
+      });
+    } catch (e, st) {
+      final err = ApiErrorClassifier.from(e, st);
+      if (err.type != ApiErrorType.unauthorized) {
+        AppLogger.captureError(e, stackTrace: st, context: 'notifications_load');
+      }
+      if (!mounted) return;
+      setState(() {
+        _error = err;
+        _isLoading = false;
+      });
     }
-    final list = await _api.fetchList();
-    list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    if (!mounted) return;
+  }
+
+  Future<void> _retryLoad() async {
     setState(() {
-      _userId = userId;
-      _items = list;
-      _isLoading = false;
+      _isLoading = true;
+      _error = null;
     });
+    await _load();
   }
 
   Future<void> _markAllAsRead() async {
@@ -116,19 +142,24 @@ class _NotificationsPageState extends State<NotificationsPage> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _items.isEmpty
-              ? _buildEmpty(isDark)
-              : RefreshIndicator(
-                  onRefresh: _load,
-                  child: ListView.separated(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
-                    itemCount: _items.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 8),
-                    itemBuilder: (_, i) =>
-                        _buildItem(context, _items[i], isDark),
-                  ),
-                ),
+          : _error != null && _items.isEmpty
+              ? ErrorRetryView(
+                  error: _error!,
+                  onRetry: _retryLoad,
+                )
+              : _items.isEmpty
+                  ? _buildEmpty(isDark)
+                  : RefreshIndicator(
+                      onRefresh: _load,
+                      child: ListView.separated(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
+                        itemCount: _items.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        itemBuilder: (_, i) =>
+                            _buildItem(context, _items[i], isDark),
+                      ),
+                    ),
     );
   }
 

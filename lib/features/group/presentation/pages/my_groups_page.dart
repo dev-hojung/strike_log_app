@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/errors/api_error.dart';
+import '../../../../core/errors/api_error_classifier.dart';
 import '../../../../core/services/api_client.dart';
+import '../../../../core/services/app_logger.dart';
+import '../../../../core/widgets/error_retry_view.dart';
 import '../../data/services/group_creation_requests_service.dart';
 import 'club_join_requests_page.dart';
 import 'club_leaderboard_page.dart';
@@ -26,6 +30,7 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
   String? _currentUserId;
   bool _isLoading = true;
   bool _sortByScore = true;
+  ApiError? _error;
   final _searchController = TextEditingController();
   final GroupCreationRequestsService _creationRequestsService =
       GroupCreationRequestsService();
@@ -121,12 +126,29 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
           _filteredMembers = List.from(members);
           _pendingCreationRequests = pending;
           _isLoading = false;
+          _error = null;
           _applySorting();
         });
       }
-    } catch (e) {
-      if (mounted) setState(() => _isLoading = false);
+    } catch (e, st) {
+      final err = ApiErrorClassifier.from(e, st);
+      if (err.type != ApiErrorType.unauthorized) {
+        AppLogger.captureError(e, stackTrace: st, context: 'my_groups_fetch');
+      }
+      if (!mounted) return;
+      setState(() {
+        _error = err;
+        _isLoading = false;
+      });
     }
+  }
+
+  Future<void> _retryFetch() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    await _fetchData();
   }
 
   Future<void> _cancelCreationRequest(int requestId) async {
@@ -224,7 +246,12 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
           : _club == null
               ? (_pendingCreationRequests.isNotEmpty
                   ? _buildPendingView(isDark)
-                  : _buildEmptyState(isDark))
+                  : _error != null
+                      ? ErrorRetryView(
+                          error: _error!,
+                          onRetry: _retryFetch,
+                        )
+                      : _buildEmptyState(isDark))
               : _buildClubContent(isDark),
     );
   }

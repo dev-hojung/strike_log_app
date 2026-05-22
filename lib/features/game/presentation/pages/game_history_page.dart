@@ -3,7 +3,11 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/errors/api_error.dart';
+import '../../../../core/errors/api_error_classifier.dart';
 import '../../../../core/services/api_client.dart';
+import '../../../../core/services/app_logger.dart';
+import '../../../../core/widgets/error_retry_view.dart';
 import '../../../home/data/models/home_dashboard_data.dart';
 import '../../data/services/game_api_service.dart';
 import 'game_detail_page.dart';
@@ -79,6 +83,7 @@ class _GameHistoryPageState extends State<GameHistoryPage> {
   List<RecentGame> _games = [];
   int _averageScore = 0;
   bool _isLoading = true;
+  ApiError? _error;
 
   @override
   void initState() {
@@ -108,11 +113,28 @@ class _GameHistoryPageState extends State<GameHistoryPage> {
           _games = games;
           _averageScore = statsData['averageScore'] ?? 0;
           _isLoading = false;
+          _error = null;
         });
       }
-    } catch (e) {
-      if (mounted) setState(() => _isLoading = false);
+    } catch (e, st) {
+      final err = ApiErrorClassifier.from(e, st);
+      if (err.type != ApiErrorType.unauthorized) {
+        AppLogger.captureError(e, stackTrace: st, context: 'game_history_fetch');
+      }
+      if (!mounted) return;
+      setState(() {
+        _error = err;
+        _isLoading = false;
+      });
     }
+  }
+
+  Future<void> _retryFetch() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    await _fetchData();
   }
 
   /// 게임을 월별로 그룹핑
@@ -150,12 +172,17 @@ class _GameHistoryPageState extends State<GameHistoryPage> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _games.isEmpty
-              ? _buildEmptyState(isDark)
-              : RefreshIndicator(
-                  onRefresh: _fetchData,
-                  child: _buildGameList(isDark),
-                ),
+          : _error != null && _games.isEmpty
+              ? ErrorRetryView(
+                  error: _error!,
+                  onRetry: _retryFetch,
+                )
+              : _games.isEmpty
+                  ? _buildEmptyState(isDark)
+                  : RefreshIndicator(
+                      onRefresh: _fetchData,
+                      child: _buildGameList(isDark),
+                    ),
     );
   }
 
