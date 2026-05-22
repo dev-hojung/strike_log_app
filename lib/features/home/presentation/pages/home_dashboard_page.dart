@@ -5,7 +5,11 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/errors/api_error.dart';
+import '../../../../core/errors/api_error_classifier.dart';
+import '../../../../core/services/app_logger.dart';
 import '../../../../core/services/unread_notifications_service.dart';
+import '../../../../core/widgets/error_retry_view.dart';
 import '../../../game/data/models/game_series.dart';
 import '../../../game/data/services/series_api_service.dart';
 import '../../../notifications/presentation/pages/notifications_page.dart';
@@ -42,6 +46,7 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
   HomeDashboardData? _data;
   GameSeries? _bestSeries;
   bool _isLoading = true;
+  ApiError? _error;
 
   @override
   void initState() {
@@ -55,25 +60,53 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
   }
 
   Future<void> _fetchData() async {
-    final prefs = await SharedPreferences.getInstance();
-    final userId = prefs.getString('user_id') ?? '1';
-    final data = await _apiService.fetchDashboardData(userId);
-    // 베스트 시리즈는 실패해도 대시보드 자체에는 영향 없도록 격리.
-    GameSeries? best;
     try {
-      best = await _seriesService.getBest(userId);
-    } catch (_) {
-      best = null;
-    }
-    if (mounted) {
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('user_id') ?? '1';
+      final data = await _apiService.fetchDashboardData(userId);
+      // 베스트 시리즈는 실패해도 대시보드 자체에는 영향 없도록 격리.
+      GameSeries? best;
+      try {
+        best = await _seriesService.getBest(userId);
+      } catch (_) {
+        best = null;
+      }
+      if (mounted) {
+        setState(() {
+          _data = data;
+          _bestSeries = best;
+          _cachedData = data;
+          _cachedBestSeries = best;
+          _isLoading = false;
+          _error = null;
+        });
+      }
+    } catch (e, st) {
+      final err = ApiErrorClassifier.from(e, st);
+      // 인증 만료는 별도 401 가드가 처리하므로 본 화면 에러 UI는 노출하지 않음.
+      if (err.type != ApiErrorType.unauthorized) {
+        AppLogger.captureError(e, stackTrace: st, context: 'home_dashboard_fetch');
+      }
+      if (!mounted) return;
       setState(() {
-        _data = data;
-        _bestSeries = best;
-        _cachedData = data;
-        _cachedBestSeries = best;
+        _error = err;
         _isLoading = false;
       });
+      // 캐시 데이터가 있는 상태에서의 갱신 실패는 SnackBar로만 알리고 화면은 유지.
+      if (_data != null && err.type != ApiErrorType.unauthorized) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(err.message)),
+        );
+      }
     }
+  }
+
+  Future<void> _retryFetch() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    await _fetchData();
   }
 
   Future<void> _openNotifications() async {
@@ -97,6 +130,19 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
             isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
         appBar: _buildAppBar(isDark, ''),
         body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    // 첫 로드 실패 (캐시 없음 + 에러). 재시도 화면으로 대체.
+    if (_error != null && data == null) {
+      return Scaffold(
+        backgroundColor:
+            isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
+        appBar: _buildAppBar(isDark, ''),
+        body: ErrorRetryView(
+          error: _error!,
+          onRetry: _retryFetch,
+        ),
       );
     }
 
