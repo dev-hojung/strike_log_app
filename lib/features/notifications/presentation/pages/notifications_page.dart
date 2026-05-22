@@ -331,6 +331,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
         return Symbols.schedule;
       case NotificationType.clubTrialExpired:
         return Symbols.warning;
+      case NotificationType.newBestScore:
+        return Symbols.emoji_events;
       case NotificationType.unknown:
         return Symbols.notifications;
     }
@@ -356,6 +358,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
         return Colors.orange;
       case NotificationType.clubTrialExpired:
         return Colors.redAccent;
+      case NotificationType.newBestScore:
+        return Colors.amber;
       case NotificationType.unknown:
         return Colors.grey;
     }

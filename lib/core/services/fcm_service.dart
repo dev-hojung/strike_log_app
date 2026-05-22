@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../features/game/presentation/pages/game_detail_page.dart';
 import '../../features/group/presentation/pages/admin_creation_requests_page.dart';
 import '../../features/group/presentation/pages/club_join_requests_page.dart';
 import '../../features/notifications/data/services/notifications_api_service.dart';
@@ -222,6 +223,7 @@ class FcmService {
       case 'club_trial_expiring_soon':
       case 'club_trial_expired':
       case 'club_game_created':
+      case 'new_best_score':
         return true;
       default:
         // 거절 / 알 수 없는 타입은 이동 대상 없음.
@@ -276,6 +278,14 @@ class FcmService {
       case 'club_trial_expired':
       case 'club_game_created':
         _switchToClubsTab(nav);
+        break;
+      case 'new_best_score':
+        final gameId = int.tryParse(targetId ?? '') ?? 0;
+        if (gameId > 0) {
+          nav.push(MaterialPageRoute(
+            builder: (_) => GameDetailPage(gameId: gameId),
+          ));
+        }
         break;
       default:
         break;

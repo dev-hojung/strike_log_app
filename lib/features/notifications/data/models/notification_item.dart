@@ -10,6 +10,7 @@
 /// - `club_creation_rejected`: 내 클럽 생성 신청이 거절됨
 /// - `club_trial_expiring_soon`: 체험판 만료 임박
 /// - `club_trial_expired`: 체험판 만료
+/// - `new_best_score`: 개인 최고 점수 갱신 (`targetId` = gameId)
 enum NotificationType {
   clubGameCreated,
   clubJoinRequest,
@@ -20,6 +21,7 @@ enum NotificationType {
   clubCreationRejected,
   clubTrialExpiringSoon,
   clubTrialExpired,
+  newBestScore,
   unknown;
 
   /// 백엔드에서 내려오는 문자열 값.
@@ -43,6 +45,8 @@ enum NotificationType {
         return 'club_trial_expiring_soon';
       case NotificationType.clubTrialExpired:
         return 'club_trial_expired';
+      case NotificationType.newBestScore:
+        return 'new_best_score';
       case NotificationType.unknown:
         return '';
     }
@@ -68,6 +72,8 @@ enum NotificationType {
         return NotificationType.clubTrialExpiringSoon;
       case 'club_trial_expired':
         return NotificationType.clubTrialExpired;
+      case 'new_best_score':
+        return NotificationType.newBestScore;
       default:
         return NotificationType.unknown;
     }
