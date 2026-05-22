@@ -5,6 +5,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/share_capture.dart';
+import '../../../badges/presentation/widgets/new_badges_dialog.dart';
 import '../../../home/presentation/pages/home_dashboard_page.dart';
 import '../../data/bowling_scorer.dart';
 import '../../data/services/game_draft_repository.dart';
@@ -204,7 +205,7 @@ class _GameSummaryPageState extends State<GameSummaryPage> {
 
         if (result.success) {
           _isSaved = true;
-          await _afterSaveSuccess();
+          await _afterSaveSuccess(result);
           return;
         }
 
@@ -239,7 +240,10 @@ class _GameSummaryPageState extends State<GameSummaryPage> {
   /// - 시리즈 중간 게임이면: "다음 게임 진행" 다이얼로그
   /// - 시리즈 마지막 게임이면: completeSeries 호출 후 루트로 복귀
   /// - 단일 게임이면: 그대로 루트로 복귀
-  Future<void> _afterSaveSuccess() async {
+  Future<void> _afterSaveSuccess(GameSaveResult result) async {
+    if (!mounted) return;
+    // 신규 배지가 있으면 다른 분기보다 먼저 모달로 노출 (확인 후 정상 흐름 진행).
+    await NewBadgesDialog.showIfAny(context, result.newlyEarnedBadges);
     if (!mounted) return;
     final messenger = ScaffoldMessenger.of(context);
     messenger.showSnackBar(

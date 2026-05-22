@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/socket_service.dart';
+import '../../../badges/presentation/widgets/new_badges_dialog.dart';
 import '../../../home/presentation/pages/home_dashboard_page.dart';
 import '../../data/bowling_scorer.dart';
 import '../../data/services/game_draft_repository.dart';
@@ -226,6 +227,8 @@ class _ClubGameSummaryPageState extends State<ClubGameSummaryPage> {
 
         if (result.success) {
           _isSaved = true;
+          await NewBadgesDialog.showIfAny(context, result.newlyEarnedBadges);
+          if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('경기가 성공적으로 저장되었습니다.')),
           );

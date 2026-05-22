@@ -26,13 +26,17 @@ enum GameSaveErrorType {
 }
 
 /// 게임 저장 결과. [success] 여부에 따라 [errorType]/[errorMessage]가 설정됨.
+///
+/// [newlyEarnedBadges]는 서버 응답의 `newly_earned_badges` 배열을 그대로 전달한다.
+/// (성공일 때만 의미가 있고, 평가가 비활성이거나 신규 배지가 없으면 빈 리스트.)
 class GameSaveResult {
   final bool success;
   final GameSaveErrorType? errorType;
   final String? errorMessage;
   final int? statusCode;
+  final List<Map<String, dynamic>> newlyEarnedBadges;
 
-  const GameSaveResult.success()
+  const GameSaveResult.success({this.newlyEarnedBadges = const []})
       : success = true,
         errorType = null,
         errorMessage = null,
@@ -42,7 +46,8 @@ class GameSaveResult {
     required this.errorType,
     required this.errorMessage,
     this.statusCode,
-  }) : success = false;
+  })  : success = false,
+        newlyEarnedBadges = const [];
 }
 
 /// 게임 저장 API 호출 + 자동 재시도 + 에러 분류를 담당하는 서비스.
@@ -81,7 +86,16 @@ class GameSaveService {
         final response = await _dio.post('/games', data: payload);
         final code = response.statusCode;
         if (code == 200 || code == 201) {
-          return const GameSaveResult.success();
+          // 서버가 newly_earned_badges 배열을 동봉하면 UI 모달 노출용으로 전달.
+          final data = response.data;
+          List<Map<String, dynamic>> badges = const [];
+          if (data is Map && data['newly_earned_badges'] is List) {
+            badges = (data['newly_earned_badges'] as List)
+                .whereType<Map>()
+                .map((e) => Map<String, dynamic>.from(e))
+                .toList();
+          }
+          return GameSaveResult.success(newlyEarnedBadges: badges);
         }
         lastFailure = GameSaveResult.failure(
           errorType: GameSaveErrorType.server,
