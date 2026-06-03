@@ -22,7 +22,17 @@ class ApiClient {
     _handlingUnauthorized = false;
   }
 
+  /// 빌드 시 `--dart-define=API_BASE_URL=...`로 주입된 값을 우선 사용한다.
+  /// 값이 비어 있으면 개발용 로컬 분기로 폴백.
+  ///
+  /// 운영 빌드:
+  ///   flutter build appbundle --release \
+  ///     --dart-define=API_BASE_URL=https://strikelogapi-production.up.railway.app
+  static const String _envBaseUrl =
+      String.fromEnvironment('API_BASE_URL');
+
   static String get baseUrl {
+    if (_envBaseUrl.isNotEmpty) return _envBaseUrl;
     if (Platform.isAndroid) {
       return 'http://10.0.2.2:3001';
     } else {
