@@ -10,6 +10,7 @@ import '../../../../core/services/fcm_service.dart';
 import '../../../../core/services/image_upload_service.dart';
 import '../../../../core/services/session_manager.dart';
 import '../../../../core/services/user_profile_cache.dart';
+import '../../../../core/widgets/avatar_image.dart';
 import '../../../auth/presentation/pages/login_page.dart';
 import '../../../group/presentation/pages/admin_creation_requests_page.dart';
 import 'account_settings_page.dart';
@@ -113,15 +114,21 @@ class _ProfilePageState extends State<ProfilePage> {
         return;
       }
 
-      final bytes = await ImageUploadService.compress(picked);
-      final url = await ImageUploadService.uploadProfileImage(
-        userId: userId,
-        bytes: bytes,
-      );
+      final dataUri = await ImageUploadService.toBase64DataUri(picked);
+      if (dataUri.length > ImageUploadService.maxDataUriLength) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('이미지가 너무 큽니다. 더 작은 사진을 선택해주세요.'),
+            ),
+          );
+        }
+        return;
+      }
 
-      // 백엔드에 새 URL 반영. 응답 본문은 무시하고 fetchProfile로 캐시까지 동기화.
+      // 백엔드는 profile_image_url 컬럼(LONGTEXT)에 Data URI 그대로 저장.
       await ApiClient().dio.patch('/users/$userId', data: {
-        'profile_image_url': url,
+        'profile_image_url': dataUri,
       });
       await _fetchProfile();
       if (mounted) {
@@ -290,10 +297,11 @@ class _ProfilePageState extends State<ProfilePage> {
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      if (profileImageUrl != null && profileImageUrl.isNotEmpty)
-                        Image.network(profileImageUrl, fit: BoxFit.cover)
-                      else
-                        Icon(Symbols.person, size: 48, color: Colors.grey[500]),
+                      AvatarImage(
+                        url: profileImageUrl,
+                        fallback: Icon(Symbols.person,
+                            size: 48, color: Colors.grey[500]),
+                      ),
                       if (_isUploadingImage)
                         Container(
                           color: Colors.black.withValues(alpha: 0.45),

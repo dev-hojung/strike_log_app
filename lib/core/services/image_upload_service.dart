@@ -1,34 +1,26 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'app_logger.dart';
 
-/// 이미지 선택 → 압축 → Firebase Storage 업로드 헬퍼.
+/// 이미지 선택 → 압축 → base64 Data URI 변환 헬퍼.
 ///
-/// 백엔드에는 파일 수신 인프라가 없어, 클라가 직접 Firebase Storage에 업로드한 뒤
-/// 받은 다운로드 URL을 `PATCH /users/:id`의 `profile_image_url`로 전송하는 방식.
+/// 백엔드는 파일 수신 인프라 없이 `profile_image_url`을 단순 string으로 받는 구조라,
+/// 클라가 압축한 이미지 바이트를 `data:image/jpeg;base64,...` Data URI로 인코딩해
+/// 그대로 PATCH 본문에 실어 보낸다.
 ///
-/// 보안 룰(Firebase Console > Storage > Rules) 예시:
-/// ```
-/// rules_version = '2';
-/// service firebase.storage {
-///   match /b/{bucket}/o {
-///     match /profile_images/{userId}/{file=**} {
-///       allow read: if true;
-///       allow write: if request.auth != null && request.auth.uid == userId
-///                    && request.resource.size < 5 * 1024 * 1024;
-///     }
-///   }
-/// }
-/// ```
+/// DB·페이로드 부담 때문에 압축은 공격적으로 적용 (quality 50, minWidth 400).
+/// 아바타 표시는 96~200px 수준이라 손실 화질은 체감 어렵다.
 class ImageUploadService {
   ImageUploadService._();
 
   static final _picker = ImagePicker();
-  static final _storage = FirebaseStorage.instance;
+
+  /// Data URI 최대 길이(권장). 약 250KB 정도까지만 허용 — 그 이상이면 호출 측에서 차단.
+  static const int maxDataUriLength = 350 * 1024;
 
   /// 갤러리 또는 카메라에서 이미지 선택.
   ///
@@ -36,52 +28,36 @@ class ImageUploadService {
   static Future<XFile?> pickImage({required ImageSource source}) {
     return _picker.pickImage(
       source: source,
-      // image_picker 자체에서도 1차 리사이즈 (디바이스 메모리 보호).
-      maxWidth: 2048,
-      maxHeight: 2048,
+      // 디바이스 메모리 보호 위해 image_picker 자체에서도 1차 리사이즈.
+      maxWidth: 1024,
+      maxHeight: 1024,
       imageQuality: 90,
     );
   }
 
-  /// 선택된 이미지를 JPEG 압축.
+  /// 이미지를 압축한 뒤 `data:image/jpeg;base64,...` Data URI로 반환.
   ///
-  /// 프로필 이미지는 96x96~200x200 정도로 표시되므로 1024px + 품질 70이면 충분.
-  /// 실패 시 원본 바이트 반환.
-  static Future<Uint8List> compress(
+  /// [quality] 기본 50, [maxWidth] 기본 400 — 프로필 아바타 용도라 충분.
+  static Future<String> toBase64DataUri(
     XFile file, {
-    int quality = 70,
-    int maxWidth = 1024,
+    int quality = 50,
+    int maxWidth = 400,
   }) async {
+    Uint8List bytes;
     try {
       final input = await file.readAsBytes();
-      final result = await FlutterImageCompress.compressWithList(
+      bytes = await FlutterImageCompress.compressWithList(
         input,
         quality: quality,
         minWidth: maxWidth,
         minHeight: maxWidth,
         format: CompressFormat.jpeg,
       );
-      return result;
     } catch (e, st) {
       AppLogger.captureError(e, stackTrace: st, context: 'image_compress');
-      return file.readAsBytes();
+      bytes = await file.readAsBytes();
     }
-  }
-
-  /// 프로필 이미지를 Firebase Storage에 업로드하고 다운로드 URL을 반환.
-  ///
-  /// 경로: `profile_images/{userId}/{timestamp}.jpg`
-  /// 동일 사용자가 새로 올릴 때마다 새 객체 생성 → 캐시 무효화 자동.
-  static Future<String> uploadProfileImage({
-    required String userId,
-    required Uint8List bytes,
-  }) async {
-    final ts = DateTime.now().millisecondsSinceEpoch;
-    final ref = _storage.ref('profile_images/$userId/$ts.jpg');
-    final task = await ref.putData(
-      bytes,
-      SettableMetadata(contentType: 'image/jpeg'),
-    );
-    return task.ref.getDownloadURL();
+    final b64 = base64Encode(bytes);
+    return 'data:image/jpeg;base64,$b64';
   }
 }

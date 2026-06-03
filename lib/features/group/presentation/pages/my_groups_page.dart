@@ -6,6 +6,7 @@ import '../../../../core/errors/api_error.dart';
 import '../../../../core/errors/api_error_classifier.dart';
 import '../../../../core/services/api_client.dart';
 import '../../../../core/services/app_logger.dart';
+import '../../../../core/widgets/avatar_image.dart';
 import '../../../../core/widgets/error_retry_view.dart';
 import '../../data/services/group_creation_requests_service.dart';
 import 'club_join_requests_page.dart';
@@ -743,13 +744,14 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
                     ),
                   ),
                   child: ClipOval(
-                    child: profileImageUrl != null && profileImageUrl.isNotEmpty
-                        ? Image.network(profileImageUrl, fit: BoxFit.cover)
-                        : Icon(
-                            Symbols.person,
-                            size: 28,
-                            color: isDark ? Colors.grey[600] : Colors.grey[400],
-                          ),
+                    child: AvatarImage(
+                      url: profileImageUrl?.toString(),
+                      fallback: Icon(
+                        Symbols.person,
+                        size: 28,
+                        color: isDark ? Colors.grey[600] : Colors.grey[400],
+                      ),
+                    ),
                   ),
                 ),
                 if (isMe)

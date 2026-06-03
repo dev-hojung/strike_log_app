@@ -5,6 +5,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/api_client.dart';
 import '../../../../core/services/app_logger.dart';
 import '../../../../core/services/user_profile_cache.dart';
+import '../../../../core/widgets/avatar_image.dart';
 import '../../../legal/presentation/pages/privacy_policy_page.dart';
 import '../../../legal/presentation/pages/terms_of_service_page.dart';
 import 'edit_nickname_page.dart';
@@ -110,9 +111,11 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
                                 ),
                               ),
                               child: ClipOval(
-                                child: profileImageUrl != null && profileImageUrl.toString().isNotEmpty
-                                    ? Image.network(profileImageUrl, fit: BoxFit.cover)
-                                    : Icon(Symbols.person, size: 64, color: Colors.grey[500]),
+                                child: AvatarImage(
+                                  url: profileImageUrl?.toString(),
+                                  fallback: Icon(Symbols.person,
+                                      size: 64, color: Colors.grey[500]),
+                                ),
                               ),
                             ),
                             Positioned(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/widgets/avatar_image.dart';
 import '../../data/services/club_join_requests_service.dart';
 
 /// 클럽장이 가입 신청을 승인/거절하는 페이지.
@@ -148,15 +149,22 @@ class _ClubJoinRequestsPageState extends State<ClubJoinRequestsPage> {
         children: [
           Row(
             children: [
-              CircleAvatar(
-                radius: 22,
-                backgroundColor: Colors.white10,
-                backgroundImage:
-                    imageUrl != null ? NetworkImage(imageUrl) : null,
-                child: imageUrl == null
-                    ? Text(nickname.isNotEmpty ? nickname[0] : '?',
-                        style: const TextStyle(color: Colors.white))
-                    : null,
+              Container(
+                width: 44,
+                height: 44,
+                decoration: const BoxDecoration(
+                  color: Colors.white10,
+                  shape: BoxShape.circle,
+                ),
+                clipBehavior: Clip.antiAlias,
+                alignment: Alignment.center,
+                child: AvatarImage(
+                  url: imageUrl,
+                  fallback: Text(
+                    nickname.isNotEmpty ? nickname[0] : '?',
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
