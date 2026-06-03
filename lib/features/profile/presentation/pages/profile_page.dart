@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -6,6 +7,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/api_client.dart';
 import '../../../../core/services/app_logger.dart';
 import '../../../../core/services/fcm_service.dart';
+import '../../../../core/services/image_upload_service.dart';
 import '../../../../core/services/session_manager.dart';
 import '../../../../core/services/user_profile_cache.dart';
 import '../../../auth/presentation/pages/login_page.dart';
@@ -23,6 +25,7 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   Map<String, dynamic>? _profile;
   bool _fetchFailed = false;
+  bool _isUploadingImage = false;
 
   @override
   void initState() {
@@ -56,6 +59,85 @@ class _ProfilePageState extends State<ProfilePage> {
       if (mounted && _profile == null) {
         setState(() => _fetchFailed = true);
       }
+    }
+  }
+
+  /// 아바타 탭 시 ActionSheet → 갤러리/카메라 선택 → 압축 → Storage 업로드 → PATCH.
+  Future<void> _pickAndUploadProfileImage() async {
+    if (_isUploadingImage) return;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Symbols.photo_library),
+              title: const Text('갤러리에서 선택'),
+              onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+            ),
+            ListTile(
+              leading: const Icon(Symbols.photo_camera),
+              title: const Text('카메라로 촬영'),
+              onTap: () => Navigator.pop(ctx, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Symbols.close),
+              title: const Text('취소'),
+              onTap: () => Navigator.pop(ctx),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null || !mounted) return;
+
+    setState(() => _isUploadingImage = true);
+    try {
+      final picked = await ImageUploadService.pickImage(source: source);
+      if (picked == null) {
+        if (mounted) setState(() => _isUploadingImage = false);
+        return;
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('user_id');
+      if (userId == null) {
+        if (mounted) setState(() => _isUploadingImage = false);
+        return;
+      }
+
+      final bytes = await ImageUploadService.compress(picked);
+      final url = await ImageUploadService.uploadProfileImage(
+        userId: userId,
+        bytes: bytes,
+      );
+
+      // 백엔드에 새 URL 반영. 응답 본문은 무시하고 fetchProfile로 캐시까지 동기화.
+      await ApiClient().dio.patch('/users/$userId', data: {
+        'profile_image_url': url,
+      });
+      await _fetchProfile();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('프로필 사진을 변경했어요.')),
+        );
+      }
+    } catch (e, st) {
+      AppLogger.captureError(e, stackTrace: st, context: 'profile_image_upload');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('프로필 사진 변경에 실패했어요. 잠시 후 다시 시도해주세요.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isUploadingImage = false);
     }
   }
 
@@ -184,47 +266,70 @@ class _ProfilePageState extends State<ProfilePage> {
   ) {
     return Column(
       children: [
-        Stack(
-          alignment: Alignment.bottomRight,
-          children: [
-            Container(
-              width: 96,
-              height: 96,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.grey[300],
-                border: Border.all(color: surfaceColor, width: 4),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
+        GestureDetector(
+          onTap: _isUploadingImage ? null : _pickAndUploadProfileImage,
+          child: Stack(
+            alignment: Alignment.bottomRight,
+            children: [
+              Container(
+                width: 96,
+                height: 96,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.grey[300],
+                  border: Border.all(color: surfaceColor, width: 4),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.1),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: ClipOval(
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      if (profileImageUrl != null && profileImageUrl.isNotEmpty)
+                        Image.network(profileImageUrl, fit: BoxFit.cover)
+                      else
+                        Icon(Symbols.person, size: 48, color: Colors.grey[500]),
+                      if (_isUploadingImage)
+                        Container(
+                          color: Colors.black.withValues(alpha: 0.45),
+                          child: const Center(
+                            child: SizedBox(
+                              width: 28,
+                              height: 28,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2.5,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
-                ],
+                ),
               ),
-              child: ClipOval(
-                child: profileImageUrl != null && profileImageUrl.isNotEmpty
-                    ? Image.network(profileImageUrl, fit: BoxFit.cover)
-                    : Icon(Symbols.person, size: 48, color: Colors.grey[500]),
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: surfaceColor, width: 2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.1),
+                      blurRadius: 2,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+                child: const Icon(Symbols.photo_camera, color: Colors.white, size: 16),
               ),
-            ),
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                shape: BoxShape.circle,
-                border: Border.all(color: surfaceColor, width: 2),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    blurRadius: 2,
-                    offset: const Offset(0, 1),
-                  ),
-                ],
-              ),
-              child: const Icon(Symbols.photo_camera, color: Colors.white, size: 16),
-            ),
-          ],
+            ],
+          ),
         ),
         const SizedBox(height: 16),
         Text(
