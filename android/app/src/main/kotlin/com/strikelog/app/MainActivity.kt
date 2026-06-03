@@ -1,4 +1,4 @@
-package com.hojung.strikelog
+package com.strikelog.app
 
 import io.flutter.embedding.android.FlutterActivity
 

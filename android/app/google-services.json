@@ -7,9 +7,9 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:482906166961:android:4e1e1cd283cebb41f6f490",
+        "mobilesdk_app_id": "1:482906166961:android:a3b57f12be03dd11f6f490",
         "android_client_info": {
-          "package_name": "com.hojung.strikelog"
+          "package_name": "com.strikelog.app"
         }
       },
       "oauth_client": [],

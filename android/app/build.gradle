@@ -15,7 +15,7 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace = "com.hojung.strikelog"
+    namespace = "com.strikelog.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -31,7 +31,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.hojung.strikelog"
+        applicationId = "com.strikelog.app"
         // flutter_local_notifications 권장 최소 SDK
         minSdkVersion = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
