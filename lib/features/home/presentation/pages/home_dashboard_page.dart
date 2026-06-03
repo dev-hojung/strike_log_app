@@ -9,6 +9,8 @@ import '../../../../core/errors/api_error.dart';
 import '../../../../core/errors/api_error_classifier.dart';
 import '../../../../core/services/app_logger.dart';
 import '../../../../core/services/unread_notifications_service.dart';
+import '../../../../core/services/user_profile_cache.dart';
+import '../../../../core/widgets/avatar_image.dart';
 import '../../../../core/widgets/error_retry_view.dart';
 import '../../../badges/data/models/badge_item.dart';
 import '../../../badges/data/services/badges_api_service.dart';
@@ -282,13 +284,15 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
             height: 40,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              image: const DecorationImage(
-                image: NetworkImage(
-                    'https://api.dicebear.com/7.x/avataaars/png?seed=Alex'),
-                fit: BoxFit.cover,
-              ),
+              color: Colors.grey[300],
               border: Border.all(
                   color: AppColors.primary.withValues(alpha: 0.2), width: 2),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: AvatarImage(
+              url: UserProfileCache.cached?['profile_image_url']?.toString(),
+              fallback: Icon(Symbols.person,
+                  size: 22, color: Colors.grey[600]),
             ),
           ),
           const SizedBox(width: 12),
