@@ -6,6 +6,14 @@ plugins {
     id "com.google.gms.google-services"
 }
 
+// 릴리즈 서명용 키 정보 로드.
+// key.properties는 gitignored. 파일이 없으면 debug 서명으로 폴백해 로컬 빌드는 그대로 가능.
+def keystorePropertiesFile = rootProject.file("key.properties")
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
 android {
     namespace = "com.hojung.strikelog"
     compileSdk = flutter.compileSdkVersion
@@ -31,10 +39,25 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        release {
+            // key.properties 누락 시 storeFile=null이 되도록 방어. (build 시점에 검증 메시지 출력)
+            if (keystoreProperties.getProperty("storeFile") != null) {
+                storeFile file(keystoreProperties["storeFile"])
+                storePassword keystoreProperties["storePassword"]
+                keyAlias keystoreProperties["keyAlias"]
+                keyPassword keystoreProperties["keyPassword"]
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            signingConfig = signingConfigs.debug
+            // key.properties가 있으면 release 서명, 없으면 debug 서명으로 폴백.
+            // 폴백 빌드는 Play Store에 업로드 불가하지만 로컬 검증은 가능.
+            signingConfig = keystoreProperties.getProperty("storeFile") != null
+                ? signingConfigs.release
+                : signingConfigs.debug
         }
     }
 }
