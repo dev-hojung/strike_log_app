@@ -2,7 +2,7 @@
     <!-- Android 13+ 런타임 알림 권한 -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <application
-        android:label="Strike Log"
+        android:label="스트라이크 로그"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon">
         <activity
