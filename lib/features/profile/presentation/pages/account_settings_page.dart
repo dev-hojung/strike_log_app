@@ -4,8 +4,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/api_client.dart';
 import '../../../../core/services/app_logger.dart';
+import '../../../../core/services/fcm_service.dart';
+import '../../../../core/services/session_manager.dart';
 import '../../../../core/services/user_profile_cache.dart';
 import '../../../../core/widgets/avatar_image.dart';
+import '../../../auth/presentation/pages/login_page.dart';
 import '../../../legal/presentation/pages/privacy_policy_page.dart';
 import '../../../legal/presentation/pages/terms_of_service_page.dart';
 import 'edit_nickname_page.dart';
@@ -47,6 +50,74 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
     } catch (e, st) {
       AppLogger.captureError(e,
           stackTrace: st, context: 'accountSettings.fetch');
+    }
+  }
+
+  /// 회원 탈퇴 확인 다이얼로그. 사용자가 명확히 동의해야 실제 처리로 진행.
+  Future<void> _confirmDeleteAccount() async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
+        title: const Text('회원 탈퇴하시겠어요?'),
+        content: const Text(
+          '탈퇴 시 다음 데이터가 영구 삭제되며 복구할 수 없습니다.\n\n'
+          '• 게임 및 시리즈 기록\n'
+          '• 클럽 멤버십 및 신청 내역\n'
+          '• 획득한 배지와 출석 기록\n'
+          '• 알림 및 푸시 토큰\n\n'
+          '정말 진행하시겠어요?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: Colors.redAccent),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('탈퇴하기'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    await _performDeleteAccount();
+  }
+
+  /// 실제 탈퇴 처리. DELETE /users/me 호출 후 세션 정리 + 로그인 화면으로 복귀.
+  Future<void> _performDeleteAccount() async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      // 로그아웃과 동일하게 FCM 토큰을 서버에서 먼저 제거.
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('user_id');
+      if (userId != null) {
+        await FcmService.instance.clearTokenOnServer(userId);
+      }
+
+      await ApiClient().dio.delete('/users/me');
+
+      await SessionManager.clearAll();
+      if (!mounted) return;
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginPage()),
+        (route) => false,
+      );
+      messenger.showSnackBar(
+        const SnackBar(content: Text('회원 탈퇴가 완료되었습니다.')),
+      );
+    } catch (e, st) {
+      AppLogger.captureError(e,
+          stackTrace: st, context: 'accountSettings.delete');
+      if (!mounted) return;
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('회원 탈퇴에 실패했어요. 잠시 후 다시 시도해주세요.'),
+        ),
+      );
     }
   }
 
@@ -296,6 +367,34 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
                               ),
                             ),
                           ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 32),
+                      Padding(
+                        padding: const EdgeInsets.only(left: 4, bottom: 12),
+                        child: Text(
+                          '계정 관리',
+                          style: TextStyle(
+                            color: textColor,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      Container(
+                        clipBehavior: Clip.antiAlias,
+                        decoration: BoxDecoration(
+                          color: surfaceColor,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: borderColor),
+                        ),
+                        child: _buildActionRow(
+                          icon: Symbols.delete_forever,
+                          label: '회원 탈퇴',
+                          textColor: Colors.redAccent,
+                          secondaryColor: Colors.redAccent,
+                          onTap: _confirmDeleteAccount,
                         ),
                       ),
 
