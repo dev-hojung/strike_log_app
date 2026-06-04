@@ -7,6 +7,7 @@ import '../../../../core/errors/api_error.dart';
 import '../../../../core/errors/api_error_classifier.dart';
 import '../../../../core/services/api_client.dart';
 import '../../../../core/services/app_logger.dart';
+import '../../../../core/services/pending_join_requests_service.dart';
 import '../../../../core/widgets/avatar_image.dart';
 import '../../../../core/widgets/error_retry_view.dart';
 import '../../data/services/group_creation_requests_service.dart';
@@ -84,6 +85,9 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
   }
 
   Future<void> _fetchData() async {
+    // 헤더의 가입 신청 카운트 뱃지도 함께 갱신.
+    // ignore: unawaited_futures
+    PendingJoinRequestsService.instance.refresh();
     try {
       final prefs = await SharedPreferences.getInstance();
       final userId = prefs.getString('user_id');
@@ -630,14 +634,48 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
               onPressed: _openMembers,
             ),
           if (_isClubLeader())
-            IconButton(
-              icon: Icon(
-                Symbols.person_add,
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                size: 20,
+            ValueListenableBuilder<int>(
+              valueListenable: PendingJoinRequestsService.instance.pendingCount,
+              builder: (_, count, __) => Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      Symbols.person_add,
+                      color: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight,
+                      size: 20,
+                    ),
+                    tooltip: '가입 신청 관리',
+                    onPressed: _openJoinRequests,
+                  ),
+                  if (count > 0)
+                    Positioned(
+                      right: 4,
+                      top: 4,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 5, vertical: 1),
+                        constraints: const BoxConstraints(minWidth: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.redAccent,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          count > 99 ? '99+' : '$count',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            height: 1.2,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
-              tooltip: '가입 신청 관리',
-              onPressed: _openJoinRequests,
             ),
           if (!_isClubLeader())
             IconButton(

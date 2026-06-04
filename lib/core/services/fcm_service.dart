@@ -11,6 +11,7 @@ import '../../features/badges/presentation/pages/badge_list_page.dart';
 import '../../features/game/presentation/pages/game_detail_page.dart';
 import '../../features/group/presentation/pages/admin_creation_requests_page.dart';
 import '../../features/group/presentation/pages/club_join_requests_page.dart';
+import 'pending_join_requests_service.dart';
 import '../../features/notifications/data/services/notifications_api_service.dart';
 import '../../features/notifications/presentation/pages/notifications_page.dart';
 import '../../main.dart' show appNavigatorKey;
@@ -101,6 +102,10 @@ class FcmService {
     FirebaseMessaging.onMessage.listen((msg) async {
       debugPrint('[FCM][foreground] ${msg.notification?.title} / ${msg.notification?.body}');
       UnreadNotificationsService.instance.increment();
+      // 클럽 가입 신청 알림은 운영자에게만 가므로 네비/헤더 뱃지 카운트도 갱신.
+      if (msg.data['type']?.toString() == 'club_join_request') {
+        PendingJoinRequestsService.instance.increment();
+      }
       await _showForegroundNotification(msg);
     });
 

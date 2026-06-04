@@ -18,6 +18,25 @@ class GroupsApiService {
 
   final ApiClient _apiClient;
 
+  /// 내가 운영자인 클럽들의 pending 가입 신청 합계.
+  ///
+  /// 하단 네비/헤더 뱃지 표시용. 일반 멤버는 항상 0.
+  /// 응답 예: `{ count: 3 }`
+  Future<int> fetchPendingJoinRequestsCount() async {
+    try {
+      final res = await _apiClient.dio.get('/groups/me/pending-join-requests-count');
+      final data = res.data;
+      if (data is Map && data['count'] is num) {
+        return (data['count'] as num).toInt();
+      }
+      return 0;
+    } on DioException catch (e, st) {
+      await AppLogger.captureError(e,
+          stackTrace: st, context: 'groups.fetchPendingJoinRequestsCount');
+      return 0;
+    }
+  }
+
   /// 클럽 멤버 목록(역할 포함) 조회.
   ///
   /// 응답 예: `[{ user: {id, nickname, profile_image_url}, role, avg_score }, ...]`

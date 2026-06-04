@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/services/pending_join_requests_service.dart';
 import '../../../../core/widgets/avatar_image.dart';
 import '../../data/services/club_join_requests_service.dart';
 
@@ -53,6 +54,10 @@ class _ClubJoinRequestsPageState extends State<ClubJoinRequestsPage> {
         _requests.removeWhere((r) => r['id'].toString() == requestId);
       }
     });
+    if (ok) {
+      // 네비/헤더의 가입 신청 뱃지 카운트도 즉시 감소.
+      PendingJoinRequestsService.instance.decrement();
+    }
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

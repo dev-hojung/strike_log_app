@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'core/services/api_client.dart';
 import 'core/services/auth_token_storage.dart';
 import 'core/services/fcm_service.dart';
+import 'core/services/pending_join_requests_service.dart';
 import 'core/services/session_manager.dart';
 import 'core/services/unread_notifications_service.dart';
 import 'core/services/user_profile_cache.dart';
@@ -78,6 +79,7 @@ void main() async {
         if (userId != null) {
           unawaited(FcmService.instance.syncTokenToServer(userId));
           unawaited(UnreadNotificationsService.instance.refresh());
+          unawaited(PendingJoinRequestsService.instance.refresh());
         }
       }
     } catch (e, st) {

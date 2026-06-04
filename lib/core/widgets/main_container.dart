@@ -3,6 +3,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../features/home/presentation/pages/home_dashboard_page.dart';
 import '../../features/group/presentation/pages/my_groups_page.dart';
+import '../services/pending_join_requests_service.dart';
 import '../../features/game/presentation/pages/game_mode_page.dart';
 import '../../features/game/presentation/pages/frame_entry_page.dart';
 import '../../features/game/presentation/pages/game_history_page.dart';
@@ -324,7 +325,7 @@ class _MainContainerState extends State<MainContainer> with RouteAware {
             _buildNavItem(0, Symbols.home, '홈'),
             _buildNavItem(1, Symbols.bar_chart, '기록'),
             const SizedBox(width: 48), // FAB 공간 확보
-            _buildNavItem(2, Symbols.groups, '클럽'),
+            _buildNavItem(2, Symbols.groups, '클럽', showPendingJoinDot: true),
             _buildNavItem(3, Symbols.person, '프로필'),
           ],
         ),
@@ -336,13 +337,54 @@ class _MainContainerState extends State<MainContainer> with RouteAware {
   ///
   /// [index]는 탭의 인덱스, [icon]은 아이콘 데이터, [label]은 텍스트 라벨입니다.
   /// 선택된 상태에 따라 색상이 변경됩니다.
-  Widget _buildNavItem(int index, IconData icon, String label) {
+  Widget _buildNavItem(
+    int index,
+    IconData icon,
+    String label, {
+    bool showPendingJoinDot = false,
+  }) {
     final isSelected = _selectedIndex == index;
     final color = isSelected
         ? AppColors.primary
         : (Theme.of(context).brightness == Brightness.dark
             ? AppColors.textSecondaryDark
             : AppColors.textSecondaryLight);
+
+    Widget iconWidget = Icon(
+      icon,
+      color: color,
+      size: 24,
+      weight: isSelected ? 600 : 400,
+    );
+
+    // 클럽 탭: 내가 운영자인 클럽에 pending 가입 신청이 있을 때 빨간 점.
+    if (showPendingJoinDot) {
+      iconWidget = ValueListenableBuilder<int>(
+        valueListenable: PendingJoinRequestsService.instance.pendingCount,
+        builder: (_, count, child) {
+          return Stack(
+            clipBehavior: Clip.none,
+            children: [
+              child!,
+              if (count > 0)
+                Positioned(
+                  right: -2,
+                  top: -2,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      color: Colors.redAccent,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
+        child: iconWidget,
+      );
+    }
 
     return Expanded(
       child: InkWell(
@@ -357,13 +399,13 @@ class _MainContainerState extends State<MainContainer> with RouteAware {
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: color, size: 24, weight: isSelected ? 600 : 400),
+            iconWidget,
             const SizedBox(height: 2), // gap-1 equivalent
             Text(
               label,
               style: TextStyle(
-                color: color, 
-                fontSize: 10, 
+                color: color,
+                fontSize: 10,
                 fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500
               ),
             ),
