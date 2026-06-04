@@ -46,6 +46,9 @@ class _FrameEntryPageState extends State<FrameEntryPage> {
   // 각 프레임의 투구 기록 (10프레임, 각 프레임 최대 3투구)
   final List<List<int>> _frames = List.generate(10, (_) => <int>[]);
 
+  // 활성 프레임이 화면 밖으로 사라지지 않도록 자동 스크롤을 제어하는 컨트롤러
+  final ScrollController _frameScrollController = ScrollController();
+
   // 현재 선택된 프레임 인덱스 (0~9)
   int _currentFrame = 0;
 
@@ -121,6 +124,7 @@ class _FrameEntryPageState extends State<FrameEntryPage> {
 
   @override
   void dispose() {
+    _frameScrollController.dispose();
     if (widget.isClubGame) {
       _socketService.off('roomStateUpdated');
       // 클럽 게임 생명주기 종료 시 서버의 방에서 나가고 소켓 연결을 정리.
@@ -131,6 +135,27 @@ class _FrameEntryPageState extends State<FrameEntryPage> {
       _socketService.disconnect();
     }
     super.dispose();
+  }
+
+  /// 활성 프레임이 가시 영역의 가운데로 오도록 스크롤한다.
+  /// (입력 후 다음 프레임으로 진행될 때 호출)
+  void _scrollToCurrentFrame() {
+    if (!_frameScrollController.hasClients) return;
+    const horizontalPadding = 24.0;
+    const cardSpacing = 12.0;
+    const normalCardWidth = 80.0;
+    final cardWidth = _currentFrame == 9 ? 96.0 : normalCardWidth;
+    final cardStart =
+        horizontalPadding + _currentFrame * (normalCardWidth + cardSpacing);
+    final viewportWidth = _frameScrollController.position.viewportDimension;
+    final maxScroll = _frameScrollController.position.maxScrollExtent;
+    final targetOffset =
+        (cardStart + cardWidth / 2 - viewportWidth / 2).clamp(0.0, maxScroll);
+    _frameScrollController.animateTo(
+      targetOffset,
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOut,
+    );
   }
 
   /// 소켓으로 점수 + 통계 업데이트 전송
@@ -198,6 +223,8 @@ class _FrameEntryPageState extends State<FrameEntryPage> {
       }
     });
     _emitScoreUpdate();
+    // setState로 ListView가 다시 그려진 다음 프레임에 스크롤을 맞춰야 viewport 계산이 정확하다.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToCurrentFrame());
   }
 
   void _handleStrike() {
@@ -215,10 +242,10 @@ class _FrameEntryPageState extends State<FrameEntryPage> {
         _frames[9].add(10);
         _currentThrow = 2;
       } else if (_currentThrow == 2) {
-        if (_frames[9][1] == 10 || (_frames[9][0] == 10 && _frames[9].length == 2)) {
-          _frames[9].add(10);
-          _checkGameComplete();
-        }
+        // 보너스 투구 — _currentThrow == 2에 도달했다는 것은 이미 자격이 검증된 상태
+        // (스페어든 더블이든 _handleNumber/_handleSpare에서 _currentThrow=2로 진입할 때만 자격이 부여됨)
+        _frames[9].add(10);
+        _checkGameComplete();
       }
     }
   }
@@ -566,6 +593,7 @@ class _FrameEntryPageState extends State<FrameEntryPage> {
                     SizedBox(
                       height: 100,
                       child: ListView.separated(
+                        controller: _frameScrollController,
                         scrollDirection: Axis.horizontal,
                         padding: const EdgeInsets.symmetric(horizontal: 24),
                         itemCount: 10,

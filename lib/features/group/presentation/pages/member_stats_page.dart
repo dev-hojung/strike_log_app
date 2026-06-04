@@ -318,12 +318,19 @@ class _MemberStatsPageState extends State<MemberStatsPage> {
                 color: color.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Text(
-                symbol,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+              // `올커버`처럼 여러 글자 라벨이 32x32 박스를 넘기지 않도록 자동 축소.
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    symbol,
+                    style: TextStyle(
+                      color: color,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ),
             ),

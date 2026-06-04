@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/api_client.dart';
@@ -12,7 +11,6 @@ import '../../../legal/presentation/pages/terms_of_service_page.dart';
 /// 주요 기능:
 /// - 이메일 인증 (OTP 발송 및 검증)
 /// - 설정할 비밀번호, 닉네임 입력 폼
-/// - 간편 회원가입 (소셜 로그인)
 /// - 기존 계정으로 돌아가는 로그인 링크
 class SignupPage extends StatefulWidget {
   const SignupPage({super.key});
@@ -568,61 +566,6 @@ class _SignupPageState extends State<SignupPage> {
 
               const SizedBox(height: 48),
 
-              // 간편 회원가입 로고 라인
-              Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      margin: const EdgeInsets.only(left: 40, right: 16),
-                      height: 1,
-                      color: borderColor,
-                    ),
-                  ),
-                  Text(
-                    '간편 회원가입',
-                    style: TextStyle(color: subTextColor, fontSize: 12),
-                  ),
-                  Expanded(
-                    child: Container(
-                      margin: const EdgeInsets.only(left: 16, right: 40),
-                      height: 1,
-                      color: borderColor,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-
-              // 소셜 버튼
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _buildSocialIcon(
-                    color: const Color(0xFFFEE500),
-                    child: SvgPicture.string(
-                      '<svg viewBox="0 0 24 24" fill="#391B1B"><path d="M12 3C7.58 3 4 5.79 4 9.24c0 1.96 1.15 3.73 3 4.94l-.77 2.85c-.06.22.19.4.39.29l3.35-2.23c.66.1 1.34.15 2.03.15 4.42 0 8-2.79 8-6.24S16.42 3 12 3z"></path></svg>',
-                    ),
-                  ),
-                  const SizedBox(width: 20),
-                  _buildSocialIcon(
-                    color: const Color(0xFF03C75A),
-                    child: const Text('N',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 22,
-                            fontWeight: FontWeight.w900)),
-                  ),
-                  const SizedBox(width: 20),
-                  _buildSocialIcon(
-                    color: Colors.white,
-                    child:
-                        const Icon(Icons.apple, color: Colors.black, size: 28),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 48),
-
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -781,21 +724,6 @@ class _SignupPageState extends State<SignupPage> {
                 )
               : null,
         ),
-      ),
-    );
-  }
-
-  /// 스크린샷 룩앤필에 맞춘 소셜 버튼
-  Widget _buildSocialIcon({required Color color, required Widget child}) {
-    return Container(
-      width: 52,
-      height: 52,
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
-      ),
-      child: Center(
-        child: SizedBox(width: 24, height: 24, child: child),
       ),
     );
   }

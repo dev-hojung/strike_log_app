@@ -333,7 +333,7 @@ class _GameSummaryPageState extends State<GameSummaryPage> {
       isDismissible: false,
       enableDrag: false,
       builder: (context) => Container(
-        padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
+        padding: EdgeInsets.fromLTRB(24, 8, 24, 32 + MediaQuery.of(context).viewPadding.bottom),
         decoration: BoxDecoration(
           color: isDark ? AppColors.surfaceDark : Colors.white,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
@@ -449,7 +449,7 @@ class _GameSummaryPageState extends State<GameSummaryPage> {
       context: context,
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
-        padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
+        padding: EdgeInsets.fromLTRB(24, 8, 24, 32 + MediaQuery.of(context).viewPadding.bottom),
         decoration: BoxDecoration(
           color: isDark ? AppColors.surfaceDark : Colors.white,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
