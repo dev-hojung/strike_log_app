@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -9,8 +10,10 @@ import '../../../../core/services/app_logger.dart';
 import '../../../../core/widgets/avatar_image.dart';
 import '../../../../core/widgets/error_retry_view.dart';
 import '../../data/services/group_creation_requests_service.dart';
+import '../../data/services/groups_api_service.dart';
 import 'club_join_requests_page.dart';
 import 'club_leaderboard_page.dart';
+import 'club_members_page.dart';
 import 'create_club_page.dart';
 import 'explore_clubs_page.dart';
 import 'member_stats_page.dart';
@@ -614,6 +617,18 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
             tooltip: '랭킹',
             onPressed: _openLeaderboard,
           ),
+          // 멤버 관리(운영자 위임/탈퇴)는 클럽장만 진입.
+          // 일반 멤버는 옆의 [탈퇴] 아이콘으로 곧바로 탈퇴할 수 있다.
+          if (_isClubLeader())
+            IconButton(
+              icon: Icon(
+                Symbols.group,
+                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                size: 20,
+              ),
+              tooltip: '멤버 관리',
+              onPressed: _openMembers,
+            ),
           if (_isClubLeader())
             IconButton(
               icon: Icon(
@@ -623,6 +638,16 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
               ),
               tooltip: '가입 신청 관리',
               onPressed: _openJoinRequests,
+            ),
+          if (!_isClubLeader())
+            IconButton(
+              icon: const Icon(
+                Symbols.logout,
+                color: Colors.redAccent,
+                size: 20,
+              ),
+              tooltip: '클럽 탈퇴',
+              onPressed: _confirmLeaveAsMember,
             ),
         ],
       ),
@@ -641,6 +666,89 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
         ),
       ),
     );
+  }
+
+  Future<void> _openMembers() async {
+    final clubId = _club?['id'];
+    if (clubId == null) return;
+    final result = await Navigator.push<Map<String, dynamic>>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ClubMembersPage(
+          groupId: clubId is int ? clubId : int.parse(clubId.toString()),
+          groupName: _club?['name']?.toString() ?? '',
+        ),
+      ),
+    );
+    if (!mounted) return;
+    // 탈퇴했으면 멤버 페이지가 {'left': true, 'group_deleted': bool}를 반환.
+    if (result != null && result['left'] == true) {
+      final groupDeleted = result['group_deleted'] == true;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(groupDeleted ? '클럽에서 탈퇴했어요. (클럽도 함께 삭제됐어요)' : '클럽에서 탈퇴했어요.'),
+        ),
+      );
+      await _fetchData();
+    } else {
+      // 위임 등 일부 변경만 있어도 멤버 권한 표시가 바뀌므로 동기화.
+      await _fetchData();
+    }
+  }
+
+  /// 일반 멤버용 즉시 탈퇴 흐름.
+  /// 운영자 권한 관리 없이 곧바로 DELETE /groups/:id/leave 호출.
+  /// (클럽장은 [ClubMembersPage]의 우상단 메뉴에서 권한 위임 후 탈퇴)
+  Future<void> _confirmLeaveAsMember() async {
+    final clubId = _club?['id'];
+    final clubName = _club?['name']?.toString() ?? '';
+    if (clubId == null) return;
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('클럽에서 탈퇴할까요?'),
+        content: Text(
+          "'$clubName'에서 나갑니다.\n"
+          '그동안의 게임 기록은 본인 계정에 그대로 남아요.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.redAccent),
+            child: const Text('탈퇴하기'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+
+    try {
+      final api = GroupsApiService();
+      final res = await api.leaveGroup(
+        clubId is int ? clubId : int.parse(clubId.toString()),
+      );
+      if (!mounted) return;
+      final groupDeleted = res['group_deleted'] == true;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(groupDeleted
+              ? '클럽에서 탈퇴했어요. (클럽도 함께 삭제됐어요)'
+              : '클럽에서 탈퇴했어요.'),
+        ),
+      );
+      await _fetchData();
+    } on DioException catch (e) {
+      if (!mounted) return;
+      final msg = e.response?.data is Map
+          ? (e.response!.data['message']?.toString() ?? '탈퇴에 실패했습니다.')
+          : '탈퇴에 실패했습니다.';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    }
   }
 
   Widget _buildSearchBar(bool isDark) {
