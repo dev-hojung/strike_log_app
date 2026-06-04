@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -33,6 +34,11 @@ final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 void main() async {
   // Flutter 엔진 초기화 보장 (비동기 처리 시 필수)
   WidgetsFlutterBinding.ensureInitialized();
+
+  // google_fonts 패키지가 런타임에 폰트를 다운로드하지 않도록 차단.
+  // `assets/google_fonts/`에 번들된 .ttf만 사용한다.
+  // (첫 실행 시 폰트가 시스템 폰트 → Lexend로 깜빡이며 바뀌는 현상 방지)
+  GoogleFonts.config.allowRuntimeFetching = false;
 
   // 환경변수(.env) 로드
   await dotenv.load(fileName: ".env");
