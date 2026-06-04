@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'api_client.dart';
 import 'app_logger.dart';
+import 'auth_token_storage.dart';
 
 /// Socket.IO 클라이언트 싱글톤 서비스
 ///
@@ -35,12 +36,17 @@ class SocketService {
 
     final completer = Completer<void>();
 
+    // 백엔드 GameRoomsGateway.handleConnection이 handshake.auth.token으로 JWT를 검증한다.
+    // 토큰이 없으면 즉시 disconnect되므로 connect 시점에 반드시 전달.
+    final accessToken = AuthTokenStorage.current;
     _socket = IO.io(ApiClient.baseUrl, <String, dynamic>{
       'transports': ['websocket'],
       'autoConnect': true,
       // 자동 재연결 제한 (무한 재시도로 완료 실패가 묻히는 것 방지)
       'reconnectionAttempts': 3,
       'timeout': timeout.inMilliseconds,
+      if (accessToken != null && accessToken.isNotEmpty)
+        'auth': {'token': accessToken},
     });
 
     _socket!.onConnect((_) {
