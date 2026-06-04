@@ -29,10 +29,35 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
+  /// 아이디 저장 체크박스 상태 + 저장 키.
+  /// 체크 시 마지막 로그인 이메일을 기억해 다음 진입 때 입력란을 미리 채워준다.
+  static const String _kRememberFlagKey = 'login_remember_email_v1';
+  static const String _kRememberedEmailKey = 'login_remembered_email_v1';
+
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _isLoading = false;
+  bool _rememberEmail = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRememberedEmail();
+  }
+
+  Future<void> _loadRememberedEmail() async {
+    final prefs = await SharedPreferences.getInstance();
+    final remember = prefs.getBool(_kRememberFlagKey) ?? false;
+    final savedEmail = prefs.getString(_kRememberedEmailKey);
+    if (!mounted) return;
+    setState(() {
+      _rememberEmail = remember;
+      if (remember && savedEmail != null && savedEmail.isNotEmpty) {
+        _emailController.text = savedEmail;
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -111,6 +136,13 @@ class _LoginPageState extends State<LoginPage> {
           await prefs.setString('user_id', userId.toString());
           if (nickname != null) {
             await prefs.setString('nickname', nickname.toString());
+          }
+          // 아이디 저장 토글 반영: 켜져 있으면 이메일 저장, 꺼져 있으면 제거.
+          await prefs.setBool(_kRememberFlagKey, _rememberEmail);
+          if (_rememberEmail) {
+            await prefs.setString(_kRememberedEmailKey, email);
+          } else {
+            await prefs.remove(_kRememberedEmailKey);
           }
           unawaited(FcmService.instance.syncTokenToServer(userId.toString()));
           unawaited(_prefetchProfile(userId.toString()));
@@ -291,7 +323,48 @@ class _LoginPageState extends State<LoginPage> {
                               color: Color(0xFF64748B)),
                         ),
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 12),
+                      // 아이디 저장 체크박스
+                      InkWell(
+                        onTap: () =>
+                            setState(() => _rememberEmail = !_rememberEmail),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 4, vertical: 4),
+                          child: Row(
+                            children: [
+                              SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: Checkbox(
+                                  value: _rememberEmail,
+                                  onChanged: (v) => setState(
+                                      () => _rememberEmail = v ?? false),
+                                  activeColor: AppColors.primary,
+                                  side: const BorderSide(
+                                      color: Color(0xFF64748B), width: 1.5),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  materialTapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              const Text(
+                                '아이디 저장',
+                                style: TextStyle(
+                                  color: Color(0xFFCBD5E1),
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
                                           SizedBox(
                                             width: double.infinity,
                                             height: 56,

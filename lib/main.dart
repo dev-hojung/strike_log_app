@@ -16,6 +16,7 @@ import 'core/services/session_manager.dart';
 import 'core/services/unread_notifications_service.dart';
 import 'core/services/user_profile_cache.dart';
 import 'core/theme/app_theme.dart';
+import 'core/widgets/main_container.dart';
 import 'features/auth/presentation/pages/login_page.dart';
 
 /// 앱 전역 RouteObserver.
@@ -64,29 +65,37 @@ void main() async {
 
   final sentryDsn = dotenv.env['SENTRY_DSN'];
   Future<void> runAppWithSentry() async {
-    // Firebase 초기화 + FCM 준비.
-    // iOS는 GoogleService-Info.plist, Android는 google-services.json이 있어야 동작.
-    // 구성 파일이 없는 플랫폼(예: iOS 시뮬레이터 임시 구동)에서는 조용히 건너뛴다.
+    // 1) 자동 로그인 판정. AuthTokenStorage는 init()에서 이미 메모리로 로드된 상태.
+    //    저장된 JWT + user_id가 둘 다 있으면 MainContainer로 직접 진입.
+    //    (서버 401이 떨어지면 ApiClient.onUnauthorized 콜백이 SessionManager.clearAll → LoginPage push)
+    Widget? autoLoginHome;
+    String? autoUserId;
+    final storedToken = AuthTokenStorage.current;
+    if (storedToken != null && storedToken.isNotEmpty) {
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('user_id');
+      if (userId != null && userId.isNotEmpty) {
+        autoLoginHome = const MainContainer();
+        autoUserId = userId;
+      }
+    }
+
+    // 2) Firebase + FCM 초기화. iOS 시뮬레이터처럼 구성 파일이 없으면 조용히 건너뜀.
     try {
       await Firebase.initializeApp();
       await FcmService.instance.init();
-      // 저장된 JWT가 있으면 매 앱 시작마다 FCM 토큰을 서버에 재동기화.
-      // (로그인 직후만 등록되면, watch 모드 재빌드/토큰 회전/서버 다운 시에 누락됨)
-      final storedToken = AuthTokenStorage.current;
-      if (storedToken != null && storedToken.isNotEmpty) {
-        final prefs = await SharedPreferences.getInstance();
-        final userId = prefs.getString('user_id');
-        if (userId != null) {
-          unawaited(FcmService.instance.syncTokenToServer(userId));
-          unawaited(UnreadNotificationsService.instance.refresh());
-          unawaited(PendingJoinRequestsService.instance.refresh());
-        }
+      // 저장된 JWT가 있을 때만 동기화 호출 (자동 로그인 케이스).
+      if (autoUserId != null) {
+        unawaited(FcmService.instance.syncTokenToServer(autoUserId));
+        unawaited(UnreadNotificationsService.instance.refresh());
+        unawaited(PendingJoinRequestsService.instance.refresh());
       }
     } catch (e, st) {
       debugPrint('[Firebase] init skipped: $e');
       debugPrintStack(stackTrace: st, label: 'Firebase init');
     }
-    runApp(const BowlingApp());
+
+    runApp(BowlingApp(initialHome: autoLoginHome));
   }
 
   if (sentryDsn != null && sentryDsn.isNotEmpty) {
@@ -107,9 +116,12 @@ void main() async {
 /// 플러터 볼링 앱의 진입점입니다.
 ///
 /// [MaterialApp]을 설정하고, 테마 및 라우팅을 관리합니다.
-/// 앱의 기본 홈 화면으로 [LoginPage]를 설정합니다.
+/// 저장된 JWT + user_id가 모두 유효하면 [MainContainer]로 자동 진입, 아니면 [LoginPage].
 class BowlingApp extends StatelessWidget {
-  const BowlingApp({super.key});
+  const BowlingApp({super.key, this.initialHome});
+
+  /// 앱 시작 시 표시할 첫 화면. null이면 [LoginPage] (자동 로그인 미해당).
+  final Widget? initialHome;
 
   @override
   Widget build(BuildContext context) {
@@ -119,7 +131,7 @@ class BowlingApp extends StatelessWidget {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.dark,
-      home: const LoginPage(),
+      home: initialHome ?? const LoginPage(),
       navigatorKey: appNavigatorKey,
       navigatorObservers: [appRouteObserver],
     );
