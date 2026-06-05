@@ -131,6 +131,53 @@ class _ClubMembersPageState extends State<ClubMembersPage> {
     }
   }
 
+  Future<void> _confirmKick(Map<String, dynamic> member) async {
+    final nickname = member['user']?['nickname']?.toString() ?? '멤버';
+    final targetId = member['user']?['id']?.toString();
+    if (targetId == null) return;
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('회원을 추방할까요?'),
+        content: Text(
+          '$nickname 님을 클럽에서 추방합니다.\n'
+          '추방된 멤버는 다시 가입 신청을 해야 클럽에 참여할 수 있어요.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.redAccent),
+            child: const Text('추방하기'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+
+    setState(() => _busy = true);
+    try {
+      await _api.kickMember(groupId: widget.groupId, targetUserId: targetId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$nickname 님을 추방했습니다.')),
+      );
+      await _refresh();
+    } on DioException catch (e) {
+      if (!mounted) return;
+      final msg = e.response?.data is Map
+          ? (e.response!.data['message']?.toString() ?? '추방에 실패했습니다.')
+          : '추방에 실패했습니다.';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _confirmLeave() async {
     final ok = await showDialog<bool>(
       context: context,
@@ -300,10 +347,33 @@ class _ClubMembersPageState extends State<ClubMembersPage> {
               ))
           : null,
       trailing: (_amAdmin && !isAdmin && !isMe)
-          ? TextButton.icon(
-              onPressed: _busy ? null : () => _confirmPromote(member),
-              icon: const Icon(Symbols.shield_person, size: 18),
-              label: const Text('운영자 위임'),
+          ? PopupMenuButton<String>(
+              enabled: !_busy,
+              icon: const Icon(Symbols.more_vert),
+              onSelected: (v) {
+                if (v == 'promote') _confirmPromote(member);
+                if (v == 'kick') _confirmKick(member);
+              },
+              itemBuilder: (_) => const [
+                PopupMenuItem(
+                  value: 'promote',
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(Symbols.shield_person),
+                    title: Text('운영자로 위임'),
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'kick',
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading:
+                        Icon(Symbols.person_remove, color: Colors.redAccent),
+                    title: Text('추방하기',
+                        style: TextStyle(color: Colors.redAccent)),
+                  ),
+                ),
+              ],
             )
           : null,
     );

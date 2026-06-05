@@ -70,6 +70,21 @@ class GroupsApiService {
     }
   }
 
+  /// 회원 추방. 운영자가 일반 멤버를 클럽에서 제거.
+  /// 본인/ADMIN 추방은 백엔드에서 차단된다 (409 / Forbidden).
+  Future<void> kickMember({
+    required int groupId,
+    required String targetUserId,
+  }) async {
+    try {
+      await _apiClient.dio.delete('/groups/$groupId/members/$targetUserId');
+    } on DioException catch (e, st) {
+      await AppLogger.captureError(e,
+          stackTrace: st, context: 'groups.kickMember');
+      rethrow;
+    }
+  }
+
   /// 클럽 탈퇴.
   ///
   /// 응답: `{ ok: true, group_deleted: bool }`

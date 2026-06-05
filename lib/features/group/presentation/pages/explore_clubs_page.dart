@@ -19,6 +19,10 @@ class _ExploreClubsPageState extends State<ExploreClubsPage> {
   bool _isLoading = true;
   final _searchController = TextEditingController();
 
+  /// 본인이 이미 가입한 클럽 ID 집합. 1인 1클럽 정책상 보통 0~1개.
+  Set<int> _myClubIds = const {};
+  bool get _amInAnyClub => _myClubIds.isNotEmpty;
+
   @override
   void initState() {
     super.initState();
@@ -34,13 +38,35 @@ class _ExploreClubsPageState extends State<ExploreClubsPage> {
 
   Future<void> _fetchClubs() async {
     try {
-      final response = await ApiClient().dio.get('/groups');
-      final clubs = response.data is List ? response.data as List : [];
+      // 전체 클럽 + 본인이 가입한 클럽을 병렬 조회.
+      // /groups/me 실패는 무시 (가입 상태 정보만 누락될 뿐 탐색은 가능).
+      final dio = ApiClient().dio;
+      final allFuture = dio.get('/groups');
+      final mineFuture = dio.get('/groups/me');
+      final allResp = await allFuture;
+      dynamic mineRaw;
+      try {
+        final mineResp = await mineFuture;
+        mineRaw = mineResp.data;
+      } catch (_) {
+        mineRaw = null;
+      }
+      final clubs = allResp.data is List ? allResp.data as List : [];
+      final mineIds = <int>{};
+      if (mineRaw is List) {
+        for (final m in mineRaw) {
+          if (m is Map && m['id'] != null) {
+            final id = int.tryParse(m['id'].toString());
+            if (id != null) mineIds.add(id);
+          }
+        }
+      }
 
       if (mounted) {
         setState(() {
           _clubs = clubs;
           _filteredClubs = List.from(clubs);
+          _myClubIds = mineIds;
           _isLoading = false;
         });
       }
@@ -177,16 +203,25 @@ class _ExploreClubsPageState extends State<ExploreClubsPage> {
     final description = club['description'] ?? '';
     final memberCount = club['member_count'] ?? 0;
     final avgScore = (club['avg_score'] as num?)?.toInt() ?? 0;
+    final clubId = int.tryParse(club['id']?.toString() ?? '');
+    final isMine = clubId != null && _myClubIds.contains(clubId);
+    // 다른 클럽인데 본인이 어떤 클럽에든 이미 가입 상태면 disabled.
+    final isDisabled = !isMine && _amInAnyClub;
 
-    return GestureDetector(
-      onTap: () => _navigateToJoin(club),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: surfaceColor,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: borderColor),
-        ),
+    return Opacity(
+      opacity: isDisabled ? 0.45 : 1.0,
+      child: GestureDetector(
+        onTap: () => _navigateToJoin(club),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: surfaceColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isMine ? AppColors.primary.withValues(alpha: 0.6) : borderColor,
+              width: isMine ? 1.5 : 1,
+            ),
+          ),
         child: Row(
           children: [
             // 클럽 아이콘
@@ -209,11 +244,39 @@ class _ExploreClubsPageState extends State<ExploreClubsPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    name,
-                    style: TextStyle(color: textColor, fontSize: 16, fontWeight: FontWeight.w700),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          name,
+                          style: TextStyle(
+                              color: textColor,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (isMine) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            '내 클럽',
+                            style: TextStyle(
+                              color: AppColors.primary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                   const SizedBox(height: 4),
                   Row(
@@ -271,10 +334,36 @@ class _ExploreClubsPageState extends State<ExploreClubsPage> {
           ],
         ),
       ),
+      ),
     );
   }
 
   void _navigateToJoin(dynamic club) {
+    // 본인이 이미 어떤 클럽에든 가입한 상태면 새 가입 신청 차단.
+    final clubId = int.tryParse(club['id']?.toString() ?? '');
+    final isMine = clubId != null && _myClubIds.contains(clubId);
+
+    if (_amInAnyClub) {
+      showDialog<void>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: Text(isMine ? '이미 가입된 클럽이에요' : '먼저 탈퇴 후 시도해주세요'),
+          content: Text(
+            isMine
+                ? '본인이 가입한 클럽입니다. 내 클럽 화면에서 활동을 이어가세요.'
+                : '한 번에 하나의 클럽에만 가입할 수 있습니다. 현재 가입된 클럽에서 탈퇴한 후 다시 시도해주세요.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('확인'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     Navigator.push(
       context,
       MaterialPageRoute(
