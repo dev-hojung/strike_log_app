@@ -30,6 +30,8 @@ class _MemberStatsPageState extends State<MemberStatsPage> {
 
   // statistics API
   int _averageScore = 0;
+  int _personalAverageScore = 0;
+  int _clubAverageScore = 0;
   int _highestScore = 0;
   List<Map<String, dynamic>> _recentTrend = [];
   Map<String, dynamic> _monthlyTrend = {};
@@ -66,6 +68,10 @@ class _MemberStatsPageState extends State<MemberStatsPage> {
       if (mounted) {
         setState(() {
           _averageScore = (stats['averageScore'] as num?)?.toInt() ?? 0;
+          _personalAverageScore =
+              (stats['personalAverageScore'] as num?)?.toInt() ?? 0;
+          _clubAverageScore =
+              (stats['clubAverageScore'] as num?)?.toInt() ?? 0;
           _highestScore = (stats['highestScore'] as num?)?.toInt() ?? 0;
           _recentTrend = (stats['recentTrend'] as List?)
                   ?.map((e) => Map<String, dynamic>.from(e as Map))
@@ -197,34 +203,86 @@ class _MemberStatsPageState extends State<MemberStatsPage> {
     );
   }
 
-  /// 평균 점수, 최고 점수, 이번 달 경기 수
+  /// 평균 점수(종합), 최고 점수, 이번 달 경기 수 + 개인/클럽 분할 평균
   Widget _buildCoreStats(bool isDark) {
-    return Row(
+    return Column(
       children: [
-        _buildStatCard(
-          label: '평균 점수',
-          value: '$_averageScore',
-          icon: Symbols.equalizer,
-          color: AppColors.primary,
-          isDark: isDark,
+        Row(
+          children: [
+            _buildStatCard(
+              label: '종합 에버',
+              value: '$_averageScore',
+              icon: Symbols.equalizer,
+              color: AppColors.primary,
+              isDark: isDark,
+            ),
+            const SizedBox(width: 12),
+            _buildStatCard(
+              label: '최고 점수',
+              value: '$_highestScore',
+              icon: Symbols.emoji_events,
+              color: Colors.amber,
+              isDark: isDark,
+            ),
+            const SizedBox(width: 12),
+            _buildStatCard(
+              label: '이번 달',
+              value: '$_monthGameCount경기',
+              icon: Symbols.history,
+              color: Colors.orange,
+              isDark: isDark,
+            ),
+          ],
         ),
-        const SizedBox(width: 12),
-        _buildStatCard(
-          label: '최고 점수',
-          value: '$_highestScore',
-          icon: Symbols.emoji_events,
-          color: Colors.amber,
-          isDark: isDark,
-        ),
-        const SizedBox(width: 12),
-        _buildStatCard(
-          label: '이번 달',
-          value: '$_monthGameCount경기',
-          icon: Symbols.history,
-          color: Colors.orange,
-          isDark: isDark,
-        ),
+        const SizedBox(height: 12),
+        _buildAverageBreakdown(isDark),
       ],
+    );
+  }
+
+  /// 개인/클럽 에버리지 작은 분할 표시 (홈 대시보드와 동일 패턴).
+  Widget _buildAverageBreakdown(bool isDark) {
+    final surface = isDark ? AppColors.surfaceDark : Colors.white;
+    final border = isDark ? Colors.white12 : Colors.black12;
+    final mutedText =
+        isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+
+    Widget cell(String label, int value, Color accent) {
+      return Expanded(
+        child: Column(
+          children: [
+            Text(label, style: TextStyle(color: mutedText, fontSize: 11)),
+            const SizedBox(height: 4),
+            Text(
+              value > 0 ? '$value' : '-',
+              style: TextStyle(
+                color: value > 0 ? accent : mutedText,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      decoration: BoxDecoration(
+        color: surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: border),
+      ),
+      child: Row(
+        children: [
+          cell('개인', _personalAverageScore, const Color(0xFF60A5FA)),
+          Container(width: 1, height: 28, color: border),
+          cell('클럽', _clubAverageScore, const Color(0xFFFBBF24)),
+          Container(width: 1, height: 28, color: border),
+          cell('종합', _averageScore,
+              isDark ? Colors.white : AppColors.textPrimaryLight),
+        ],
+      ),
     );
   }
 

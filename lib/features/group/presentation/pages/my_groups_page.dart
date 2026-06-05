@@ -599,15 +599,55 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
                     letterSpacing: -0.45,
                   ),
                 ),
-                Text(
-                  _club?['description'] ?? '',
-                  style: TextStyle(
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                    fontSize: 12,
-                    letterSpacing: 0.6,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                Row(
+                  children: [
+                    if ((_club?['description'] ?? '').toString().isNotEmpty)
+                      Flexible(
+                        child: Text(
+                          _club?['description'] ?? '',
+                          style: TextStyle(
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight,
+                            fontSize: 12,
+                            letterSpacing: 0.6,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    if ((_club?['avg_score'] as num?)?.toInt() != null &&
+                        ((_club?['avg_score'] as num?)?.toInt() ?? 0) > 0) ...[
+                      if ((_club?['description'] ?? '').toString().isNotEmpty)
+                        Text(
+                          ' · ',
+                          style: TextStyle(
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight,
+                            fontSize: 12,
+                          ),
+                        ),
+                      Icon(
+                        Symbols.equalizer,
+                        size: 12,
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
+                      ),
+                      const SizedBox(width: 2),
+                      Text(
+                        '에버 ${(_club?['avg_score'] as num).toInt()}',
+                        style: TextStyle(
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondaryLight,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ],
             ),

@@ -176,6 +176,7 @@ class _ExploreClubsPageState extends State<ExploreClubsPage> {
     final name = club['name'] ?? '';
     final description = club['description'] ?? '';
     final memberCount = club['member_count'] ?? 0;
+    final avgScore = (club['avg_score'] as num?)?.toInt() ?? 0;
 
     return GestureDetector(
       onTap: () => _navigateToJoin(club),
@@ -221,6 +222,13 @@ class _ExploreClubsPageState extends State<ExploreClubsPage> {
                       const SizedBox(width: 4),
                       Text(
                         '$memberCount명',
+                        style: TextStyle(color: secondaryColor, fontSize: 12),
+                      ),
+                      const SizedBox(width: 10),
+                      Icon(Symbols.equalizer, color: secondaryColor, size: 14),
+                      const SizedBox(width: 4),
+                      Text(
+                        avgScore > 0 ? '에버 $avgScore' : '에버 -',
                         style: TextStyle(color: secondaryColor, fontSize: 12),
                       ),
                       if (description.isNotEmpty) ...[

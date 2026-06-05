@@ -37,6 +37,8 @@ class HomeApiService {
       return HomeDashboardData(
         nickname: profile['nickname'] ?? 'Guest',
         averageScore: stats['averageScore'] ?? 0,
+        personalAverageScore: (stats['personalAverageScore'] as num?)?.toInt() ?? 0,
+        clubAverageScore: (stats['clubAverageScore'] as num?)?.toInt() ?? 0,
         highestScore: stats['highestScore'] ?? 0,
         highestScoreDate: stats['highestScoreDate'] != null
             ? DateTime.parse(stats['highestScoreDate'].toString())

@@ -1,5 +1,12 @@
 class HomeDashboardData {
+  /// 종합 평균 (개인 + 클럽 게임 전체)
   final int averageScore;
+
+  /// 개인 게임만의 평균 (is_club_game=false)
+  final int personalAverageScore;
+
+  /// 클럽 게임만의 평균 (is_club_game=true)
+  final int clubAverageScore;
   final int highestScore;
   final double? trendPercentage; // Added trend percentage
   final DateTime? highestScoreDate;
@@ -30,6 +37,8 @@ class HomeDashboardData {
 
   HomeDashboardData({
     required this.averageScore,
+    this.personalAverageScore = 0,
+    this.clubAverageScore = 0,
     required this.highestScore,
     this.trendPercentage,
     this.highestScoreDate,
@@ -115,12 +124,16 @@ class ClubInfo {
   final String? coverImageUrl;
   final int memberCount;
 
+  /// 클럽 평균 점수 (멤버 전원의 모든 게임 평균). 게임이 없으면 0.
+  final int avgScore;
+
   ClubInfo({
     required this.id,
     required this.name,
     this.description,
     this.coverImageUrl,
     this.memberCount = 0,
+    this.avgScore = 0,
   });
 
   factory ClubInfo.fromJson(Map<String, dynamic> json) {
@@ -130,6 +143,7 @@ class ClubInfo {
       description: json['description'],
       coverImageUrl: json['cover_image_url'],
       memberCount: json['member_count'] ?? 0,
+      avgScore: (json['avg_score'] as num?)?.toInt() ?? 0,
     );
   }
 }

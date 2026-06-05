@@ -205,7 +205,7 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
               children: [
                 _buildStatCard(
                   context,
-                  title: '현재 에버리지',
+                  title: '종합 에버리지',
                   value: data.averageScore.toString(),
                   icon: Symbols.analytics,
                   isDark: isDark,
@@ -231,6 +231,9 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
               ],
             ),
             ),
+            const SizedBox(height: 12),
+            // 개인/클럽 에버리지 분할 표시 (클럽 미가입자는 클럽 값이 0)
+            _buildAverageBreakdown(data, isDark),
             const SizedBox(height: 16),
 
             // 출석 streak + 최근 배지 카드 (모든 데이터 로드 후 노출)
@@ -543,6 +546,57 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  /// 개인/클럽 에버리지 작은 분할 표시.
+  /// 클럽 미가입자는 클럽 값이 0으로 떨어지지만 시각적으로 표시는 유지(설명용).
+  Widget _buildAverageBreakdown(HomeDashboardData data, bool isDark) {
+    final surface = isDark ? AppColors.surfaceDark : Colors.white;
+    final border = isDark ? Colors.white12 : Colors.black12;
+    final mutedText =
+        isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final primaryText =
+        isDark ? Colors.white : AppColors.textPrimaryLight;
+
+    Widget cell(String label, int value, Color accent) {
+      return Expanded(
+        child: Column(
+          children: [
+            Text(
+              label,
+              style: TextStyle(color: mutedText, fontSize: 11),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              value > 0 ? '$value' : '-',
+              style: TextStyle(
+                color: value > 0 ? accent : mutedText,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      decoration: BoxDecoration(
+        color: surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: border),
+      ),
+      child: Row(
+        children: [
+          cell('개인', data.personalAverageScore, const Color(0xFF60A5FA)),
+          Container(width: 1, height: 28, color: border),
+          cell('클럽', data.clubAverageScore, const Color(0xFFFBBF24)),
+          Container(width: 1, height: 28, color: border),
+          cell('종합', data.averageScore, primaryText),
+        ],
       ),
     );
   }
