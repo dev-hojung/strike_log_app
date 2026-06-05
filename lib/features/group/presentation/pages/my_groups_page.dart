@@ -462,12 +462,87 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
                     padding: const EdgeInsets.only(bottom: 12),
                     child: _buildMemberCard(member, isDark),
                   )),
+                  const SizedBox(height: 16),
+                  _buildExploreClubsEntry(isDark),
                   const SizedBox(height: 100),
                 ],
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// 클럽 가입자도 다른 클럽들을 둘러볼 수 있는 진입 카드.
+  /// (기존엔 미가입자에게만 노출됐던 ExploreClubsPage 버튼을 가입자 화면에도 노출)
+  Widget _buildExploreClubsEntry(bool isDark) {
+    final surface = isDark ? AppColors.surfaceDark : Colors.white;
+    final border = isDark ? Colors.white12 : Colors.black12;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ExploreClubsPage()),
+          );
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: border),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Symbols.search, color: AppColors.primary, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '다른 클럽 둘러보기',
+                      style: TextStyle(
+                        color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '평균 점수와 멤버 수를 한눈에 비교해보세요.',
+                      style: TextStyle(
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Symbols.chevron_right,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
+                size: 20,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -13,6 +13,7 @@ import '../../../../core/services/user_profile_cache.dart';
 import '../../../../core/widgets/avatar_image.dart';
 import '../../../../core/widgets/error_retry_view.dart';
 import '../../../badges/data/models/badge_item.dart';
+import '../../../help/presentation/pages/help_page.dart';
 import '../../../badges/data/services/badges_api_service.dart';
 import '../../../badges/presentation/pages/badge_list_page.dart';
 import '../../../game/data/models/game_series.dart';
@@ -65,6 +66,49 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
     _fetchData();
     // 미읽음 알림 수는 전역 싱글톤이 관리. 대시보드 진입마다 동기화.
     UnreadNotificationsService.instance.refresh();
+    // 첫 실행 시 1회 온보딩 다이얼로그 노출.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeShowOnboarding());
+  }
+
+  /// SharedPreferences에 플래그가 없으면 도움말 안내 다이얼로그 1회 표시.
+  /// "도움말 보기"를 누르면 [HelpPage]로 이동하고 플래그를 저장.
+  Future<void> _maybeShowOnboarding() async {
+    const flagKey = 'help_onboarding_shown_v1';
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool(flagKey) == true) return;
+    if (!mounted) return;
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('스트라이크 로그에 오신 걸 환영합니다! 🎳'),
+        content: const Text(
+          '주요 기능과 볼링 용어를 안내해드려요.\n\n'
+          '• 게임 점수 자동 계산과 기록\n'
+          '• 클럽에서 다른 멤버와 함께 게임\n'
+          '• 개인/클럽/종합 에버리지로 실력 추적\n'
+          '• 배지와 출석 streak로 즐거움 더하기\n\n'
+          '언제든 우상단 ❓ 아이콘이나 프로필 → 도움말에서 다시 볼 수 있어요.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('닫기'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const HelpPage()),
+              );
+            },
+            child: const Text('도움말 보기'),
+          ),
+        ],
+      ),
+    );
+    await prefs.setBool(flagKey, true);
   }
 
   Future<void> _fetchData() async {
@@ -356,6 +400,20 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
             ),
             onPressed: _openNotifications,
           ),
+        ),
+        IconButton(
+          tooltip: '도움말',
+          icon: Icon(
+            Symbols.help,
+            color: isDark ? Colors.white : AppColors.textPrimaryLight,
+            size: 24,
+          ),
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const HelpPage()),
+            );
+          },
         ),
         const SizedBox(width: 8),
       ],

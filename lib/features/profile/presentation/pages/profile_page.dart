@@ -14,6 +14,7 @@ import '../../../../core/widgets/avatar_image.dart';
 import '../../../auth/presentation/pages/login_page.dart';
 import '../../../group/presentation/pages/admin_creation_requests_page.dart';
 import 'account_settings_page.dart';
+import '../../../help/presentation/pages/help_page.dart';
 
 /// 프로필 화면을 나타내는 페이지입니다.
 class ProfilePage extends StatefulWidget {
@@ -428,8 +429,11 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
           child: Column(
             children: [
-              _buildSettingsTile('계정 설정', Symbols.settings, textColor, secondaryTextColor, borderColor, isLast: true, onTap: () {
+              _buildSettingsTile('계정 설정', Symbols.settings, textColor, secondaryTextColor, borderColor, onTap: () {
                 Navigator.push(context, MaterialPageRoute(builder: (_) => const AccountSettingsPage())).then((_) => _fetchProfile());
+              }),
+              _buildSettingsTile('도움말', Symbols.help, textColor, secondaryTextColor, borderColor, isLast: true, onTap: () {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpPage()));
               }),
             ],
           ),
