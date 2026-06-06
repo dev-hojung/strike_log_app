@@ -88,6 +88,18 @@ class FcmService {
     _token = await _messaging.getToken();
     debugPrint('[FCM] token: $_token');
 
+    // 이미 로그인된 상태(자동 로그인 / 권한 늦게 허용 등)라면 init 시점에 곧장 등록.
+    // 로그인 시점에만 등록하면 회원가입 후 권한 허용 → 로그인 페이지 복귀 흐름에서 누락될 수 있다.
+    final t0 = _token;
+    if (t0 != null && t0.isNotEmpty) {
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('user_id');
+      if (userId != null && userId.isNotEmpty) {
+        final ok = await _api.registerFcmToken(token: t0, platform: _platform());
+        debugPrint('[FCM] init-time register result: $ok');
+      }
+    }
+
     _messaging.onTokenRefresh.listen((t) async {
       _token = t;
       debugPrint('[FCM] token refreshed: $t');

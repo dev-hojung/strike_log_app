@@ -16,6 +16,9 @@ import '../../../badges/data/models/badge_item.dart';
 import '../../../help/presentation/pages/help_page.dart';
 import '../../../badges/data/services/badges_api_service.dart';
 import '../../../badges/presentation/pages/badge_list_page.dart';
+import '../../../challenges/data/models/weekly_challenge.dart';
+import '../../../challenges/data/services/challenges_api_service.dart';
+import '../../../challenges/presentation/widgets/weekly_challenges_card.dart';
 import '../../../game/data/models/game_series.dart';
 import '../../../game/data/services/series_api_service.dart';
 import '../../../notifications/presentation/pages/notifications_page.dart';
@@ -45,6 +48,7 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
   final HomeApiService _apiService = HomeApiService();
   final SeriesApiService _seriesService = SeriesApiService();
   final BadgesApiService _badgesService = BadgesApiService();
+  final ChallengesApiService _challengesService = ChallengesApiService();
 
   /// 캐싱된 대시보드 데이터 (페이지 재생성 시에도 유지)
   static HomeDashboardData? _cachedData;
@@ -54,6 +58,7 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
   GameSeries? _bestSeries;
   AttendanceStreak? _streak;
   BadgeItem? _recentBadge;
+  List<WeeklyChallenge> _weeklyChallenges = const [];
   bool _isLoading = true;
   ApiError? _error;
 
@@ -137,12 +142,19 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
       } catch (_) {
         recentBadge = null;
       }
+      List<WeeklyChallenge> weekly = const [];
+      try {
+        weekly = await _challengesService.fetchWeekly();
+      } catch (_) {
+        weekly = const [];
+      }
       if (mounted) {
         setState(() {
           _data = data;
           _bestSeries = best;
           _streak = streak;
           _recentBadge = recentBadge;
+          _weeklyChallenges = weekly;
           _cachedData = data;
           _cachedBestSeries = best;
           _isLoading = false;
@@ -285,6 +297,16 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
               _buildStreakBadgeCard(isDark),
               const SizedBox(height: 8),
             ],
+
+            // 주간 챌린지 카드 (백엔드 응답이 있을 때만)
+            if (_weeklyChallenges.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              WeeklyChallengesCard(
+                challenges: _weeklyChallenges,
+                isDark: isDark,
+              ),
+            ],
+
             const SizedBox(height: 16),
 
             // 성적 추이 그래프
