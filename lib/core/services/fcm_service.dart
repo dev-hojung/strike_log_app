@@ -229,6 +229,7 @@ class FcmService {
       case 'club_trial_expiring_soon':
       case 'club_trial_expired':
       case 'club_game_created':
+      case 'club_announcement':
       case 'new_best_score':
       case 'badge_earned':
         return true;
@@ -284,6 +285,8 @@ class FcmService {
       case 'club_trial_expiring_soon':
       case 'club_trial_expired':
       case 'club_game_created':
+      case 'club_announcement':
+        // 클럽 탭으로 이동. 공지사항은 사용자가 헤더 📢 아이콘으로 열 수 있음.
         _switchToClubsTab(nav);
         break;
       case 'new_best_score':

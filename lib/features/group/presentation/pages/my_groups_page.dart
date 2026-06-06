@@ -13,6 +13,7 @@ import '../../../../core/widgets/error_retry_view.dart';
 import '../../data/services/group_creation_requests_service.dart';
 import '../../data/services/groups_api_service.dart';
 import 'club_join_requests_page.dart';
+import 'club_announcements_page.dart';
 import 'club_leaderboard_page.dart';
 import 'club_members_page.dart';
 import 'create_club_page.dart';
@@ -736,6 +737,15 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
             tooltip: '랭킹',
             onPressed: _openLeaderboard,
           ),
+          IconButton(
+            icon: Icon(
+              Symbols.campaign,
+              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              size: 20,
+            ),
+            tooltip: '공지사항',
+            onPressed: _openAnnouncements,
+          ),
           // 멤버 관리(운영자 위임/탈퇴)는 클럽장만 진입.
           // 일반 멤버는 옆의 [탈퇴] 아이콘으로 곧바로 탈퇴할 수 있다.
           if (_isClubLeader())
@@ -816,6 +826,21 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
         builder: (_) => ClubLeaderboardPage(
           clubId: clubId is int ? clubId : int.parse(clubId.toString()),
           clubName: _club?['name']?.toString() ?? '',
+        ),
+      ),
+    );
+  }
+
+  void _openAnnouncements() {
+    final clubId = _club?['id'];
+    if (clubId == null) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ClubAnnouncementsPage(
+          groupId: clubId is int ? clubId : int.parse(clubId.toString()),
+          groupName: _club?['name']?.toString() ?? '',
+          isAdmin: _isClubLeader(),
         ),
       ),
     );
