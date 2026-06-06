@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'auth_token_storage.dart';
 
 /// API 통신을 위한 Dio 클라이언트 싱글톤 클래스.
@@ -31,8 +32,15 @@ class ApiClient {
   static const String _envBaseUrl =
       String.fromEnvironment('API_BASE_URL');
 
+  /// 운영 빌드에서 dart-define을 빠뜨려도 실기기에서 죽지 않도록 하는 안전망.
+  static const String _productionBaseUrl =
+      'https://strikelogapi-production.up.railway.app';
+
   static String get baseUrl {
     if (_envBaseUrl.isNotEmpty) return _envBaseUrl;
+    // release 빌드에서 dart-define이 누락된 경우 운영 URL로 폴백.
+    // (debug 빌드는 기존 로컬 분기 유지)
+    if (kReleaseMode) return _productionBaseUrl;
     if (Platform.isAndroid) {
       return 'http://10.0.2.2:3001';
     } else {
