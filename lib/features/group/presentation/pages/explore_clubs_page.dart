@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/data/korea_regions.dart';
 import '../../../../core/services/api_client.dart';
 import 'club_join_page.dart';
 
@@ -22,6 +23,9 @@ class _ExploreClubsPageState extends State<ExploreClubsPage> {
   /// 본인이 이미 가입한 클럽 ID 집합. 1인 1클럽 정책상 보통 0~1개.
   Set<int> _myClubIds = const {};
   bool get _amInAnyClub => _myClubIds.isNotEmpty;
+
+  /// 시/도 필터 ("전체"는 null).
+  String? _filterProvince;
 
   @override
   void initState() {
@@ -77,16 +81,22 @@ class _ExploreClubsPageState extends State<ExploreClubsPage> {
 
   void _filterClubs() {
     final query = _searchController.text.toLowerCase();
+    final province = _filterProvince;
     setState(() {
-      if (query.isEmpty) {
-        _filteredClubs = List.from(_clubs);
-      } else {
-        _filteredClubs = _clubs.where((c) {
+      _filteredClubs = _clubs.where((c) {
+        // 텍스트 검색 (이름·설명)
+        if (query.isNotEmpty) {
           final name = (c['name'] ?? '').toString().toLowerCase();
           final desc = (c['description'] ?? '').toString().toLowerCase();
-          return name.contains(query) || desc.contains(query);
-        }).toList();
-      }
+          if (!name.contains(query) && !desc.contains(query)) return false;
+        }
+        // 시/도 필터 — region 문자열의 앞부분이 시/도와 일치하면 통과.
+        if (province != null && province.isNotEmpty) {
+          final region = (c['activity_region'] ?? '').toString();
+          if (!region.startsWith(province)) return false;
+        }
+        return true;
+      }).toList();
     });
   }
 
@@ -125,7 +135,10 @@ class _ExploreClubsPageState extends State<ExploreClubsPage> {
                   const SizedBox(height: 8),
                   // 검색바
                   _buildSearchBar(isDark, textColor, secondaryColor, borderColor),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 12),
+                  // 시/도 필터 (가로 스크롤 ChoiceChip)
+                  _buildRegionFilter(isDark, textColor, secondaryColor, borderColor),
+                  const SizedBox(height: 12),
                   // 리스트 헤더
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -191,6 +204,49 @@ class _ExploreClubsPageState extends State<ExploreClubsPage> {
     );
   }
 
+  /// 시/도 필터 — 가로 스크롤 ChoiceChip 리스트.
+  Widget _buildRegionFilter(
+    bool isDark, Color textColor, Color secondaryColor, Color borderColor,
+  ) {
+    final all = ['전체', ...kProvinces];
+    return SizedBox(
+      height: 36,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: all.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (_, i) {
+          final label = all[i];
+          final isAll = i == 0;
+          final selected = isAll
+              ? _filterProvince == null
+              : _filterProvince == label;
+          return ChoiceChip(
+            label: Text(label),
+            selected: selected,
+            onSelected: (_) {
+              setState(() => _filterProvince = isAll ? null : label);
+              _filterClubs();
+            },
+            labelStyle: TextStyle(
+              color: selected ? Colors.white : textColor,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+            selectedColor: AppColors.primary,
+            backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
+            side: BorderSide(color: selected ? AppColors.primary : borderColor),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18),
+            ),
+            visualDensity: VisualDensity.compact,
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          );
+        },
+      ),
+    );
+  }
+
   Widget _buildClubCard(
     dynamic club,
     bool isDark,
@@ -203,6 +259,7 @@ class _ExploreClubsPageState extends State<ExploreClubsPage> {
     final description = club['description'] ?? '';
     final memberCount = club['member_count'] ?? 0;
     final avgScore = (club['avg_score'] as num?)?.toInt() ?? 0;
+    final activityRegion = (club['activity_region'] ?? '').toString();
     final clubId = int.tryParse(club['id']?.toString() ?? '');
     final isMine = clubId != null && _myClubIds.contains(clubId);
     // 다른 클럽인데 본인이 어떤 클럽에든 이미 가입 상태면 disabled.
@@ -294,6 +351,19 @@ class _ExploreClubsPageState extends State<ExploreClubsPage> {
                         avgScore > 0 ? '에버 $avgScore' : '에버 -',
                         style: TextStyle(color: secondaryColor, fontSize: 12),
                       ),
+                      if (activityRegion.isNotEmpty) ...[
+                        const SizedBox(width: 10),
+                        Icon(Symbols.location_on, color: secondaryColor, size: 14),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            activityRegion,
+                            style: TextStyle(color: secondaryColor, fontSize: 12),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                       if (description.isNotEmpty) ...[
                         const SizedBox(width: 12),
                         Expanded(

@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/data/korea_regions.dart';
 import '../../data/services/group_creation_requests_service.dart';
 
 /// 새로운 클럽(그룹)을 생성하는 페이지입니다.
@@ -20,28 +21,11 @@ class _CreateClubPageState extends State<CreateClubPage> {
   final _imagePicker = ImagePicker();
   bool _isLoading = false;
 
-  String? _selectedRegion;
+  // 활동 지역 — 시/도 + 시/군/구 2단계 드롭다운.
+  // 백엔드에는 `composeRegion()`으로 단일 문자열("시/도 시/군/구")로 합쳐 전송.
+  String? _selectedProvince;
+  String? _selectedCity;
   File? _selectedImage;
-
-  final List<String> _regions = [
-    '서울',
-    '경기',
-    '인천',
-    '부산',
-    '대구',
-    '광주',
-    '대전',
-    '울산',
-    '세종',
-    '강원',
-    '충북',
-    '충남',
-    '전북',
-    '전남',
-    '경북',
-    '경남',
-    '제주',
-  ];
 
   @override
   void dispose() {
@@ -82,6 +66,7 @@ class _CreateClubPageState extends State<CreateClubPage> {
       await GroupCreationRequestsService().createRequest(
         name: _nameController.text.trim(),
         description: _descController.text.trim(),
+        activityRegion: composeRegion(_selectedProvince, _selectedCity),
       );
 
       if (!mounted) return;
@@ -418,33 +403,62 @@ class _CreateClubPageState extends State<CreateClubPage> {
   Widget _buildRegionDropdown(
     Color surfaceColor, Color textColor, Color secondaryColor, Color borderColor,
   ) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        color: surfaceColor,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: borderColor),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: _selectedRegion,
-          hint: Text(
-            '활동 지역을 선택하세요',
-            style: TextStyle(color: secondaryColor, fontSize: 14),
-          ),
-          isExpanded: true,
-          icon: Icon(Symbols.keyboard_arrow_down, color: secondaryColor),
-          dropdownColor: surfaceColor,
-          style: TextStyle(color: textColor, fontSize: 14),
-          items: _regions.map((region) {
-            return DropdownMenuItem(
-              value: region,
-              child: Text(region),
-            );
-          }).toList(),
-          onChanged: (value) => setState(() => _selectedRegion = value),
+    Widget dropdown({
+      required String? value,
+      required String hint,
+      required List<String> items,
+      required void Function(String?)? onChanged,
+    }) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          color: surfaceColor,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: borderColor),
         ),
-      ),
+        child: DropdownButtonHideUnderline(
+          child: DropdownButton<String>(
+            value: value,
+            hint: Text(hint,
+                style: TextStyle(color: secondaryColor, fontSize: 14)),
+            isExpanded: true,
+            icon: Icon(Symbols.keyboard_arrow_down, color: secondaryColor),
+            dropdownColor: surfaceColor,
+            style: TextStyle(color: textColor, fontSize: 14),
+            items: items
+                .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+                .toList(),
+            onChanged: onChanged,
+          ),
+        ),
+      );
+    }
+
+    return Row(
+      children: [
+        Expanded(
+          child: dropdown(
+            value: _selectedProvince,
+            hint: '시/도 선택',
+            items: kProvinces,
+            onChanged: (v) => setState(() {
+              _selectedProvince = v;
+              _selectedCity = null; // 시/도 바뀌면 시/군/구 리셋
+            }),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: dropdown(
+            value: _selectedCity,
+            hint: '시/군/구 선택',
+            items: citiesOf(_selectedProvince),
+            onChanged: _selectedProvince == null
+                ? null
+                : (v) => setState(() => _selectedCity = v),
+          ),
+        ),
+      ],
     );
   }
 

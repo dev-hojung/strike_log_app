@@ -37,6 +37,7 @@ class GroupCreationRequestsService {
   Future<Map<String, dynamic>> createRequest({
     required String name,
     String? description,
+    String? activityRegion,
     String? coverImageUrl,
   }) async {
     try {
@@ -45,6 +46,8 @@ class GroupCreationRequestsService {
         data: {
           'name': name,
           if (description != null && description.isNotEmpty) 'description': description,
+          if (activityRegion != null && activityRegion.isNotEmpty)
+            'activity_region': activityRegion,
           if (coverImageUrl != null && coverImageUrl.isNotEmpty)
             'cover_image_url': coverImageUrl,
         },
