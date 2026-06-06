@@ -5,13 +5,16 @@
 
 ## 페이지
 - `HomeDashboardPage`
-  - 통계 카드 (평균·최고 점수, 트렌드 %)
+  - AppBar: 좌측 닉네임, 우측 알림(미읽음 카운트 뱃지) + 도움말(`?`) 아이콘
+  - 통계 카드 (종합 에버리지·최고 점수, 트렌드 %)
+  - **에버리지 3분할 패널** (개인/클럽/종합) — `HomeDashboardData.personalAverageScore`, `clubAverageScore`, `averageScore`
   - 출석 streak + 최근 배지 통합 카드 (탭 → BadgeListPage)
   - 성적 추이 라인 차트 (fl_chart)
   - 이번 달 프레임 요약 (스트라이크/스페어/오픈/올커버)
   - 베스트 시리즈 카드
   - 최근 게임
   - 빈 상태 SVG 일러스트
+  - **첫 실행 1회 온보딩 다이얼로그** (`SharedPreferences` 키 `help_onboarding_shown_v1`)
 
 ## 데이터 모델
 - `data/models/home_dashboard_data.dart` — 대시보드 집계 응답 + `RecentGame`/`TrendData`
@@ -28,8 +31,10 @@
 ## 의존성
 - `core/errors/...` — 첫 로드 실패 시 `ErrorRetryView` 노출
 - `core/services/unread_notifications_service.dart` — 미읽음 뱃지
+- `core/services/pending_join_requests_service.dart` — 하단 네비 그룹 탭 가입 신청 뱃지 (운영자만)
 - `features/badges/...` — streak/배지 카드 + 진입
 - `features/game/...` — 최근 게임, 시리즈 등
+- `features/help/...` — AppBar `?` 아이콘 / 온보딩 다이얼로그가 `HelpPage`로 진입
 
 ## 캐싱 전략
 - `static HomeDashboardData? _cachedData`, `_cachedBestSeries` — 페이지 재생성 시에도 유지
