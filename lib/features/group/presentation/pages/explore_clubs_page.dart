@@ -125,13 +125,15 @@ class _ExploreClubsPageState extends State<ExploreClubsPage> {
           style: TextStyle(color: textColor, fontSize: 18, fontWeight: FontWeight.w700),
         ),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _fetchClubs,
-              child: ListView(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                children: [
+      body: SafeArea(
+        top: false,
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : RefreshIndicator(
+                onRefresh: _fetchClubs,
+                child: ListView(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  children: [
                   const SizedBox(height: 8),
                   // 검색바
                   _buildSearchBar(isDark, textColor, secondaryColor, borderColor),
@@ -179,6 +181,7 @@ class _ExploreClubsPageState extends State<ExploreClubsPage> {
                 ],
               ),
             ),
+      ),
     );
   }
 

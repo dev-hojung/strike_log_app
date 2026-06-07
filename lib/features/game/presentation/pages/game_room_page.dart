@@ -280,7 +280,10 @@ class _GameRoomPageState extends State<GameRoomPage> {
         ),
         centerTitle: true,
       ),
-      body: _isInRoom ? _buildRoomView(isDark) : _buildJoinView(isDark),
+      body: SafeArea(
+        top: false,
+        child: _isInRoom ? _buildRoomView(isDark) : _buildJoinView(isDark),
+      ),
     );
   }
 

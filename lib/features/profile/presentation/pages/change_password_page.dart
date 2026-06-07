@@ -117,7 +117,9 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
           style: TextStyle(color: textColor, fontSize: 18, fontWeight: FontWeight.w700),
         ),
       ),
-      body: Column(
+      body: SafeArea(
+        top: false,
+        child: Column(
         children: [
           Expanded(
             child: SingleChildScrollView(
@@ -200,6 +202,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
             ),
           ),
         ],
+        ),
       ),
     );
   }

@@ -125,44 +125,47 @@ class _MemberStatsPageState extends State<MemberStatsPage> {
         ),
         centerTitle: true,
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-              ? _buildError(isDark)
-              : RefreshIndicator(
-                  onRefresh: _fetchStats,
-                  child: SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // 핵심 통계 카드
-                        _buildCoreStats(isDark),
-                        const SizedBox(height: 24),
-                        // 월간 프레임 통계
-                        _buildSectionTitle('이번 달 프레임 통계', isDark),
-                        const SizedBox(height: 12),
-                        _buildFrameStats(isDark),
-                        const SizedBox(height: 24),
-                        // 월간 비교
-                        if (_monthlyTrend['status'] != 'none') ...[
-                          _buildSectionTitle('월간 비교', isDark),
-                          const SizedBox(height: 12),
-                          _buildMonthlyTrend(isDark),
+      body: SafeArea(
+        top: false,
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _error != null
+                ? _buildError(isDark)
+                : RefreshIndicator(
+                    onRefresh: _fetchStats,
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // 핵심 통계 카드
+                          _buildCoreStats(isDark),
                           const SizedBox(height: 24),
-                        ],
-                        // 최근 10경기 트렌드
-                        if (_recentTrend.isNotEmpty) ...[
-                          _buildSectionTitle('최근 경기 트렌드', isDark),
+                          // 월간 프레임 통계
+                          _buildSectionTitle('이번 달 프레임 통계', isDark),
                           const SizedBox(height: 12),
-                          _buildRecentTrend(isDark),
+                          _buildFrameStats(isDark),
+                          const SizedBox(height: 24),
+                          // 월간 비교
+                          if (_monthlyTrend['status'] != 'none') ...[
+                            _buildSectionTitle('월간 비교', isDark),
+                            const SizedBox(height: 12),
+                            _buildMonthlyTrend(isDark),
+                            const SizedBox(height: 24),
+                          ],
+                          // 최근 10경기 트렌드
+                          if (_recentTrend.isNotEmpty) ...[
+                            _buildSectionTitle('최근 경기 트렌드', isDark),
+                            const SizedBox(height: 12),
+                            _buildRecentTrend(isDark),
+                          ],
+                          const SizedBox(height: 32),
                         ],
-                        const SizedBox(height: 32),
-                      ],
+                      ),
                     ),
                   ),
-                ),
+      ),
     );
   }
 

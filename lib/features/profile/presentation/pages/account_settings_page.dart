@@ -154,7 +154,9 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
           ),
         ),
       ),
-      body: SingleChildScrollView(
+      body: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 672),
@@ -405,6 +407,7 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
               ],
             ),
           ),
+        ),
         ),
       ),
     );

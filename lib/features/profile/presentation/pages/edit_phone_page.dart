@@ -136,7 +136,9 @@ class _EditPhonePageState extends State<EditPhonePage> {
           style: TextStyle(color: textColor, fontSize: 18, fontWeight: FontWeight.w700),
         ),
       ),
-      body: Padding(
+      body: SafeArea(
+        top: false,
+        child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -310,6 +312,7 @@ class _EditPhonePageState extends State<EditPhonePage> {
                 ),
               ),
           ],
+        ),
         ),
       ),
     );

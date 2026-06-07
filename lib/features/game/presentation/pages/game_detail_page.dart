@@ -106,11 +106,14 @@ class _GameDetailPageState extends State<GameDetailPage> {
             ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-              ? _buildErrorState(fg)
-              : _buildBody(isDark, _detail!),
+      body: SafeArea(
+        top: false,
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _error != null
+                ? _buildErrorState(fg)
+                : _buildBody(isDark, _detail!),
+      ),
     );
   }
 

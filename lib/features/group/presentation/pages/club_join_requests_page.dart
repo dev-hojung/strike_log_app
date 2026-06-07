@@ -93,19 +93,22 @@ class _ClubJoinRequestsPageState extends State<ClubJoinRequestsPage> {
         ),
         centerTitle: true,
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _requests.isEmpty
-              ? _buildEmpty(isDark)
-              : RefreshIndicator(
-                  onRefresh: _load,
-                  child: ListView.separated(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _requests.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 12),
-                    itemBuilder: (_, i) => _buildCard(_requests[i], isDark),
+      body: SafeArea(
+        top: false,
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _requests.isEmpty
+                ? _buildEmpty(isDark)
+                : RefreshIndicator(
+                    onRefresh: _load,
+                    child: ListView.separated(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _requests.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 12),
+                      itemBuilder: (_, i) => _buildCard(_requests[i], isDark),
+                    ),
                   ),
-                ),
+      ),
     );
   }
 

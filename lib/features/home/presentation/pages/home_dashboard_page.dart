@@ -209,7 +209,10 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
         backgroundColor:
             isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
         appBar: _buildAppBar(isDark, ''),
-        body: const Center(child: CircularProgressIndicator()),
+        body: const SafeArea(
+          top: false,
+          child: Center(child: CircularProgressIndicator()),
+        ),
       );
     }
 
@@ -219,9 +222,12 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
         backgroundColor:
             isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
         appBar: _buildAppBar(isDark, ''),
-        body: ErrorRetryView(
-          error: _error!,
-          onRetry: _retryFetch,
+        body: SafeArea(
+          top: false,
+          child: ErrorRetryView(
+            error: _error!,
+            onRetry: _retryFetch,
+          ),
         ),
       );
     }
@@ -232,7 +238,10 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
         backgroundColor:
             isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
         appBar: _buildAppBar(isDark, data?.nickname ?? ''),
-        body: _buildEmptyState(isDark),
+        body: SafeArea(
+          top: false,
+          child: _buildEmptyState(isDark),
+        ),
       );
     }
 
@@ -240,7 +249,9 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
       backgroundColor:
           isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
       appBar: _buildAppBar(isDark, data.nickname),
-      body: SingleChildScrollView(
+      body: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -334,6 +345,7 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
             const SizedBox(height: 140), // 하단 여백 (네비게이션 + FAB 영역)
           ],
         ),
+      ),
       ),
     );
   }

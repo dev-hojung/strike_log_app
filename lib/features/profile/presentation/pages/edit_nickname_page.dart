@@ -88,7 +88,9 @@ class _EditNicknamePageState extends State<EditNicknamePage> {
           style: TextStyle(color: textColor, fontSize: 18, fontWeight: FontWeight.w700),
         ),
       ),
-      body: Padding(
+      body: SafeArea(
+        top: false,
+        child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -171,6 +173,7 @@ class _EditNicknamePageState extends State<EditNicknamePage> {
               ),
             ),
           ],
+        ),
         ),
       ),
     );

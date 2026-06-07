@@ -277,20 +277,23 @@ class _ClubMembersPageState extends State<ClubMembersPage> {
           ),
         ],
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _refresh,
-              child: ListView.separated(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                itemCount: _members.length,
-                separatorBuilder: (_, __) => Divider(
-                  height: 1,
-                  color: isDark ? Colors.white12 : Colors.black12,
+      body: SafeArea(
+        top: false,
+        child: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : RefreshIndicator(
+                onRefresh: _refresh,
+                child: ListView.separated(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  itemCount: _members.length,
+                  separatorBuilder: (_, __) => Divider(
+                    height: 1,
+                    color: isDark ? Colors.white12 : Colors.black12,
+                  ),
+                  itemBuilder: (_, i) => _buildMemberTile(_members[i], isDark),
                 ),
-                itemBuilder: (_, i) => _buildMemberTile(_members[i], isDark),
               ),
-            ),
+      ),
     );
   }
 

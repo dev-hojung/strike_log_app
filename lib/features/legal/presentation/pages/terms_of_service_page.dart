@@ -40,7 +40,9 @@ class TermsOfServicePage extends StatelessWidget {
         ),
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
+      body: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
         child: DefaultTextStyle(
           style: TextStyle(
@@ -152,6 +154,7 @@ class TermsOfServicePage extends StatelessWidget {
             ],
           ),
         ),
+      ),
       ),
     );
   }

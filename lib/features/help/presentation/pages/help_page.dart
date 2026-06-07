@@ -51,16 +51,19 @@ class _GuideTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      itemCount: kHelpGuideSections.length,
-      itemBuilder: (_, sectionIdx) {
-        final section = kHelpGuideSections[sectionIdx];
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: _sectionCard(isDark, section),
-        );
-      },
+    return SafeArea(
+      top: false,
+      child: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        itemCount: kHelpGuideSections.length,
+        itemBuilder: (_, sectionIdx) {
+          final section = kHelpGuideSections[sectionIdx];
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _sectionCard(isDark, section),
+          );
+        },
+      ),
     );
   }
 
@@ -151,7 +154,9 @@ class _TermsTabState extends State<_TermsTab> {
         isDark ? Colors.white : AppColors.textPrimaryLight;
     final terms = _filtered;
 
-    return Column(
+    return SafeArea(
+      top: false,
+      child: Column(
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
@@ -193,13 +198,14 @@ class _TermsTabState extends State<_TermsTab> {
                   ),
                 )
               : ListView.separated(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                   itemCount: terms.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 8),
                   itemBuilder: (_, i) => _termCard(terms[i], isDark, primaryText, mutedText),
                 ),
         ),
       ],
+      ),
     );
   }
 

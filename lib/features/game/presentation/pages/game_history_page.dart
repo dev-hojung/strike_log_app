@@ -170,19 +170,22 @@ class _GameHistoryPageState extends State<GameHistoryPage> {
         ),
         centerTitle: true,
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null && _games.isEmpty
-              ? ErrorRetryView(
-                  error: _error!,
-                  onRetry: _retryFetch,
-                )
-              : _games.isEmpty
-                  ? _buildEmptyState(isDark)
-                  : RefreshIndicator(
-                      onRefresh: _fetchData,
-                      child: _buildGameList(isDark),
-                    ),
+      body: SafeArea(
+        top: false,
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _error != null && _games.isEmpty
+                ? ErrorRetryView(
+                    error: _error!,
+                    onRetry: _retryFetch,
+                  )
+                : _games.isEmpty
+                    ? _buildEmptyState(isDark)
+                    : RefreshIndicator(
+                        onRefresh: _fetchData,
+                        child: _buildGameList(isDark),
+                      ),
+      ),
     );
   }
 

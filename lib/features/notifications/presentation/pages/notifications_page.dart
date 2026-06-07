@@ -140,26 +140,29 @@ class _NotificationsPageState extends State<NotificationsPage> {
             ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null && _items.isEmpty
-              ? ErrorRetryView(
-                  error: _error!,
-                  onRetry: _retryLoad,
-                )
-              : _items.isEmpty
-                  ? _buildEmpty(isDark)
-                  : RefreshIndicator(
-                      onRefresh: _load,
-                      child: ListView.separated(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 12),
-                        itemCount: _items.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 8),
-                        itemBuilder: (_, i) =>
-                            _buildItem(context, _items[i], isDark),
+      body: SafeArea(
+        top: false,
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _error != null && _items.isEmpty
+                ? ErrorRetryView(
+                    error: _error!,
+                    onRetry: _retryLoad,
+                  )
+                : _items.isEmpty
+                    ? _buildEmpty(isDark)
+                    : RefreshIndicator(
+                        onRefresh: _load,
+                        child: ListView.separated(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 12),
+                          itemCount: _items.length,
+                          separatorBuilder: (_, __) => const SizedBox(height: 8),
+                          itemBuilder: (_, i) =>
+                              _buildItem(context, _items[i], isDark),
+                        ),
                       ),
-                    ),
+      ),
     );
   }
 

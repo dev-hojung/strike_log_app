@@ -92,14 +92,17 @@ class _BadgeListPageState extends State<BadgeListPage> {
         ),
         centerTitle: true,
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null && _items.isEmpty
-              ? ErrorRetryView(error: _error!, onRetry: _retry)
-              : RefreshIndicator(
-                  onRefresh: _load,
-                  child: _buildBody(isDark, earnedCount, totalCount),
-                ),
+      body: SafeArea(
+        top: false,
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _error != null && _items.isEmpty
+                ? ErrorRetryView(error: _error!, onRetry: _retry)
+                : RefreshIndicator(
+                    onRefresh: _load,
+                    child: _buildBody(isDark, earnedCount, totalCount),
+                  ),
+      ),
     );
   }
 

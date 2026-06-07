@@ -112,33 +112,36 @@ class _SeriesSummaryPageState extends State<SeriesSummaryPage> {
             ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Symbols.error_outline,
-                            color: Colors.redAccent, size: 48),
-                        const SizedBox(height: 12),
-                        Text(_error!,
-                            style: TextStyle(color: fg, fontSize: 14)),
-                        const SizedBox(height: 16),
-                        OutlinedButton(
-                          onPressed: () {
-                            setState(() => _isLoading = true);
-                            _fetch();
-                          },
-                          child: const Text('다시 시도'),
-                        ),
-                      ],
+      body: SafeArea(
+        top: false,
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _error != null
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Symbols.error_outline,
+                              color: Colors.redAccent, size: 48),
+                          const SizedBox(height: 12),
+                          Text(_error!,
+                              style: TextStyle(color: fg, fontSize: 14)),
+                          const SizedBox(height: 16),
+                          OutlinedButton(
+                            onPressed: () {
+                              setState(() => _isLoading = true);
+                              _fetch();
+                            },
+                            child: const Text('다시 시도'),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                )
-              : _buildContent(isDark, _series!),
+                  )
+                : _buildContent(isDark, _series!),
+      ),
     );
   }
 
