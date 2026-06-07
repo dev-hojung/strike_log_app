@@ -11,6 +11,7 @@ import '../../features/game/presentation/widgets/location_input_dialog.dart';
 import '../../features/game/data/services/game_draft_repository.dart';
 import '../../features/game/data/services/game_save_service.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
+import '../../features/system_notices/data/services/system_notices_service.dart';
 import '../../main.dart' show appRouteObserver;
 import '../constants/app_colors.dart';
 import '../services/api_client.dart';
@@ -43,7 +44,11 @@ class _MainContainerState extends State<MainContainer> with RouteAware {
     super.initState();
     // 앱 진입 시 미저장 경기 드래프트 자동 재시도.
     // UI 완전 렌더 이후 실행해 ScaffoldMessenger에 접근 가능하도록 addPostFrameCallback 사용.
-    WidgetsBinding.instance.addPostFrameCallback((_) => _retryPendingDrafts());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _retryPendingDrafts();
+      // 시스템 공지 모달 (오늘 하루 안 보기 처리된 항목은 제외)
+      SystemNoticesService.instance.maybeShowAll(context);
+    });
   }
 
   @override

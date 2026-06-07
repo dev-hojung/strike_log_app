@@ -13,6 +13,7 @@ import '../../../../core/services/fcm_service.dart';
 import '../../../../core/services/session_manager.dart';
 import '../../../../core/services/unread_notifications_service.dart';
 import '../../../../core/services/user_profile_cache.dart';
+import '../../../system_notices/data/services/system_notices_service.dart';
 import 'signup_page.dart';
 
 /// 앱의 로그인 화면을 담당하는 페이지입니다.
@@ -44,6 +45,12 @@ class _LoginPageState extends State<LoginPage> {
   void initState() {
     super.initState();
     _loadRememberedEmail();
+    // 시스템 공지 모달 — 로그인 전에도 호출 가능한 public endpoint를 사용.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        SystemNoticesService.instance.maybeShowAll(context);
+      }
+    });
   }
 
   Future<void> _loadRememberedEmail() async {
