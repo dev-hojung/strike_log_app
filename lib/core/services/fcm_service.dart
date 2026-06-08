@@ -371,11 +371,6 @@ class FcmService {
     try {
       final prefs = await SharedPreferences.getInstance();
       final userId = prefs.getString('user_id');
-      if (userId == null || userId.isEmpty) {
-        debugPrint('[FCM] register skipped — not logged in ($reason)');
-        _cancelRetry();
-        return;
-      }
 
       // 토큰 확보. permission 거부면 null 반환.
       final t = _token ?? await _messaging.getToken();
@@ -386,16 +381,23 @@ class FcmService {
       }
       _token = t;
 
-      if (_lastRegisteredToken == t) {
-        debugPrint('[FCM] register skipped — token unchanged ($reason)');
+      // 같은 토큰을 같은 바인딩 상태로 또 보내지 않도록 캐시 키에 user_id 포함.
+      final cacheKey = '${userId ?? 'anon'}|$t';
+      if (_lastRegisteredToken == cacheKey) {
+        debugPrint('[FCM] register skipped — unchanged ($reason)');
         _cancelRetry();
         return;
       }
 
-      final ok = await _api.registerFcmToken(token: t, platform: _platform());
-      debugPrint('[FCM] register ok=$ok user=$userId reason=$reason');
+      final loggedIn = userId != null && userId.isNotEmpty;
+      final ok = loggedIn
+          ? await _api.registerFcmToken(token: t, platform: _platform())
+          : await _api.registerAnonymousFcmToken(token: t, platform: _platform());
+      debugPrint(
+        '[FCM] register ok=$ok mode=${loggedIn ? "auth" : "anon"} user=${userId ?? "-"} reason=$reason',
+      );
       if (ok) {
-        _lastRegisteredToken = t;
+        _lastRegisteredToken = cacheKey;
         _cancelRetry();
       } else {
         _scheduleRetry(reason);
@@ -438,16 +440,25 @@ class FcmService {
     await _ensureTokenRegistered(reason: 'resume');
   }
 
-  /// 로그아웃 시 호출. 서버에서 토큰 제거 후 로컬 토큰 삭제.
-  /// 호출 시점에 아직 토큰이 유효하다면 서버 측에서도 즉시 정리.
+  /// 로그아웃 시 호출. 서버 토큰을 익명 바인딩으로 재등록해서
+  /// 시스템 공지 broadcast 푸시는 계속 받을 수 있도록 유지.
+  ///
+  /// (예전 구현: 서버에서 토큰 행 삭제 + 로컬 deleteToken — 로그아웃 후 시스템 공지도 못 받음)
   Future<void> clearTokenOnServer(String userId) async {
     if (!_initialized) return;
-    final t = _token;
-    if (t != null) {
-      await _api.deleteFcmToken(token: t);
+    final t = _token ?? await _messaging.getToken();
+    if (t == null || t.isEmpty) {
+      debugPrint('[FCM] logout — no token to rebind');
+      return;
     }
-    await _messaging.deleteToken();
-    _token = null;
+    // 서버 측 userId 바인딩만 NULL로 풀어둔다. FCM 토큰 자체는 살려둠.
+    final ok = await _api.registerAnonymousFcmToken(
+      token: t,
+      platform: _platform(),
+    );
+    debugPrint('[FCM] logout rebind to anonymous ok=$ok user=$userId');
+    // 다음 로그인 시점에 _ensureTokenRegistered가 다시 호출되도록 캐시 초기화.
+    _lastRegisteredToken = null;
   }
 
   String _platform() {

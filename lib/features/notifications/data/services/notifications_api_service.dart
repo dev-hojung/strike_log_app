@@ -83,6 +83,25 @@ class NotificationsApiService {
     }
   }
 
+  /// 익명 FCM 토큰 등록 (로그아웃/가입 전 디바이스용).
+  /// 시스템 공지 같은 broadcast 푸시만 수신. 개인 알림은 안 옴.
+  Future<bool> registerAnonymousFcmToken({
+    required String token,
+    required String platform,
+  }) async {
+    try {
+      await _apiClient.dio.post(
+        '/notifications/fcm-token',
+        data: {'token': token, 'platform': platform},
+      );
+      return true;
+    } catch (e) {
+      // ignore: avoid_print
+      print('[FCM][registerAnonymousFcmToken] failed: $e');
+      return false;
+    }
+  }
+
   Future<bool> deleteFcmToken({required String token}) async {
     try {
       await _apiClient.dio.delete(
