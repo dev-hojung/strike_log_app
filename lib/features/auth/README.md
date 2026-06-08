@@ -31,6 +31,7 @@
 |--------|------|------|
 | POST   | `/users/login`          | 이메일/비밀번호 로그인 → JWT |
 | POST   | `/users/signup`         | 회원가입 |
+| POST   | `/users/forgot-password/reset` | 비밀번호 재설정 (OTP 1회 소비 + 새 비번 저장) |
 | POST   | `/email/send-otp`       | 이메일 인증 코드 발송 |
 | POST   | `/email/verify-otp`     | 인증 코드 검증 |
 

@@ -14,6 +14,7 @@ import '../../../../core/services/session_manager.dart';
 import '../../../../core/services/unread_notifications_service.dart';
 import '../../../../core/services/user_profile_cache.dart';
 import '../../../system_notices/data/services/system_notices_service.dart';
+import 'forgot_password_page.dart';
 import 'signup_page.dart';
 
 /// 앱의 로그인 화면을 담당하는 페이지입니다.
@@ -404,7 +405,32 @@ class _LoginPageState extends State<LoginPage> {
                                           ),                    ],
                   ),
 
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 16),
+
+                  // 비밀번호 찾기 링크
+                  Center(
+                    child: TextButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const ForgotPasswordPage(),
+                          ),
+                        );
+                      },
+                      child: const Text(
+                        '비밀번호를 잊으셨나요?',
+                        style: TextStyle(
+                          color: Color(0xFF94A3B8),
+                          fontSize: 13,
+                          decoration: TextDecoration.underline,
+                          decorationColor: Color(0xFF94A3B8),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
 
                   // 회원가입 링크
                   Row(
