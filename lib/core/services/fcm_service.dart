@@ -361,7 +361,9 @@ class FcmService {
   /// 4. dio.post 실패면 → 다음 백오프 슬롯에 재시도 예약
   /// 5. 성공이면 → 백오프 리셋, _lastRegisteredToken 갱신
   Future<void> _ensureTokenRegistered({required String reason}) async {
-    if (!_initialized) return;
+    // ⚠️ _initialized 가드를 두면 안 됨 — init()이 _initialized=true 설정 전에 이 함수를
+    //   호출하므로 가드가 있으면 init 시점 등록이 항상 무산됨. 외부 진입점
+    //   (syncTokenToServer, reverifyTokenRegistration)이 각자 _initialized를 검사함.
     if (_registerInFlight) {
       debugPrint('[FCM] register skipped — already in flight ($reason)');
       return;
