@@ -31,7 +31,6 @@
 |--------|------|------|
 | POST   | `/users/login`          | 이메일/비밀번호 로그인 → JWT |
 | POST   | `/users/signup`         | 회원가입 |
-| POST   | `/users/sync`           | 소셜 로그인 동기화 (없으면 생성) |
 | POST   | `/email/send-otp`       | 이메일 인증 코드 발송 |
 | POST   | `/email/verify-otp`     | 인증 코드 검증 |
 
