@@ -117,11 +117,37 @@ void main() async {
 ///
 /// [MaterialApp]을 설정하고, 테마 및 라우팅을 관리합니다.
 /// 저장된 JWT + user_id가 모두 유효하면 [MainContainer]로 자동 진입, 아니면 [LoginPage].
-class BowlingApp extends StatelessWidget {
+class BowlingApp extends StatefulWidget {
   const BowlingApp({super.key, this.initialHome});
 
   /// 앱 시작 시 표시할 첫 화면. null이면 [LoginPage] (자동 로그인 미해당).
   final Widget? initialHome;
+
+  @override
+  State<BowlingApp> createState() => _BowlingAppState();
+}
+
+class _BowlingAppState extends State<BowlingApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // 백그라운드 → 포어그라운드 복귀 시점에 FCM 토큰 재검증.
+    // 사용자가 OS 설정에서 권한을 늦게 켰거나 등록 시도가 누적 실패한 경우 자동 복구.
+    if (state == AppLifecycleState.resumed) {
+      FcmService.instance.reverifyTokenRegistration();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -131,7 +157,7 @@ class BowlingApp extends StatelessWidget {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.dark,
-      home: initialHome ?? const LoginPage(),
+      home: widget.initialHome ?? const LoginPage(),
       navigatorKey: appNavigatorKey,
       navigatorObservers: [appRouteObserver],
     );

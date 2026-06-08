@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show Platform;
 
@@ -60,6 +61,26 @@ class FcmService {
   String? get token => _token;
   bool get isInitialized => _initialized;
 
+  /// 직전 register 성공 시 저장된 토큰. 같은 토큰을 또 보내지 않기 위해 비교용으로 사용.
+  String? _lastRegisteredToken;
+
+  /// 토큰 등록 재시도 백오프 단계 (0=첫시도, 마지막 도달 시 멈춤).
+  /// 5s → 15s → 30s → 60s → 5min → 30min.
+  int _registerRetryStep = 0;
+  Timer? _registerRetryTimer;
+
+  /// 중복 진입 방지 가드.
+  bool _registerInFlight = false;
+
+  static const List<Duration> _retryBackoff = [
+    Duration(seconds: 5),
+    Duration(seconds: 15),
+    Duration(seconds: 30),
+    Duration(seconds: 60),
+    Duration(minutes: 5),
+    Duration(minutes: 30),
+  ];
+
   Future<void> init() async {
     // 핫 리스타트나 다른 진입점에서 init이 또 호출돼도 listener가 중복 등록되지
     // 않도록 가드. onTokenRefresh/onMessage/onMessageOpenedApp 구독은 핸들이
@@ -88,27 +109,15 @@ class FcmService {
     _token = await _messaging.getToken();
     debugPrint('[FCM] token: $_token');
 
-    // 이미 로그인된 상태(자동 로그인 / 권한 늦게 허용 등)라면 init 시점에 곧장 등록.
-    // 로그인 시점에만 등록하면 회원가입 후 권한 허용 → 로그인 페이지 복귀 흐름에서 누락될 수 있다.
-    final t0 = _token;
-    if (t0 != null && t0.isNotEmpty) {
-      final prefs = await SharedPreferences.getInstance();
-      final userId = prefs.getString('user_id');
-      if (userId != null && userId.isNotEmpty) {
-        final ok = await _api.registerFcmToken(token: t0, platform: _platform());
-        debugPrint('[FCM] init-time register result: $ok');
-      }
-    }
+    // 권한·네트워크·JWT 어디서 막혀도 자동 재시도되도록 백오프 매니저로 일원화.
+    unawaited(_ensureTokenRegistered(reason: 'init'));
 
     _messaging.onTokenRefresh.listen((t) async {
       _token = t;
       debugPrint('[FCM] token refreshed: $t');
-      // 로그인 상태이면 서버에 갱신 요청. JWT 토큰이 있어야 인증 통과.
-      final prefs = await SharedPreferences.getInstance();
-      final userId = prefs.getString('user_id');
-      if (userId != null) {
-        await _api.registerFcmToken(token: t, platform: _platform());
-      }
+      // 토큰이 바뀌면 마지막 성공 캐시 무효화 후 재등록 시도.
+      _lastRegisteredToken = null;
+      unawaited(_ensureTokenRegistered(reason: 'refresh'));
     });
 
     FirebaseMessaging.onMessage.listen((msg) async {
@@ -331,19 +340,102 @@ class FcmService {
   }
 
   /// 로그인 직후 호출. 현재 토큰을 백엔드에 등록.
+  /// 새 세션이라 마지막 성공 캐시 무효화 후 즉시 시도 + 실패 시 백오프 재시도.
   Future<void> syncTokenToServer(String userId) async {
     if (!_initialized) {
       debugPrint('[FCM] syncTokenToServer skipped (not initialized)');
       return;
     }
-    final t = _token ?? await _messaging.getToken();
-    if (t == null) {
-      debugPrint('[FCM] syncTokenToServer: no token available');
+    _lastRegisteredToken = null;
+    await _ensureTokenRegistered(reason: 'login:$userId');
+  }
+
+  /// 토큰 등록을 "최종적 일관성"으로 보장하는 단일 진입점.
+  ///
+  /// 호출 위치: init / onTokenRefresh / 로그인 / AppLifecycleState.resumed.
+  ///
+  /// 흐름:
+  /// 1. 권한 거부/토큰 null이면 → 다음 백오프 슬롯에 재시도 예약 (사용자가 늦게 권한 켤 수도 있음)
+  /// 2. user_id 없으면 → 등록 안 함 (로그아웃 상태). 재시도도 안 함 — 로그인 시점에 다시 진입함
+  /// 3. 이전에 동일 토큰으로 성공했으면 → no-op (불필요한 호출 방지)
+  /// 4. dio.post 실패면 → 다음 백오프 슬롯에 재시도 예약
+  /// 5. 성공이면 → 백오프 리셋, _lastRegisteredToken 갱신
+  Future<void> _ensureTokenRegistered({required String reason}) async {
+    if (!_initialized) return;
+    if (_registerInFlight) {
+      debugPrint('[FCM] register skipped — already in flight ($reason)');
       return;
     }
-    _token = t;
-    final ok = await _api.registerFcmToken(token: t, platform: _platform());
-    debugPrint('[FCM] register token for user=$userId ok=$ok');
+    _registerInFlight = true;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('user_id');
+      if (userId == null || userId.isEmpty) {
+        debugPrint('[FCM] register skipped — not logged in ($reason)');
+        _cancelRetry();
+        return;
+      }
+
+      // 토큰 확보. permission 거부면 null 반환.
+      final t = _token ?? await _messaging.getToken();
+      if (t == null || t.isEmpty) {
+        debugPrint('[FCM] register skipped — no token yet ($reason). scheduling retry.');
+        _scheduleRetry(reason);
+        return;
+      }
+      _token = t;
+
+      if (_lastRegisteredToken == t) {
+        debugPrint('[FCM] register skipped — token unchanged ($reason)');
+        _cancelRetry();
+        return;
+      }
+
+      final ok = await _api.registerFcmToken(token: t, platform: _platform());
+      debugPrint('[FCM] register ok=$ok user=$userId reason=$reason');
+      if (ok) {
+        _lastRegisteredToken = t;
+        _cancelRetry();
+      } else {
+        _scheduleRetry(reason);
+      }
+    } catch (e, st) {
+      debugPrint('[FCM] _ensureTokenRegistered error: $e');
+      AppLogger.captureError(e, stackTrace: st, context: 'fcm.ensureTokenRegistered');
+      _scheduleRetry(reason);
+    } finally {
+      _registerInFlight = false;
+    }
+  }
+
+  void _scheduleRetry(String reason) {
+    _registerRetryTimer?.cancel();
+    if (_registerRetryStep >= _retryBackoff.length) {
+      debugPrint('[FCM] retry budget exhausted — will try again on next resume/login');
+      return;
+    }
+    final delay = _retryBackoff[_registerRetryStep];
+    _registerRetryStep++;
+    debugPrint('[FCM] schedule retry in ${delay.inSeconds}s (step=$_registerRetryStep) reason=$reason');
+    _registerRetryTimer = Timer(delay, () {
+      unawaited(_ensureTokenRegistered(reason: 'retry:$reason'));
+    });
+  }
+
+  void _cancelRetry() {
+    _registerRetryTimer?.cancel();
+    _registerRetryTimer = null;
+    _registerRetryStep = 0;
+  }
+
+  /// 외부(앱 라이프사이클 옵저버 등)에서 강제 재검증할 때 호출.
+  Future<void> reverifyTokenRegistration() async {
+    if (!_initialized) return;
+    // resume 시점엔 백오프 리셋해서 빠르게 첫 시도.
+    _registerRetryStep = 0;
+    _registerRetryTimer?.cancel();
+    await _ensureTokenRegistered(reason: 'resume');
   }
 
   /// 로그아웃 시 호출. 서버에서 토큰 제거 후 로컬 토큰 삭제.
