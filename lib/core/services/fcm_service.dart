@@ -87,56 +87,88 @@ class FcmService {
     // 저장되지 않아 cancel이 불가하므로, 진입 자체를 막는다.
     if (_initialized) return;
 
-    await _initLocalNotifications();
+    // 어떤 단계가 던지든 _ensureTokenRegistered/reverifyTokenRegistration이
+    // 동작할 수 있도록 초기화 플래그를 가장 먼저 켠다. (이전 구현은 init의 일부 await에서
+    // 예외가 나면 등록 호출이 영영 안 일어나는 사고가 있었음)
+    _initialized = true;
 
-    FirebaseMessaging.onBackgroundMessage(_firebaseBackgroundHandler);
+    try {
+      await _initLocalNotifications();
+    } catch (e) {
+      debugPrint('[FCM] local notifications init skipped: $e');
+    }
 
-    final settings = await _messaging.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
-    debugPrint('[FCM] permission: ${settings.authorizationStatus}');
+    try {
+      FirebaseMessaging.onBackgroundMessage(_firebaseBackgroundHandler);
+    } catch (e) {
+      debugPrint('[FCM] onBackgroundMessage register skipped: $e');
+    }
 
-    // iOS는 기본적으로 포어그라운드 알림을 시스템이 안 보여준다.
-    // 명시적으로 켜야 알림이 화면 상단에 뜬다. (Android는 영향 없음)
-    await _messaging.setForegroundNotificationPresentationOptions(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
+    try {
+      final settings = await _messaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+      debugPrint('[FCM] permission: ${settings.authorizationStatus}');
+    } catch (e) {
+      debugPrint('[FCM] requestPermission skipped: $e');
+    }
 
-    _token = await _messaging.getToken();
-    debugPrint('[FCM] token: $_token');
+    try {
+      await _messaging.setForegroundNotificationPresentationOptions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+    } catch (e) {
+      debugPrint('[FCM] setForegroundNotificationPresentationOptions skipped: $e');
+    }
+
+    try {
+      _token = await _messaging.getToken();
+      debugPrint('[FCM] token: $_token');
+    } catch (e) {
+      debugPrint('[FCM] getToken skipped: $e');
+      _token = null;
+    }
 
     // 권한·네트워크·JWT 어디서 막혀도 자동 재시도되도록 백오프 매니저로 일원화.
+    // 위 단계가 실패해도 무조건 1회는 시도한다(빈 token이면 retry 스케줄됨).
     unawaited(_ensureTokenRegistered(reason: 'init'));
 
-    _messaging.onTokenRefresh.listen((t) async {
-      _token = t;
-      debugPrint('[FCM] token refreshed: $t');
-      // 토큰이 바뀌면 마지막 성공 캐시 무효화 후 재등록 시도.
-      _lastRegisteredToken = null;
-      unawaited(_ensureTokenRegistered(reason: 'refresh'));
-    });
-
-    FirebaseMessaging.onMessage.listen((msg) async {
-      debugPrint('[FCM][foreground] ${msg.notification?.title} / ${msg.notification?.body}');
-      UnreadNotificationsService.instance.increment();
-      // 클럽 가입 신청 알림은 운영자에게만 가므로 네비/헤더 뱃지 카운트도 갱신.
-      if (msg.data['type']?.toString() == 'club_join_request') {
-        PendingJoinRequestsService.instance.increment();
-      }
-      await _showForegroundNotification(msg);
-    });
-
-    FirebaseMessaging.onMessageOpenedApp.listen(_handleTap);
-
-    final initial = await _messaging.getInitialMessage();
-    if (initial != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _handleTap(initial));
+    try {
+      _messaging.onTokenRefresh.listen((t) async {
+        _token = t;
+        debugPrint('[FCM] token refreshed: $t');
+        // 토큰이 바뀌면 마지막 성공 캐시 무효화 후 재등록 시도.
+        _lastRegisteredToken = null;
+        unawaited(_ensureTokenRegistered(reason: 'refresh'));
+      });
+    } catch (e) {
+      debugPrint('[FCM] onTokenRefresh listener skipped: $e');
     }
-    _initialized = true;
+
+    try {
+      FirebaseMessaging.onMessage.listen((msg) async {
+        debugPrint(
+          '[FCM][foreground] ${msg.notification?.title} / ${msg.notification?.body}',
+        );
+        UnreadNotificationsService.instance.increment();
+        if (msg.data['type']?.toString() == 'club_join_request') {
+          PendingJoinRequestsService.instance.increment();
+        }
+        await _showForegroundNotification(msg);
+      });
+      FirebaseMessaging.onMessageOpenedApp.listen(_handleTap);
+
+      final initial = await _messaging.getInitialMessage();
+      if (initial != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => _handleTap(initial));
+      }
+    } catch (e) {
+      debugPrint('[FCM] message listeners skipped: $e');
+    }
   }
 
   Future<void> _initLocalNotifications() async {
