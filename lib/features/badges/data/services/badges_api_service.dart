@@ -43,4 +43,10 @@ class BadgesApiService {
     }
     return const AttendanceStreak(currentStreak: 0, longestStreak: 0);
   }
+
+  /// 앱 접속 시 출석 체크. 같은 KST 날짜 중복 호출은 서버에서 idempotent 처리.
+  /// 실패해도 사용자 경로는 막지 않도록 호출 측에서 silent로 흡수할 것.
+  Future<void> checkIn() async {
+    await _apiClient.dio.post('/attendance/me/check-in');
+  }
 }

@@ -13,6 +13,7 @@ import '../../../../core/services/fcm_service.dart';
 import '../../../../core/services/session_manager.dart';
 import '../../../../core/services/unread_notifications_service.dart';
 import '../../../../core/services/user_profile_cache.dart';
+import '../../../badges/data/services/badges_api_service.dart';
 import '../../../system_notices/data/services/system_notices_service.dart';
 import 'forgot_password_page.dart';
 import 'signup_page.dart';
@@ -156,6 +157,8 @@ class _LoginPageState extends State<LoginPage> {
           unawaited(FcmService.instance.syncTokenToServer(userId.toString()));
           unawaited(_prefetchProfile(userId.toString()));
           unawaited(UnreadNotificationsService.instance.refresh());
+          // 출석 체크 — 로그인이 곧 앱 접속이므로 streak를 위해 기록.
+          unawaited(BadgesApiService().checkIn().catchError((_) {}));
         }
 
         if (mounted) {

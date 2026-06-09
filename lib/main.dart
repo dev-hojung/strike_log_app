@@ -18,6 +18,7 @@ import 'core/services/user_profile_cache.dart';
 import 'core/theme/app_theme.dart';
 import 'core/widgets/main_container.dart';
 import 'features/auth/presentation/pages/login_page.dart';
+import 'features/badges/data/services/badges_api_service.dart';
 
 /// 앱 전역 RouteObserver.
 /// MainContainer가 RouteAware로 구독해, 다른 라우트가 pop되어 다시 top이 될 때마다
@@ -89,6 +90,8 @@ void main() async {
         unawaited(FcmService.instance.syncTokenToServer(autoUserId));
         unawaited(UnreadNotificationsService.instance.refresh());
         unawaited(PendingJoinRequestsService.instance.refresh());
+        // 앱 접속 출석 체크. 실패는 사용자 흐름을 막지 않도록 silent.
+        unawaited(BadgesApiService().checkIn().catchError((_) {}));
       }
     } catch (e, st) {
       debugPrint('[Firebase] init skipped: $e');
