@@ -75,7 +75,10 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     }
     setState(() => _loading = true);
     try {
-      await ApiClient().dio.post('/email/send-otp', data: {'email': email});
+      await ApiClient().dio.post('/email/send-otp', data: {
+        'email': email,
+        'purpose': 'reset',
+      });
       setState(() => _codeSent = true);
       _startTimer();
       _toast('이메일로 인증번호가 발송되었습니다.');

@@ -41,6 +41,7 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController _passwordController = TextEditingController();
   bool _isLoading = false;
   bool _rememberEmail = false;
+  bool _pwVisible = false;
 
   @override
   void initState() {
@@ -302,7 +303,8 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                                           TextField(
                                             controller: _passwordController,
-                                            obscureText: true,                        style: const TextStyle(color: Colors.white),
+                                            obscureText: !_pwVisible,
+                                            style: const TextStyle(color: Colors.white),
                         decoration: InputDecoration(
                           hintText: '••••••••',
                           hintStyle: const TextStyle(
@@ -327,8 +329,16 @@ class _LoginPageState extends State<LoginPage> {
                             borderSide: const BorderSide(
                                 color: AppColors.primary, width: 2),
                           ),
-                          suffixIcon: const Icon(Symbols.visibility,
-                              color: Color(0xFF64748B)),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _pwVisible
+                                  ? Symbols.visibility_off
+                                  : Symbols.visibility,
+                              color: const Color(0xFF64748B),
+                            ),
+                            onPressed: () =>
+                                setState(() => _pwVisible = !_pwVisible),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 12),
