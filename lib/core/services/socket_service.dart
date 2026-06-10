@@ -81,14 +81,20 @@ class SocketService {
     );
   }
 
-  /// 방 생성
+  /// 방 생성. mode='bet'이면 핸디캡/내기 메모/최대 인원도 함께 전달.
   void createRoom({
     required String userId,
     required String nickname,
+    String mode = 'club',
+    String? betMemo,
+    int? maxPlayers,
   }) {
     _socket?.emit('createRoom', {
       'user_id': userId,
       'nickname': nickname,
+      'mode': mode,
+      if (betMemo != null) 'betMemo': betMemo,
+      if (maxPlayers != null) 'maxPlayers': maxPlayers,
     });
   }
 
@@ -139,6 +145,29 @@ class SocketService {
   /// 게임 시작 알림
   void startGame(String roomId) {
     _socket?.emit('startGame', {'roomId': roomId});
+  }
+
+  /// 내기 핸디캡 설정 (호스트, 게임 시작 전까지만).
+  void updateHandicap({
+    required String roomId,
+    required String targetUserId,
+    required int handicap,
+  }) {
+    _socket?.emit('updateHandicap', {
+      'roomId': roomId,
+      'targetUserId': targetUserId,
+      'handicap': handicap,
+    });
+  }
+
+  /// 자동 핸디캡 추천 요청. 응답은 'handicapSuggestions' 이벤트.
+  void requestHandicapSuggestions(String roomId) {
+    _socket?.emit('suggestHandicaps', {'roomId': roomId});
+  }
+
+  /// 게임 종료 + 핸디 적용 순위 요청 (호스트만). 결과는 'gameEnded' 이벤트.
+  void finishGame(String roomId) {
+    _socket?.emit('finishGame', {'roomId': roomId});
   }
 
   /// 이벤트 리스너 등록

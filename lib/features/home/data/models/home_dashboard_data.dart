@@ -26,11 +26,12 @@ class HomeDashboardData {
   /// 이번 달 평균 점수
   final int? currentMonthAvg;
 
-  /// 이번 달 누적 스트라이크/스페어/오픈 + 올커버 게임 수
+  /// 이번 달 누적 스트라이크/스페어/오픈 + 올커버 게임 수 + 퍼펙트 게임 수
   final int monthlyStrikes;
   final int monthlySpares;
   final int monthlyOpens;
   final int monthlyAllCoverGames;
+  final int monthlyPerfectGames;
 
   /// 소속 클럽 목록
   final List<ClubInfo> clubs;
@@ -53,6 +54,7 @@ class HomeDashboardData {
     this.monthlySpares = 0,
     this.monthlyOpens = 0,
     this.monthlyAllCoverGames = 0,
+    this.monthlyPerfectGames = 0,
     this.clubs = const [],
   });
 

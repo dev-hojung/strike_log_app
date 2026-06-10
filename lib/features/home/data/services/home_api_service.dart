@@ -52,6 +52,8 @@ class HomeApiService {
         monthlyOpens: (monthlyFrame['opens'] as num?)?.toInt() ?? 0,
         monthlyAllCoverGames:
             (monthlyFrame['allCoverGames'] as num?)?.toInt() ?? 0,
+        monthlyPerfectGames:
+            (monthlyFrame['perfectGames'] as num?)?.toInt() ?? 0,
         recentTrend: stats['recentTrend'] != null
             ? (stats['recentTrend'] as List)
                 .map((e) => TrendData.fromJson(Map<String, dynamic>.from(e)))

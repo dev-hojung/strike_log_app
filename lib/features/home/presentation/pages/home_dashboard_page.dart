@@ -1064,6 +1064,8 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
                   const Color(0xFFF87171)),
               _monthlyFrameItem('올커버', data.monthlyAllCoverGames,
                   const Color(0xFF60A5FA)),
+              _monthlyFrameItem('퍼펙트', data.monthlyPerfectGames,
+                  const Color(0xFFC084FC)),
             ],
           ),
         ],

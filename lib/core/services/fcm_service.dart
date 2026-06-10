@@ -283,6 +283,7 @@ class FcmService {
       case 'club_trial_expired':
       case 'club_game_created':
       case 'club_announcement':
+      case 'club_perfect_game':
       case 'new_best_score':
       case 'badge_earned':
         return true;
@@ -341,6 +342,15 @@ class FcmService {
       case 'club_announcement':
         // 클럽 탭으로 이동. 공지사항은 사용자가 헤더 📢 아이콘으로 열 수 있음.
         _switchToClubsTab(nav);
+        break;
+      case 'club_perfect_game':
+        // 다른 클럽원이 퍼펙트 달성 알림 — 해당 게임 상세로 이동
+        final perfectGameId = int.tryParse(targetId ?? '') ?? 0;
+        if (perfectGameId > 0) {
+          nav.push(MaterialPageRoute(
+            builder: (_) => GameDetailPage(gameId: perfectGameId),
+          ));
+        }
         break;
       case 'new_best_score':
         final gameId = int.tryParse(targetId ?? '') ?? 0;
