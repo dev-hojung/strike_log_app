@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/socket_service.dart';
 import '../../data/bowling_scorer.dart';
+import 'bet_result_page.dart';
 import 'club_game_summary_page.dart';
 import 'game_summary_page.dart';
 
@@ -27,6 +28,12 @@ class FrameEntryPage extends StatefulWidget {
   /// 시리즈 총 게임 수. 단일 게임은 null.
   final int? targetGameCount;
 
+  /// 내기 게임 여부 (POST /games 에 is_bet_game 전달, finishGame 호출에 사용)
+  final bool isBetGame;
+
+  /// 내기 게임에서 방장 여부 (finishGame 호출 주체 결정)
+  final bool isHost;
+
   const FrameEntryPage({
     super.key,
     this.isClubGame = false,
@@ -36,6 +43,8 @@ class FrameEntryPage extends StatefulWidget {
     this.seriesId,
     this.seriesIndex,
     this.targetGameCount,
+    this.isBetGame = false,
+    this.isHost = false,
   });
 
   @override
@@ -71,6 +80,8 @@ class _FrameEntryPageState extends State<FrameEntryPage> {
   final Map<String, int> _participantScores = {};
   // 참가자별 통계 {userId: (strikes, spares, opens)} - 순위표 라이브 표시용
   final Map<String, ({int strikes, int spares, int opens})> _participantStats = {};
+  // gameEnded 이벤트 중복 처리 방지
+  bool _gameEndedHandled = false;
   // widget.participants를 방어적으로 deep copy하여 보관.
   // (game_room_page의 원본 리스트가 라이프사이클 이벤트로 비워지더라도 영향받지 않도록)
   late final List<Map<String, dynamic>> _participants = widget.participants == null
@@ -115,6 +126,27 @@ class _FrameEntryPageState extends State<FrameEntryPage> {
         });
       }
     });
+
+    // 내기 게임: 방장이 아닌 참가자가 gameEnded 이벤트를 받아 BetResultPage로 이동
+    if (widget.isBetGame) {
+      _socketService.off('gameEnded');
+      _socketService.on('gameEnded', (data) {
+        if (!mounted || _gameEndedHandled) return;
+        _gameEndedHandled = true;
+        final rankings = (data['rankings'] as List? ?? [])
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => BetResultPage(
+              rankings: rankings,
+              betMemo: data['betMemo'] as String?,
+            ),
+          ),
+        );
+      });
+    }
   }
 
   /// 현재 프레임 데이터로 스트라이크/스페어/오픈 개수 계산
@@ -127,6 +159,9 @@ class _FrameEntryPageState extends State<FrameEntryPage> {
     _frameScrollController.dispose();
     if (widget.isClubGame) {
       _socketService.off('roomStateUpdated');
+      if (widget.isBetGame) {
+        _socketService.off('gameEnded');
+      }
       // 클럽 게임 생명주기 종료 시 서버의 방에서 나가고 소켓 연결을 정리.
       // (ClubGameSummaryPage는 이미 dispose된 상태. popUntil의 마지막 단계)
       if (widget.roomId != null && _userId.isNotEmpty) {
@@ -354,6 +389,7 @@ class _FrameEntryPageState extends State<FrameEntryPage> {
     final stats = _computeStats();
 
     if (widget.isClubGame && _participants.isNotEmpty) {
+      // 내기 게임: ClubGameSummaryPage로 이동 후 저장 완료 시 finishGame 호출
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -373,6 +409,8 @@ class _FrameEntryPageState extends State<FrameEntryPage> {
               _participantStats,
             ),
             gameStartedAt: _gameStartedAt,
+            isBetGame: widget.isBetGame,
+            isHost: widget.isHost,
           ),
         ),
       );

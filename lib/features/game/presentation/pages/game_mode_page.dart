@@ -114,6 +114,19 @@ class GameModePage extends StatelessWidget {
               isDark: isDark,
               onTap: () => _startClubGame(context),
             ),
+            const SizedBox(height: 16),
+
+            // 내기 게임
+            _buildModeCard(
+              context,
+              icon: Symbols.casino,
+              title: '내기 게임',
+              description: '핸디캡을 정하고 친구들과 한 판 — 1등·꼴찌를 가립니다.',
+              iconBgColor: const Color(0xFFC084FC).withValues(alpha: 0.1),
+              iconColor: const Color(0xFFC084FC),
+              isDark: isDark,
+              onTap: () => _startBetGame(context),
+            ),
           ],
         ),
       ),
@@ -299,6 +312,29 @@ class GameModePage extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _startBetGame(BuildContext context) async {
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString('user_id');
+
+    if (userId == null) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('로그인이 필요합니다.')),
+        );
+      }
+      return;
+    }
+
+    if (context.mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const GameRoomPage(mode: 'bet'),
+        ),
+      );
+    }
   }
 
   Future<void> _startClubGame(BuildContext context) async {

@@ -4,14 +4,15 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/socket_service.dart';
+import 'bet_result_page.dart';
 import 'frame_entry_page.dart';
 
-/// 클럽 게임 방 페이지
+/// 클럽/내기 게임 방 페이지
 ///
-/// 방장이 방을 생성하고 코드를 공유하면, 클럽 멤버들이 참가합니다.
-/// 모든 참가자가 모이면 방장이 게임을 시작합니다.
+/// [mode]가 'bet'이면 핸디캡 UI와 betMemo가 활성화됩니다.
 class GameRoomPage extends StatefulWidget {
-  const GameRoomPage({super.key});
+  final String mode;
+  const GameRoomPage({super.key, this.mode = 'club'});
 
   @override
   State<GameRoomPage> createState() => _GameRoomPageState();
@@ -27,11 +28,13 @@ class _GameRoomPageState extends State<GameRoomPage> {
   bool _isHost = false;
   bool _isInRoom = false;
   bool _isConnecting = false;
-  // 게임이 시작되어 FrameEntryPage로 전환 중인지 여부.
-  // true면 dispose에서 leaveRoom/off/disconnect를 호출하지 않음
-  // (다음 화면이 소켓과 참가자 리스트를 그대로 이어서 사용)
   bool _isGameStarted = false;
   final List<Map<String, String>> _participants = [];
+
+  // 내기 게임 전용
+  String? _betMemo;
+  int _maxPlayers = 6;
+  final Map<String, int> _handicaps = {}; // userId → handicap
 
   @override
   void initState() {
@@ -50,6 +53,20 @@ class _GameRoomPageState extends State<GameRoomPage> {
           'userId': userId,
           'nickname': p?['nickname'] ?? '게스트',
         });
+        // 핸디캡 저장
+        if (p?['handicap'] != null) {
+          _handicaps[userId] = (p['handicap'] as num).toInt();
+        }
+      }
+      // mode/betMemo/maxPlayers 갱신
+      if (state['mode'] != null) {
+        // mode는 widget.mode를 우선 사용하므로 별도 저장 불필요
+      }
+      if (state['betMemo'] != null) {
+        _betMemo = state['betMemo'] as String?;
+      }
+      if (state['maxPlayers'] != null) {
+        _maxPlayers = (state['maxPlayers'] as num).toInt();
       }
     });
   }
@@ -62,16 +79,15 @@ class _GameRoomPageState extends State<GameRoomPage> {
   }
 
   void _setupSocketListeners() {
-    // 중복 등록 방지: SocketService는 싱글톤이라 off 없이 on을 반복하면 리스너가 누적되어
-    // 한 이벤트에 여러 번 setState가 발생(이전 widget instance 포함)하고 dispose 후 setState 오류로 이어진다.
     _socketService.off('roomCreated');
     _socketService.off('roomStateUpdated');
     _socketService.off('gameStarted');
     _socketService.off('createRoomResponse');
     _socketService.off('joinRoomResponse');
     _socketService.off('error');
+    _socketService.off('handicapSuggestions');
+    _socketService.off('gameEnded');
 
-    // 방 생성 응답 (메타데이터만 설정, 참가자 목록은 roomStateUpdated에서 관리)
     _socketService.on('roomCreated', (data) {
       if (!mounted) return;
       setState(() {
@@ -80,11 +96,9 @@ class _GameRoomPageState extends State<GameRoomPage> {
         _isHost = true;
         _isConnecting = false;
       });
-      // 서버에 roomStateUpdated 요청 (참가자 목록 동기화)
       _updateParticipantsFromState(data['state']);
     });
 
-    // 참가자 목록 통합 관리 (모든 상태 변경 시)
     _socketService.on('roomStateUpdated', (data) {
       if (!mounted) return;
       setState(() {
@@ -95,11 +109,8 @@ class _GameRoomPageState extends State<GameRoomPage> {
       _updateParticipantsFromState(data);
     });
 
-    // 게임 시작
     _socketService.on('gameStarted', (data) {
       if (!mounted) return;
-      // dispose에서 leaveRoom/off/disconnect가 호출되지 않도록 플래그 설정
-      // (이 방은 게임 중에도 서버에서 유지되어야 하고, 소켓 리스너는 다음 화면이 이어 받음)
       _isGameStarted = true;
       Navigator.pushReplacement(
         context,
@@ -108,12 +119,13 @@ class _GameRoomPageState extends State<GameRoomPage> {
             isClubGame: true,
             roomId: _roomId,
             participants: _participants,
+            isBetGame: widget.mode == 'bet',
+            isHost: _isHost,
           ),
         ),
       );
     });
 
-    // 방 생성/참가 응답 (에러 처리)
     _socketService.on('createRoomResponse', (data) {
       if (!mounted) return;
       if (data['success'] == false) {
@@ -141,9 +153,56 @@ class _GameRoomPageState extends State<GameRoomPage> {
         SnackBar(content: Text(data['message'] ?? '오류가 발생했습니다.')),
       );
     });
+
+    // 핸디캡 추천 응답 (내기 모드)
+    _socketService.on('handicapSuggestions', (data) {
+      if (!mounted) return;
+      final suggestions = (data['suggestions'] as List?) ?? [];
+      for (final s in suggestions) {
+        final uid = s['userId']?.toString() ?? '';
+        final suggested = (s['suggestedHandicap'] as num?)?.toInt() ?? 0;
+        if (uid.isNotEmpty) {
+          _socketService.updateHandicap(
+            roomId: _roomId!,
+            targetUserId: uid,
+            handicap: suggested,
+          );
+        }
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('추천 핸디캡이 적용되었습니다.')),
+        );
+      }
+    });
+
+    // 게임 종료 이벤트 (내기 결과)
+    _socketService.on('gameEnded', (data) {
+      if (!mounted) return;
+      _isGameStarted = true;
+      final rankings = (data['rankings'] as List? ?? [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => BetResultPage(
+            rankings: rankings,
+            betMemo: data['betMemo'] as String?,
+          ),
+        ),
+      );
+    });
   }
 
   Future<void> _createRoom() async {
+    if (widget.mode == 'bet') {
+      // 메모 입력 다이얼로그
+      final memo = await _showBetMemoDialog();
+      if (!mounted) return;
+      _betMemo = memo ?? '';
+    }
+
     setState(() => _isConnecting = true);
     try {
       await _socketService.connect();
@@ -152,6 +211,9 @@ class _GameRoomPageState extends State<GameRoomPage> {
       _socketService.createRoom(
         userId: _userId,
         nickname: _nickname,
+        mode: widget.mode,
+        betMemo: _betMemo,
+        maxPlayers: widget.mode == 'bet' ? _maxPlayers : null,
       );
     } catch (e) {
       setState(() => _isConnecting = false);
@@ -161,6 +223,34 @@ class _GameRoomPageState extends State<GameRoomPage> {
         );
       }
     }
+  }
+
+  Future<String?> _showBetMemoDialog() async {
+    final controller = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('내기 메모'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            hintText: '예: 진 사람이 밥 사기 (선택사항)',
+            counterText: '',
+          ),
+          maxLength: 50,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, ''),
+            child: const Text('건너뛰기'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: const Text('확인'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _joinRoom() async {
@@ -202,9 +292,10 @@ class _GameRoomPageState extends State<GameRoomPage> {
     _socketService.off('createRoomResponse');
     _socketService.off('joinRoomResponse');
     _socketService.off('error');
+    _socketService.off('handicapSuggestions');
+    _socketService.off('gameEnded');
     _socketService.disconnect();
 
-    // dispose에서 호출된 경우 setState 금지 (setState after dispose 에러 방지)
     if (!mounted) {
       _isInRoom = false;
       _isHost = false;
@@ -225,25 +316,24 @@ class _GameRoomPageState extends State<GameRoomPage> {
   void dispose() {
     _roomCodeController.dispose();
     if (_isGameStarted) {
-      // 게임 전환 중: 소켓과 roomStateUpdated 리스너는 FrameEntryPage가 이어받음.
-      // GameRoomPage가 등록한 자체 리스너만 선별 제거.
       _socketService.off('roomCreated');
       _socketService.off('gameStarted');
       _socketService.off('createRoomResponse');
       _socketService.off('joinRoomResponse');
       _socketService.off('error');
+      _socketService.off('handicapSuggestions');
+      _socketService.off('gameEnded');
     } else if (_isInRoom) {
-      // 방 안에 있었다면 정상적으로 방 나가기 + 소켓 정리
       _leaveRoom();
     } else {
-      // 방에 들어가지 못한 상태 (연결 시도 후 실패 등)로 나갈 때도
-      // setup에서 등록한 리스너는 반드시 정리 (누락 시 setState after dispose 발생)
       _socketService.off('roomCreated');
       _socketService.off('roomStateUpdated');
       _socketService.off('gameStarted');
       _socketService.off('createRoomResponse');
       _socketService.off('joinRoomResponse');
       _socketService.off('error');
+      _socketService.off('handicapSuggestions');
+      _socketService.off('gameEnded');
       _socketService.disconnect();
     }
     super.dispose();
@@ -254,6 +344,7 @@ class _GameRoomPageState extends State<GameRoomPage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bgColor = isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
     final textColor = isDark ? Colors.white : AppColors.textPrimaryLight;
+    final isBet = widget.mode == 'bet';
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -264,14 +355,14 @@ class _GameRoomPageState extends State<GameRoomPage> {
         leading: IconButton(
           icon: Icon(Symbols.arrow_back, color: textColor),
           onPressed: () {
-            if (_isInRoom) {
-              _leaveRoom();
-            }
+            if (_isInRoom) _leaveRoom();
             Navigator.pop(context);
           },
         ),
         title: Text(
-          _isInRoom ? '게임 대기실' : '클럽 게임',
+          _isInRoom
+              ? '게임 대기실'
+              : (isBet ? '내기 게임' : '클럽 게임'),
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
@@ -287,11 +378,11 @@ class _GameRoomPageState extends State<GameRoomPage> {
     );
   }
 
-  /// 방 생성/참가 선택 화면
   Widget _buildJoinView(bool isDark) {
     final textColor = isDark ? Colors.white : AppColors.textPrimaryLight;
     final subTextColor = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
     final surfaceColor = isDark ? AppColors.surfaceDark : Colors.white;
+    final isBet = widget.mode == 'bet';
 
     return Padding(
       padding: const EdgeInsets.all(24),
@@ -299,7 +390,7 @@ class _GameRoomPageState extends State<GameRoomPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '클럽 멤버들과\n함께 플레이하세요',
+            isBet ? '친구들과\n내기 한 판 어때요?' : '클럽 멤버들과\n함께 플레이하세요',
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
@@ -314,7 +405,6 @@ class _GameRoomPageState extends State<GameRoomPage> {
           ),
           const SizedBox(height: 40),
 
-          // 방 만들기 버튼
           SizedBox(
             width: double.infinity,
             height: 56,
@@ -330,8 +420,9 @@ class _GameRoomPageState extends State<GameRoomPage> {
                 ),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.5),
+                backgroundColor: isBet ? const Color(0xFFC084FC) : AppColors.primary,
+                disabledBackgroundColor: (isBet ? const Color(0xFFC084FC) : AppColors.primary)
+                    .withValues(alpha: 0.5),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
@@ -341,41 +432,22 @@ class _GameRoomPageState extends State<GameRoomPage> {
 
           const SizedBox(height: 32),
 
-          // 구분선
           Row(
             children: [
-              Expanded(
-                child: Container(
-                  height: 1,
-                  color: isDark ? Colors.white10 : Colors.black12,
-                ),
-              ),
+              Expanded(child: Container(height: 1, color: isDark ? Colors.white10 : Colors.black12)),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Text(
-                  '또는',
-                  style: TextStyle(fontSize: 12, color: subTextColor),
-                ),
+                child: Text('또는', style: TextStyle(fontSize: 12, color: subTextColor)),
               ),
-              Expanded(
-                child: Container(
-                  height: 1,
-                  color: isDark ? Colors.white10 : Colors.black12,
-                ),
-              ),
+              Expanded(child: Container(height: 1, color: isDark ? Colors.white10 : Colors.black12)),
             ],
           ),
 
           const SizedBox(height: 32),
 
-          // 방 코드 입력
           Text(
             '방 코드 입력',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: subTextColor,
-            ),
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: subTextColor),
           ),
           const SizedBox(height: 8),
           Row(
@@ -401,26 +473,19 @@ class _GameRoomPageState extends State<GameRoomPage> {
                     ),
                     filled: true,
                     fillColor: surfaceColor,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 16,
-                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide(
-                        color: isDark ? Colors.white10 : Colors.black12,
-                      ),
+                      borderSide: BorderSide(color: isDark ? Colors.white10 : Colors.black12),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide(
-                        color: isDark ? Colors.white10 : Colors.black12,
-                      ),
+                      borderSide: BorderSide(color: isDark ? Colors.white10 : Colors.black12),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
-                      borderSide: const BorderSide(
-                        color: AppColors.primary,
+                      borderSide: BorderSide(
+                        color: isBet ? const Color(0xFFC084FC) : AppColors.primary,
                         width: 2,
                       ),
                     ),
@@ -434,19 +499,13 @@ class _GameRoomPageState extends State<GameRoomPage> {
                 child: ElevatedButton(
                   onPressed: _isConnecting ? null : _joinRoom,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
+                    backgroundColor: isBet ? const Color(0xFFC084FC) : AppColors.primary,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                     padding: const EdgeInsets.symmetric(horizontal: 24),
                   ),
                   child: const Text(
                     '참가',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                 ),
               ),
@@ -457,33 +516,52 @@ class _GameRoomPageState extends State<GameRoomPage> {
     );
   }
 
-  /// 방 대기실 화면
   Widget _buildRoomView(bool isDark) {
     final textColor = isDark ? Colors.white : AppColors.textPrimaryLight;
     final subTextColor = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
     final surfaceColor = isDark ? AppColors.surfaceDark : Colors.white;
+    final isBet = widget.mode == 'bet';
+    final accentColor = isBet ? const Color(0xFFC084FC) : AppColors.primary;
 
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
         children: [
-          // 방 코드 표시
+          // 방 코드
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
               color: surfaceColor,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: isDark ? Colors.white10 : Colors.black12,
-              ),
+              border: Border.all(color: isDark ? Colors.white10 : Colors.black12),
             ),
             child: Column(
               children: [
-                Text(
-                  '방 코드',
-                  style: TextStyle(fontSize: 12, color: subTextColor),
-                ),
+                if (isBet && _betMemo != null && _betMemo!.isNotEmpty) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: accentColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Symbols.casino, size: 14, color: accentColor),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            '내기 메모: $_betMemo',
+                            style: TextStyle(fontSize: 13, color: accentColor, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                Text('방 코드', style: TextStyle(fontSize: 12, color: subTextColor)),
                 const SizedBox(height: 8),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -496,7 +574,7 @@ class _GameRoomPageState extends State<GameRoomPage> {
                           style: TextStyle(
                             fontSize: 36,
                             fontWeight: FontWeight.bold,
-                            color: AppColors.primary,
+                            color: accentColor,
                             letterSpacing: 8,
                           ),
                         ),
@@ -518,14 +596,37 @@ class _GameRoomPageState extends State<GameRoomPage> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '이 코드를 클럽 멤버들에게 공유하세요',
+                  isBet ? '이 코드를 친구들에게 공유하세요' : '이 코드를 클럽 멤버들에게 공유하세요',
                   style: TextStyle(fontSize: 12, color: subTextColor),
                 ),
               ],
             ),
           ),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
+
+          // 내기 모드 자동 핸디캡 버튼
+          if (isBet && _isHost) ...[
+            SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: OutlinedButton.icon(
+                onPressed: _roomId != null
+                    ? () => _socketService.requestHandicapSuggestions(_roomId!)
+                    : null,
+                icon: Icon(Symbols.auto_fix_high, size: 18, color: accentColor),
+                label: Text(
+                  '자동 핸디캡 추천',
+                  style: TextStyle(color: accentColor, fontWeight: FontWeight.w600),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: accentColor.withValues(alpha: 0.5)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
 
           // 참가자 목록
           Expanded(
@@ -535,9 +636,7 @@ class _GameRoomPageState extends State<GameRoomPage> {
               decoration: BoxDecoration(
                 color: surfaceColor,
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: isDark ? Colors.white10 : Colors.black12,
-                ),
+                border: Border.all(color: isDark ? Colors.white10 : Colors.black12),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -554,18 +653,15 @@ class _GameRoomPageState extends State<GameRoomPage> {
                         ),
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.1),
+                          color: accentColor.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
                           '${_participants.length}명',
-                          style: const TextStyle(
-                            color: AppColors.primary,
+                          style: TextStyle(
+                            color: accentColor,
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
                           ),
@@ -580,31 +676,31 @@ class _GameRoomPageState extends State<GameRoomPage> {
                       separatorBuilder: (_, __) => const SizedBox(height: 8),
                       itemBuilder: (context, index) {
                         final p = _participants[index];
-                        final isMe = p['userId'] == _userId;
+                        final uid = p['userId'] ?? '';
+                        final isMe = uid == _userId;
                         final isCreator = index == 0;
+                        final handicap = _handicaps[uid] ?? 0;
 
                         return Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
                             color: isMe
-                                ? AppColors.primary.withValues(alpha: 0.05)
+                                ? accentColor.withValues(alpha: 0.05)
                                 : Colors.transparent,
                             borderRadius: BorderRadius.circular(12),
                             border: isMe
-                                ? Border.all(
-                                    color: AppColors.primary.withValues(alpha: 0.2),
-                                  )
+                                ? Border.all(color: accentColor.withValues(alpha: 0.2))
                                 : null,
                           ),
                           child: Row(
                             children: [
                               CircleAvatar(
                                 radius: 18,
-                                backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                                backgroundColor: accentColor.withValues(alpha: 0.1),
                                 child: Text(
                                   (p['nickname'] ?? '?')[0],
-                                  style: const TextStyle(
-                                    color: AppColors.primary,
+                                  style: TextStyle(
+                                    color: accentColor,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
@@ -622,10 +718,7 @@ class _GameRoomPageState extends State<GameRoomPage> {
                               ),
                               if (isCreator)
                                 Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 2,
-                                  ),
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                   decoration: BoxDecoration(
                                     color: Colors.amber.withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(8),
@@ -639,6 +732,16 @@ class _GameRoomPageState extends State<GameRoomPage> {
                                     ),
                                   ),
                                 ),
+                              // 핸디캡 (내기 모드)
+                              if (isBet) ...[
+                                const SizedBox(width: 8),
+                                _isHost
+                                    ? GestureDetector(
+                                        onTap: () => _editHandicap(uid, handicap),
+                                        child: _handicapChip(handicap, accentColor, editable: true),
+                                      )
+                                    : _handicapChip(handicap, accentColor, editable: false),
+                              ],
                             ],
                           ),
                         );
@@ -652,7 +755,6 @@ class _GameRoomPageState extends State<GameRoomPage> {
 
           const SizedBox(height: 16),
 
-          // 게임 시작 버튼 (방장만)
           if (_isHost)
             SizedBox(
               width: double.infinity,
@@ -664,23 +766,85 @@ class _GameRoomPageState extends State<GameRoomPage> {
                 icon: const Icon(Symbols.play_arrow, color: Colors.white),
                 label: const Text(
                   '게임 시작',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.green,
                   disabledBackgroundColor: Colors.green.withValues(alpha: 0.3),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 ),
               ),
             ),
         ],
       ),
     );
+  }
+
+  Widget _handicapChip(int handicap, Color color, {required bool editable}) {
+    final text = handicap == 0 ? '±0' : (handicap > 0 ? '+$handicap' : '$handicap');
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(10),
+        border: editable ? Border.all(color: color.withValues(alpha: 0.4)) : null,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            text,
+            style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.bold),
+          ),
+          if (editable) ...[
+            const SizedBox(width: 3),
+            Icon(Symbols.edit, size: 12, color: color),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _editHandicap(String uid, int current) async {
+    final controller = TextEditingController(text: current == 0 ? '' : '$current');
+    final result = await showDialog<int>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('핸디캡 설정'),
+        content: TextField(
+          controller: controller,
+          keyboardType: const TextInputType.numberWithOptions(signed: true),
+          decoration: const InputDecoration(
+            hintText: '-100 ~ +100',
+            counterText: '',
+          ),
+          maxLength: 4,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('취소')),
+          TextButton(
+            onPressed: () {
+              final v = int.tryParse(controller.text);
+              if (v == null || v < -100 || v > 100) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  const SnackBar(content: Text('-100 ~ +100 사이 값을 입력해주세요.')),
+                );
+                return;
+              }
+              Navigator.pop(ctx, v);
+            },
+            child: const Text('확인'),
+          ),
+        ],
+      ),
+    );
+
+    if (result != null && _roomId != null) {
+      _socketService.updateHandicap(
+        roomId: _roomId!,
+        targetUserId: uid,
+        handicap: result,
+      );
+    }
   }
 }

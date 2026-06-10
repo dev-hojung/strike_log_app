@@ -33,6 +33,10 @@ class ClubGameSummaryPage extends StatefulWidget {
   final Map<String, ({int strikes, int spares, int opens})> participantStats;
   // 실제 게임 시작 시각. play_date로 사용해 저장 시각 왜곡을 방지.
   final DateTime? gameStartedAt;
+  // 내기 게임 여부 (POST /games 에 is_bet_game 추가)
+  final bool isBetGame;
+  // 내기 게임에서 방장 여부 (저장 후 finishGame emit 주체)
+  final bool isHost;
 
   const ClubGameSummaryPage({
     super.key,
@@ -49,6 +53,8 @@ class ClubGameSummaryPage extends StatefulWidget {
     this.location,
     this.roomId,
     this.gameStartedAt,
+    this.isBetGame = false,
+    this.isHost = false,
   });
 
   @override
@@ -211,6 +217,7 @@ class _ClubGameSummaryPageState extends State<ClubGameSummaryPage> {
           'location': widget.location,
         'frames': mappedFrames,
         'is_club_game': true,
+        if (widget.isBetGame) 'is_bet_game': true,
         if (widget.roomId != null) 'room_id': widget.roomId,
         if (myRank > 0) 'club_rank': myRank,
         // 실제 플레이 시작·종료 시각 (UTC ISO). 소요 시간 통계에 활용.
@@ -229,6 +236,12 @@ class _ClubGameSummaryPageState extends State<ClubGameSummaryPage> {
           _isSaved = true;
           await NewBadgesDialog.showIfAny(context, result.newlyEarnedBadges);
           if (!mounted) return;
+          // 내기 게임 방장: 저장 완료 후 finishGame 이벤트 emit → 전원 BetResultPage로 이동
+          if (widget.isBetGame && widget.isHost && widget.roomId != null) {
+            _socketService.finishGame(widget.roomId!);
+            // gameEnded 이벤트는 FrameEntryPage의 리스너에서 처리되어 BetResultPage로 이동.
+            // ClubGameSummaryPage는 stack에서 pop되므로 여기서 navigate하지 않음.
+          }
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('경기가 성공적으로 저장되었습니다.')),
           );
