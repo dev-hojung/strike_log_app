@@ -35,6 +35,11 @@ class _GameRoomPageState extends State<GameRoomPage> {
   String? _betMemo;
   int _maxPlayers = 6;
   final Map<String, int> _handicaps = {}; // userId → handicap
+  /// 서버가 알려준 실제 방 모드. 코드 입력으로 참가한 사용자는 widget.mode가 'club' 기본인데
+  /// 서버 응답으로 'bet' 임을 알 수 있다. UI 분기는 이 값을 우선 사용한다.
+  String? _serverMode;
+
+  bool get _isBet => (_serverMode ?? widget.mode) == 'bet';
 
   @override
   void initState() {
@@ -60,7 +65,7 @@ class _GameRoomPageState extends State<GameRoomPage> {
       }
       // mode/betMemo/maxPlayers 갱신
       if (state['mode'] != null) {
-        // mode는 widget.mode를 우선 사용하므로 별도 저장 불필요
+        _serverMode = state['mode']?.toString();
       }
       if (state['betMemo'] != null) {
         _betMemo = state['betMemo'] as String?;
@@ -119,7 +124,7 @@ class _GameRoomPageState extends State<GameRoomPage> {
             isClubGame: true,
             roomId: _roomId,
             participants: _participants,
-            isBetGame: widget.mode == 'bet',
+            isBetGame: _isBet,
             isHost: _isHost,
           ),
         ),
@@ -227,30 +232,34 @@ class _GameRoomPageState extends State<GameRoomPage> {
 
   Future<String?> _showBetMemoDialog() async {
     final controller = TextEditingController();
-    return showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('내기 메모'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(
-            hintText: '예: 진 사람이 밥 사기 (선택사항)',
-            counterText: '',
+    try {
+      return await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('내기 메모'),
+          content: TextField(
+            controller: controller,
+            decoration: const InputDecoration(
+              hintText: '예: 진 사람이 밥 사기 (선택사항)',
+              counterText: '',
+            ),
+            maxLength: 50,
           ),
-          maxLength: 50,
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, ''),
+              child: const Text('건너뛰기'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+              child: const Text('확인'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, ''),
-            child: const Text('건너뛰기'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-            child: const Text('확인'),
-          ),
-        ],
-      ),
-    );
+      );
+    } finally {
+      controller.dispose();
+    }
   }
 
   Future<void> _joinRoom() async {
@@ -316,13 +325,16 @@ class _GameRoomPageState extends State<GameRoomPage> {
   void dispose() {
     _roomCodeController.dispose();
     if (_isGameStarted) {
+      // 게임이 시작되어 FrameEntryPage가 이어서 활성화된 상태.
+      // 다음 페이지가 사용하는 이벤트(roomStateUpdated, gameEnded)는 off 하지 않는다.
+      // socket.io의 off는 인자 없이 호출하면 해당 이벤트 모든 리스너 제거이므로
+      // 새 페이지가 이미 등록한 핸들러까지 함께 사라져 BetResultPage 이동이 막힌다.
       _socketService.off('roomCreated');
       _socketService.off('gameStarted');
       _socketService.off('createRoomResponse');
       _socketService.off('joinRoomResponse');
-      _socketService.off('error');
       _socketService.off('handicapSuggestions');
-      _socketService.off('gameEnded');
+      // 'error', 'gameEnded', 'roomStateUpdated'는 FrameEntryPage가 이어 사용하므로 보존.
     } else if (_isInRoom) {
       _leaveRoom();
     } else {
@@ -344,7 +356,7 @@ class _GameRoomPageState extends State<GameRoomPage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bgColor = isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
     final textColor = isDark ? Colors.white : AppColors.textPrimaryLight;
-    final isBet = widget.mode == 'bet';
+    final isBet = _isBet;
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -382,7 +394,7 @@ class _GameRoomPageState extends State<GameRoomPage> {
     final textColor = isDark ? Colors.white : AppColors.textPrimaryLight;
     final subTextColor = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
     final surfaceColor = isDark ? AppColors.surfaceDark : Colors.white;
-    final isBet = widget.mode == 'bet';
+    final isBet = _isBet;
 
     return Padding(
       padding: const EdgeInsets.all(24),
@@ -520,7 +532,7 @@ class _GameRoomPageState extends State<GameRoomPage> {
     final textColor = isDark ? Colors.white : AppColors.textPrimaryLight;
     final subTextColor = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
     final surfaceColor = isDark ? AppColors.surfaceDark : Colors.white;
-    final isBet = widget.mode == 'bet';
+    final isBet = _isBet;
     final accentColor = isBet ? const Color(0xFFC084FC) : AppColors.primary;
 
     return Padding(

@@ -239,13 +239,18 @@ class _ClubGameSummaryPageState extends State<ClubGameSummaryPage> {
           // 내기 게임 방장: 저장 완료 후 finishGame 이벤트 emit → 전원 BetResultPage로 이동
           if (widget.isBetGame && widget.isHost && widget.roomId != null) {
             _socketService.finishGame(widget.roomId!);
-            // gameEnded 이벤트는 FrameEntryPage의 리스너에서 처리되어 BetResultPage로 이동.
-            // ClubGameSummaryPage는 stack에서 pop되므로 여기서 navigate하지 않음.
           }
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('경기가 성공적으로 저장되었습니다.')),
           );
-          Navigator.of(context).popUntil((route) => route.isFirst);
+          // 내기 게임: popUntil로 FrameEntryPage 까지 dispose 하면 gameEnded 리스너가
+          // 사라져 BetResultPage 진입이 막힌다. 이 경우 현재 페이지를 유지해 두고
+          // FrameEntryPage의 핸들러가 pushReplacement로 BetResultPage를 띄우게 한다.
+          if (widget.isBetGame) {
+            // 저장 완료 표시(_isSaved=true)된 상태로 잠시 머묾. 곧 BetResultPage가 등장.
+          } else {
+            Navigator.of(context).popUntil((route) => route.isFirst);
+          }
           return;
         }
 
