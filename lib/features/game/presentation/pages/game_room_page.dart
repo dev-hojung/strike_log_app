@@ -358,7 +358,17 @@ class _GameRoomPageState extends State<GameRoomPage> {
     final textColor = isDark ? Colors.white : AppColors.textPrimaryLight;
     final isBet = _isBet;
 
-    return Scaffold(
+    return PopScope(
+      canPop: !_isInRoom,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final confirmed = await _confirmLeave();
+        if (confirmed && context.mounted) {
+          _leaveRoom();
+          Navigator.of(context).pop();
+        }
+      },
+      child: Scaffold(
       backgroundColor: bgColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -366,9 +376,16 @@ class _GameRoomPageState extends State<GameRoomPage> {
         scrolledUnderElevation: 0,
         leading: IconButton(
           icon: Icon(Symbols.arrow_back, color: textColor),
-          onPressed: () {
-            if (_isInRoom) _leaveRoom();
-            Navigator.pop(context);
+          onPressed: () async {
+            if (!_isInRoom) {
+              Navigator.pop(context);
+              return;
+            }
+            final confirmed = await _confirmLeave();
+            if (confirmed && context.mounted) {
+              _leaveRoom();
+              Navigator.pop(context);
+            }
           },
         ),
         title: Text(
@@ -387,7 +404,37 @@ class _GameRoomPageState extends State<GameRoomPage> {
         top: false,
         child: _isInRoom ? _buildRoomView(isDark) : _buildJoinView(isDark),
       ),
+      ),
     );
+  }
+
+  Future<bool> _confirmLeave() async {
+    final isBet = _isBet;
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('방을 나가시겠어요?'),
+        content: Text(
+          isBet
+              ? '내기 방을 나가면 방 코드는 사라집니다. 호스트면 다른 참가자에게 호스트가 자동 이전됩니다.'
+              : '대기 중인 방을 나갑니다. 호스트면 다른 참가자에게 호스트가 자동 이전됩니다.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text(
+              '나가기',
+              style: TextStyle(color: Colors.redAccent),
+            ),
+          ),
+        ],
+      ),
+    );
+    return result == true;
   }
 
   Widget _buildJoinView(bool isDark) {
