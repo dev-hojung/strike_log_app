@@ -184,6 +184,8 @@ class _GameRoomPageState extends State<GameRoomPage> {
     // 게임 종료 이벤트 (내기 결과)
     _socketService.on('gameEnded', (data) {
       if (!mounted) return;
+      // P1-4: 다른 방의 이벤트 무시
+      if (_roomId != null && data['roomId'] != null && data['roomId'] != _roomId) return;
       _isGameStarted = true;
       final rankings = (data['rankings'] as List? ?? [])
           .map((e) => Map<String, dynamic>.from(e as Map))
@@ -866,44 +868,50 @@ class _GameRoomPageState extends State<GameRoomPage> {
 
   Future<void> _editHandicap(String uid, int current) async {
     final controller = TextEditingController(text: current == 0 ? '' : '$current');
-    final result = await showDialog<int>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('핸디캡 설정'),
-        content: TextField(
-          controller: controller,
-          keyboardType: const TextInputType.numberWithOptions(signed: true),
-          decoration: const InputDecoration(
-            hintText: '-100 ~ +100',
-            counterText: '',
+    try {
+      final result = await showDialog<int>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('핸디캡 설정'),
+          content: TextField(
+            controller: controller,
+            keyboardType: const TextInputType.numberWithOptions(signed: true),
+            decoration: const InputDecoration(
+              hintText: '-100 ~ +100',
+              counterText: '',
+            ),
+            maxLength: 4,
           ),
-          maxLength: 4,
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('취소')),
+            TextButton(
+              onPressed: () {
+                final text = controller.text.trim();
+                // 빈 문자열은 0(핸디캡 없음)으로 처리
+                final v = text.isEmpty ? 0 : int.tryParse(text);
+                if (v == null || v < -100 || v > 100) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(content: Text('-100 ~ +100 사이 값을 입력해주세요.')),
+                  );
+                  return;
+                }
+                Navigator.pop(ctx, v);
+              },
+              child: const Text('확인'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('취소')),
-          TextButton(
-            onPressed: () {
-              final v = int.tryParse(controller.text);
-              if (v == null || v < -100 || v > 100) {
-                ScaffoldMessenger.of(ctx).showSnackBar(
-                  const SnackBar(content: Text('-100 ~ +100 사이 값을 입력해주세요.')),
-                );
-                return;
-              }
-              Navigator.pop(ctx, v);
-            },
-            child: const Text('확인'),
-          ),
-        ],
-      ),
-    );
-
-    if (result != null && _roomId != null) {
-      _socketService.updateHandicap(
-        roomId: _roomId!,
-        targetUserId: uid,
-        handicap: result,
       );
+
+      if (result != null && _roomId != null) {
+        _socketService.updateHandicap(
+          roomId: _roomId!,
+          targetUserId: uid,
+          handicap: result,
+        );
+      }
+    } finally {
+      controller.dispose();
     }
   }
 }

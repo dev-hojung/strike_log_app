@@ -132,6 +132,8 @@ class _FrameEntryPageState extends State<FrameEntryPage> {
       _socketService.off('gameEnded');
       _socketService.on('gameEnded', (data) {
         if (!mounted || _gameEndedHandled) return;
+        // P1-4: 다른 방의 이벤트 무시
+        if (widget.roomId != null && data['roomId'] != null && data['roomId'] != widget.roomId) return;
         _gameEndedHandled = true;
         final rankings = (data['rankings'] as List? ?? [])
             .map((e) => Map<String, dynamic>.from(e as Map))

@@ -9,6 +9,7 @@ import '../../../home/presentation/pages/home_dashboard_page.dart';
 import '../../data/bowling_scorer.dart';
 import '../../data/services/game_draft_repository.dart';
 import '../../data/services/game_save_service.dart';
+import 'bet_result_page.dart';
 
 /// 클럽 게임 종료 후 참가자 전원의 통합 결과를 보여주는 페이지입니다.
 ///
@@ -69,6 +70,7 @@ class _ClubGameSummaryPageState extends State<ClubGameSummaryPage> {
   late Map<String, ({int strikes, int spares, int opens})> _stats;
   bool _isSaving = false;
   bool _isSaved = false;
+  bool _gameEndedHandled = false;
 
   // 진입 시점 "이전 최고 점수" 스냅샷 - 저장으로 캐시가 갱신되어도 배너 유지.
   late final int? _previousBest = HomeDashboardPage.cachedHighestScore;
@@ -100,6 +102,9 @@ class _ClubGameSummaryPageState extends State<ClubGameSummaryPage> {
 
   void _setupSocketListener() {
     if (widget.roomId == null) return;
+
+    // P1-1: 중복 등록 방지
+    _socketService.off('roomStateUpdated');
     _socketService.on('roomStateUpdated', (data) {
       if (!mounted) return;
       if (data['participants'] != null) {
@@ -119,6 +124,33 @@ class _ClubGameSummaryPageState extends State<ClubGameSummaryPage> {
         });
       }
     });
+
+    // P0-1: 내기 게임에서 호스트도 gameEnded 수신 → BetResultPage로 이동
+    if (widget.isBetGame) {
+      _socketService.off('gameEnded');
+      _socketService.on('gameEnded', _onGameEnded);
+    }
+  }
+
+  void _onGameEnded(dynamic data) {
+    if (!mounted || _gameEndedHandled) return;
+    // 다른 방의 gameEnded 이벤트는 무시 (소켓 싱글톤 + 이전 세션 잔여 이벤트 방어)
+    if (widget.roomId != null && data['roomId'] != null && data['roomId'] != widget.roomId) {
+      return;
+    }
+    _gameEndedHandled = true;
+    final rankings = (data['rankings'] as List? ?? [])
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BetResultPage(
+          rankings: rankings,
+          betMemo: data['betMemo'] as String?,
+        ),
+      ),
+    );
   }
 
   @override
@@ -128,6 +160,9 @@ class _ClubGameSummaryPageState extends State<ClubGameSummaryPage> {
     // 등록한 리스너가 누적되어 setState 호출/leak으로 이어질 수 있다.
     if (widget.roomId != null) {
       _socketService.off('roomStateUpdated');
+      if (widget.isBetGame) {
+        _socketService.off('gameEnded');
+      }
     }
     super.dispose();
   }
@@ -243,11 +278,10 @@ class _ClubGameSummaryPageState extends State<ClubGameSummaryPage> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('경기가 성공적으로 저장되었습니다.')),
           );
-          // 내기 게임: popUntil로 FrameEntryPage 까지 dispose 하면 gameEnded 리스너가
-          // 사라져 BetResultPage 진입이 막힌다. 이 경우 현재 페이지를 유지해 두고
-          // FrameEntryPage의 핸들러가 pushReplacement로 BetResultPage를 띄우게 한다.
+          // 내기 게임: 저장 완료 후 gameEnded 이벤트를 이 페이지에서 직접 수신해
+          // BetResultPage로 이동한다. (_onGameEnded 참고)
           if (widget.isBetGame) {
-            // 저장 완료 표시(_isSaved=true)된 상태로 잠시 머묾. 곧 BetResultPage가 등장.
+            // 저장 완료 표시(_isSaved=true)된 상태로 머묾. gameEnded 수신 시 _onGameEnded가 이동.
           } else {
             Navigator.of(context).popUntil((route) => route.isFirst);
           }
@@ -428,6 +462,28 @@ class _ClubGameSummaryPageState extends State<ClubGameSummaryPage> {
     return result ?? false;
   }
 
+  /// P1-3: 내기 게임에서 결과 수신 전 뒤로 가기 경고 다이얼로그
+  Future<bool> _showBetExitWarningDialog() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('내기 결과를 받을 수 없게 됩니다'),
+        content: const Text('내기 결과를 받기 전에 나가면 결과 화면을 볼 수 없게 됩니다.\n정말 나가시겠어요?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('나가기', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
   /// 저장하지 않고 나가기 확인 시트 (GameSummaryPage와 동일 디자인)
   Future<bool> _showExitConfirmDialog() async {
     if (_isSaved) return true;
@@ -595,6 +651,17 @@ class _ClubGameSummaryPageState extends State<ClubGameSummaryPage> {
         if (didPop) return;
         // 저장 중일 땐 race condition 방지 위해 back 동작 차단
         if (_isSaving) return;
+        // P1-3: 내기 게임에서는 결과 수신 대기 중임을 경고
+        if (widget.isBetGame && !_isSaved) {
+          final confirmed = await _showBetExitWarningDialog();
+          if (!context.mounted) return;
+          if (!confirmed) return;
+          if (widget.roomId != null) {
+            _socketService.leaveRoom(roomId: widget.roomId!, userId: widget.userId);
+          }
+          Navigator.of(context).popUntil((route) => route.isFirst);
+          return;
+        }
         final shouldLeave = await _showExitConfirmDialog();
         if (shouldLeave && context.mounted) {
           Navigator.of(context).popUntil((route) => route.isFirst);
@@ -611,6 +678,17 @@ class _ClubGameSummaryPageState extends State<ClubGameSummaryPage> {
             onPressed: _isSaving
                 ? null
                 : () async {
+              // P1-3: 내기 게임에서는 결과 수신 대기 중임을 경고
+              if (widget.isBetGame && !_isSaved) {
+                final confirmed = await _showBetExitWarningDialog();
+                if (!context.mounted) return;
+                if (!confirmed) return;
+                if (widget.roomId != null) {
+                  _socketService.leaveRoom(roomId: widget.roomId!, userId: widget.userId);
+                }
+                Navigator.of(context).popUntil((route) => route.isFirst);
+                return;
+              }
               final shouldLeave = await _showExitConfirmDialog();
               if (shouldLeave && context.mounted) {
                 Navigator.of(context).popUntil((route) => route.isFirst);
