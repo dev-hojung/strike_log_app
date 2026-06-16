@@ -8,7 +8,7 @@ import '../../../../core/errors/api_error_classifier.dart';
 import '../../../../core/services/api_client.dart';
 import '../../../../core/services/app_logger.dart';
 import '../../../../core/widgets/error_retry_view.dart';
-import '../../../home/data/models/home_dashboard_data.dart';
+import '../../data/models/game_detail.dart';
 import '../../data/services/game_api_service.dart';
 import 'game_detail_page.dart';
 import 'series_summary_page.dart';

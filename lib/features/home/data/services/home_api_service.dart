@@ -9,10 +9,9 @@ class HomeApiService {
     try {
       final dio = _apiClient.dio;
 
-      // 프로필 + 통계는 필수, 최근 경기 + 클럽 + 월간 프레임 통계는 실패해도 무방
+      // 프로필 + 통계는 필수, 클럽 + 월간 프레임 통계는 실패해도 무방
       final profileFuture = dio.get('/users/$userId');
       final statsFuture = dio.get('/games/users/$userId/statistics');
-      final recentFuture = dio.get('/games/users/$userId/recent').then((r) => r.data).catchError((_) => null);
       final groupsFuture = dio.get('/groups/me').then((r) => r.data).catchError((_) => null);
       final monthlyFrameFuture = dio
           .get('/games/users/$userId/monthly-frame-stats')
@@ -21,7 +20,6 @@ class HomeApiService {
 
       final profileRes = await profileFuture;
       final statsRes = await statsFuture;
-      final recentGameData = await recentFuture;
       final groupsData = await groupsFuture;
       final monthlyFrameData = await monthlyFrameFuture;
 
@@ -59,9 +57,6 @@ class HomeApiService {
                 .map((e) => TrendData.fromJson(Map<String, dynamic>.from(e)))
                 .toList()
             : [],
-        recentGame: recentGameData != null && recentGameData is Map
-            ? RecentGame.fromJson(Map<String, dynamic>.from(recentGameData))
-            : null,
         hasGroup: groupsData is List && groupsData.isNotEmpty,
         clubs: groupsData is List
             ? groupsData.map((g) => ClubInfo.fromJson(Map<String, dynamic>.from(g))).toList()

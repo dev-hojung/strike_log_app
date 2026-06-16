@@ -44,6 +44,8 @@ class HomeDashboardPage extends StatefulWidget {
   State<HomeDashboardPage> createState() => _HomeDashboardPageState();
 }
 
+enum _TrendMetric { score, strikes, spares, opens }
+
 class _HomeDashboardPageState extends State<HomeDashboardPage> {
   final HomeApiService _apiService = HomeApiService();
   final SeriesApiService _seriesService = SeriesApiService();
@@ -61,6 +63,9 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
   List<WeeklyChallenge> _weeklyChallenges = const [];
   bool _isLoading = true;
   ApiError? _error;
+
+  /// 최근 경기 그래프 선택 metric
+  _TrendMetric _selectedTrendMetric = _TrendMetric.score;
 
   @override
   void initState() {
@@ -335,12 +340,6 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
               const SizedBox(height: 24),
               _buildBestSeriesCard(isDark, _bestSeries!),
             ],
-
-            const SizedBox(height: 24),
-
-            // 최근 경기 정보
-            if (data.recentGame != null)
-              _buildLatestGame(context, isDark, data.recentGame!),
 
             const SizedBox(height: 140), // 하단 여백 (네비게이션 + FAB 영역)
           ],
@@ -851,6 +850,22 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
 
   Widget _buildTrendChart(
       BuildContext context, bool isDark, List<TrendData> trend) {
+    // metric별 레이블·아이콘 정의
+    const metricLabels = {
+      _TrendMetric.score: '점수',
+      _TrendMetric.strikes: '스트라이크',
+      _TrendMetric.spares: '스페어',
+      _TrendMetric.opens: '오픈',
+    };
+    const metricIcons = {
+      _TrendMetric.score: Symbols.sports_score,
+      _TrendMetric.strikes: Symbols.bolt,
+      _TrendMetric.spares: Symbols.check_circle,
+      _TrendMetric.opens: Symbols.radio_button_unchecked,
+    };
+
+    final titleSuffix = metricLabels[_selectedTrendMetric]!;
+
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -861,15 +876,52 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('최근 ${trend.length}경기',
+          Text('최근 ${trend.length}경기 — $titleSuffix',
               style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                   color: isDark ? Colors.white : Colors.black)),
-          const SizedBox(height: 24),
+          const SizedBox(height: 12),
+          // metric 토글 칩
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: _TrendMetric.values.map((metric) {
+              final selected = _selectedTrendMetric == metric;
+              return ChoiceChip(
+                avatar: Icon(
+                  metricIcons[metric]!,
+                  size: 14,
+                  color: selected
+                      ? Colors.white
+                      : (isDark ? AppColors.textSecondaryDark : Colors.grey),
+                ),
+                label: Text(metricLabels[metric]!),
+                selected: selected,
+                onSelected: (_) => setState(() => _selectedTrendMetric = metric),
+                selectedColor: AppColors.primary,
+                backgroundColor:
+                    isDark ? AppColors.surfaceDark : Colors.grey.shade100,
+                labelStyle: TextStyle(
+                  fontSize: 12,
+                  color: selected
+                      ? Colors.white
+                      : (isDark ? AppColors.textSecondaryDark : Colors.black87),
+                ),
+                side: BorderSide(
+                  color: selected
+                      ? AppColors.primary
+                      : (isDark ? Colors.white24 : Colors.black12),
+                ),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 16),
           SizedBox(
             height: 180,
-            child: _buildTrendLineChart(isDark, trend),
+            child: _buildTrendLineChart(isDark, trend, _selectedTrendMetric),
           ),
           const SizedBox(height: 12),
           Row(
@@ -886,21 +938,41 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
   }
 
   /// 추이 라인 차트.
-  /// - Y축 라벨: 최소/최대 점수
+  /// - Y축 라벨: 최소/최대 값
   /// - 평균 라인: 점선 가이드
   /// - 최고점 마커: 색상 강조 + 라벨
-  Widget _buildTrendLineChart(bool isDark, List<TrendData> trend) {
-    final scores = trend.map((t) => t.score).toList();
-    final minScore = scores.reduce((a, b) => a < b ? a : b);
-    final maxScore = scores.reduce((a, b) => a > b ? a : b);
-    final avg = scores.reduce((a, b) => a + b) / scores.length;
+  Widget _buildTrendLineChart(
+      bool isDark, List<TrendData> trend, _TrendMetric metric) {
+    final values = trend.map((t) {
+      switch (metric) {
+        case _TrendMetric.score:
+          return t.score;
+        case _TrendMetric.strikes:
+          return t.strikes;
+        case _TrendMetric.spares:
+          return t.spares;
+        case _TrendMetric.opens:
+          return t.opens;
+      }
+    }).toList();
 
-    // Y축 여백: 최저점 아래 10, 최고점 위 10. 동일 값일 때 division-by-zero 방지.
-    final yMin = (minScore - 10).clamp(0, 300).toDouble();
-    final yMax = (maxScore + 10).clamp(0, 300).toDouble();
+    final minVal = values.reduce((a, b) => a < b ? a : b);
+    final maxVal = values.reduce((a, b) => a > b ? a : b);
+    final avg = values.reduce((a, b) => a + b) / values.length;
 
-    // 최고점 인덱스 (여러 개면 첫 번째). 단일 데이터일 때도 안전.
-    final maxIdx = scores.indexOf(maxScore);
+    // Y축 범위: score는 0~300, 나머지(strike/spare/open)는 0~10 기준
+    final double yMin;
+    final double yMax;
+    if (metric == _TrendMetric.score) {
+      yMin = (minVal - 10).clamp(0, 300).toDouble();
+      yMax = (maxVal + 10).clamp(0, 300).toDouble();
+    } else {
+      yMin = 0;
+      yMax = (maxVal + 1).clamp(1, 10).toDouble();
+    }
+
+    // 최고값 인덱스 (여러 개면 첫 번째). 단일 데이터일 때도 안전.
+    final maxIdx = values.indexOf(maxVal);
 
     final axisLabelStyle = TextStyle(
       color: isDark ? AppColors.textSecondaryDark : Colors.grey,
@@ -960,8 +1032,7 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
             spots: trend
                 .asMap()
                 .entries
-                .map((e) =>
-                    FlSpot(e.key.toDouble(), e.value.score.toDouble()))
+                .map((e) => FlSpot(e.key.toDouble(), values[e.key].toDouble()))
                 .toList(),
             isCurved: true,
             color: AppColors.primary,
@@ -1218,94 +1289,6 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
           fontSize: 11,
           fontWeight: FontWeight.bold,
           letterSpacing: 1.0),
-    );
-  }
-
-  Widget _buildLatestGame(BuildContext context, bool isDark, RecentGame game) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('최근 경기',
-            style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: isDark ? Colors.white : Colors.black)),
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: isDark ? AppColors.surfaceDark : Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: isDark ? Colors.white10 : Colors.black12),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.1),
-                    shape: BoxShape.circle),
-                child: Center(
-                    child: Text('${game.totalScore}',
-                        style: const TextStyle(
-                            color: AppColors.primary,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold))),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(game.location ?? '장소 정보 없음',
-                        style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: isDark ? Colors.white : Colors.black)),
-                    Text(
-                      // createdAt(시간 포함)이 있으면 시:분까지, 없으면 날짜만
-                      // (play_date는 MySQL DATE 컬럼이라 시간 정보가 없음)
-                      game.createdAt != null
-                          ? DateFormat('MM월 dd일 a h:mm').format(game.createdAt!)
-                          : DateFormat('MM월 dd일').format(game.playDate),
-                      style: const TextStyle(color: Colors.grey, fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.green.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(Symbols.arrow_upward,
-                            color: Colors.green, size: 14),
-                        SizedBox(width: 2),
-                        Text('에버리지',
-                            style: TextStyle(
-                                color: Colors.green,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text('Match #42',
-                      style: TextStyle(color: Colors.grey, fontSize: 10)),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 
