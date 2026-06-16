@@ -213,11 +213,11 @@ class FcmService {
     final payload = jsonEncode(msg.data);
     try {
       await _localNotifications.show(
-        // 고정 ID로 들어와 신규 알림이 기존 알림을 대체.
-        // 서로 다른 ID로 4건 이상 누적되면 Android가 자동 그룹화하면서 SILENT을 강제해
-        // heads-up이 안 뜨는 현상이 생긴다. 알림 이력은 DB(/notifications/me)에 남으므로
-        // 트레이엔 항상 최신 1건만 보이는 정책.
-        id: 1,
+        // 고유 ID로 들어와 매 알림이 트레이에 누적되도록 한다.
+        // 같은 ID면 Android가 기존 알림을 덮어써서 마지막 1건만 보이는 문제가 있어
+        // 시각(ms) 기반 고유값으로 분리. 32비트 정수 범위로 안전하게 자른다.
+        // 그룹 키를 명시해 Android 자동 그룹화로 인한 SILENT 강제를 회피.
+        id: DateTime.now().millisecondsSinceEpoch.remainder(1 << 31),
         title: notification.title,
         body: notification.body,
         notificationDetails: NotificationDetails(
