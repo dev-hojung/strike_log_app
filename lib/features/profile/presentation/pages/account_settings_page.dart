@@ -9,6 +9,7 @@ import '../../../../core/services/session_manager.dart';
 import '../../../../core/services/user_profile_cache.dart';
 import '../../../../core/widgets/avatar_image.dart';
 import '../../../auth/presentation/pages/login_page.dart';
+import '../../../inquiry/presentation/pages/inquiry_page.dart';
 import '../../../legal/presentation/pages/privacy_policy_page.dart';
 import '../../../legal/presentation/pages/terms_of_service_page.dart';
 import 'edit_nickname_page.dart';
@@ -365,6 +366,19 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
                                 context,
                                 MaterialPageRoute(
                                   builder: (_) => const PrivacyPolicyPage(),
+                                ),
+                              ),
+                            ),
+                            Divider(height: 1, color: borderColor),
+                            _buildActionRow(
+                              icon: Symbols.support_agent,
+                              label: '관리자 문의',
+                              textColor: textColor,
+                              secondaryColor: secondaryColor,
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const InquiryPage(),
                                 ),
                               ),
                             ),
