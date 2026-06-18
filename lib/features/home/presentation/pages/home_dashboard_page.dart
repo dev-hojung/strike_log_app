@@ -33,6 +33,9 @@ class HomeDashboardPage extends StatefulWidget {
   static void invalidateCache() {
     _HomeDashboardPageState._cachedData = null;
     _HomeDashboardPageState._cachedBestSeries = null;
+    _HomeDashboardPageState._cachedStreak = null;
+    _HomeDashboardPageState._cachedRecentBadge = null;
+    _HomeDashboardPageState._cachedWeeklyChallenges = null;
   }
 
   /// 마지막으로 본 최고 점수(캐시 기준). 게임 종료 직후 "베스트 갱신" 판정용.
@@ -55,6 +58,9 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
   /// 캐싱된 대시보드 데이터 (페이지 재생성 시에도 유지)
   static HomeDashboardData? _cachedData;
   static GameSeries? _cachedBestSeries;
+  static AttendanceStreak? _cachedStreak;
+  static BadgeItem? _cachedRecentBadge;
+  static List<WeeklyChallenge>? _cachedWeeklyChallenges;
 
   HomeDashboardData? _data;
   GameSeries? _bestSeries;
@@ -72,6 +78,9 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
     super.initState();
     _data = _cachedData;
     _bestSeries = _cachedBestSeries;
+    _streak = _cachedStreak;
+    _recentBadge = _cachedRecentBadge;
+    _weeklyChallenges = _cachedWeeklyChallenges ?? const [];
     _isLoading = _cachedData == null;
     _fetchData();
     // 미읽음 알림 수는 전역 싱글톤이 관리. 대시보드 진입마다 동기화.
@@ -125,34 +134,31 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final userId = prefs.getString('user_id') ?? '1';
-      final data = await _apiService.fetchDashboardData(userId);
-      // 베스트 시리즈는 실패해도 대시보드 자체에는 영향 없도록 격리.
-      GameSeries? best;
-      try {
-        best = await _seriesService.getBest(userId);
-      } catch (_) {
-        best = null;
-      }
-      // 출석 streak / 최근 배지도 격리 (조회 실패는 카드만 숨김).
-      AttendanceStreak? streak;
-      BadgeItem? recentBadge;
-      try {
-        streak = await _badgesService.fetchStreak();
-      } catch (_) {
-        streak = null;
-      }
-      try {
-        final list = await _badgesService.fetchRecent(limit: 1);
-        recentBadge = list.isNotEmpty ? list.first : null;
-      } catch (_) {
-        recentBadge = null;
-      }
-      List<WeeklyChallenge> weekly = const [];
-      try {
-        weekly = await _challengesService.fetchWeekly();
-      } catch (_) {
-        weekly = const [];
-      }
+      // 메인 dashboard + 보조 4개 fetch를 병렬 실행.
+      // 보조 fetch는 각자 실패해도 그 카드만 숨기도록 catch로 격리한다.
+      final results = await Future.wait([
+        _apiService.fetchDashboardData(userId),
+        _seriesService
+            .getBest(userId)
+            .then<GameSeries?>((v) => v)
+            .onError<Object>((_, __) => null),
+        _badgesService
+            .fetchStreak()
+            .then<AttendanceStreak?>((v) => v)
+            .onError<Object>((_, __) => null),
+        _badgesService
+            .fetchRecent(limit: 1)
+            .then<BadgeItem?>((list) => list.isNotEmpty ? list.first : null)
+            .onError<Object>((_, __) => null),
+        _challengesService
+            .fetchWeekly()
+            .onError<Object>((_, __) => const <WeeklyChallenge>[]),
+      ]);
+      final data = results[0] as HomeDashboardData;
+      final best = results[1] as GameSeries?;
+      final streak = results[2] as AttendanceStreak?;
+      final recentBadge = results[3] as BadgeItem?;
+      final weekly = results[4] as List<WeeklyChallenge>;
       if (mounted) {
         setState(() {
           _data = data;
@@ -162,6 +168,9 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
           _weeklyChallenges = weekly;
           _cachedData = data;
           _cachedBestSeries = best;
+          _cachedStreak = streak;
+          _cachedRecentBadge = recentBadge;
+          _cachedWeeklyChallenges = weekly;
           _isLoading = false;
           _error = null;
         });
