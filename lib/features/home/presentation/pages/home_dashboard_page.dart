@@ -873,8 +873,6 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
       _TrendMetric.opens: Symbols.radio_button_unchecked,
     };
 
-    final titleSuffix = metricLabels[_selectedTrendMetric]!;
-
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -885,47 +883,69 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('최근 ${trend.length}경기 — $titleSuffix',
-              style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white : Colors.black)),
-          const SizedBox(height: 12),
-          // metric 토글 칩
-          Wrap(
-            spacing: 8,
-            runSpacing: 4,
-            children: _TrendMetric.values.map((metric) {
-              final selected = _selectedTrendMetric == metric;
-              return ChoiceChip(
-                avatar: Icon(
-                  metricIcons[metric]!,
-                  size: 14,
-                  color: selected
-                      ? Colors.white
-                      : (isDark ? AppColors.textSecondaryDark : Colors.grey),
+          // 제목 + 지표 드롭다운 (한 줄). 칩 4개가 좁은 화면에서 가려지던 문제 해소.
+          Row(
+            children: [
+              Expanded(
+                child: Text('최근 ${trend.length}경기',
+                    style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : Colors.black)),
+              ),
+              PopupMenuButton<_TrendMetric>(
+                tooltip: '지표 선택',
+                initialValue: _selectedTrendMetric,
+                onSelected: (m) =>
+                    setState(() => _selectedTrendMetric = m),
+                itemBuilder: (_) => _TrendMetric.values
+                    .map((m) => PopupMenuItem<_TrendMetric>(
+                          value: m,
+                          child: Row(children: [
+                            Icon(metricIcons[m]!,
+                                size: 18,
+                                color: _selectedTrendMetric == m
+                                    ? AppColors.primary
+                                    : (isDark
+                                        ? AppColors.textSecondaryDark
+                                        : Colors.black54)),
+                            const SizedBox(width: 10),
+                            Text(metricLabels[m]!,
+                                style: TextStyle(
+                                    fontWeight: _selectedTrendMetric == m
+                                        ? FontWeight.w600
+                                        : FontWeight.normal)),
+                          ]),
+                        ))
+                    .toList(),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(metricIcons[_selectedTrendMetric]!,
+                          size: 16, color: AppColors.primary),
+                      const SizedBox(width: 6),
+                      Text(metricLabels[_selectedTrendMetric]!,
+                          style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.primary)),
+                      const SizedBox(width: 2),
+                      const Icon(Symbols.expand_more,
+                          size: 18, color: AppColors.primary),
+                    ],
+                  ),
                 ),
-                label: Text(metricLabels[metric]!),
-                selected: selected,
-                onSelected: (_) => setState(() => _selectedTrendMetric = metric),
-                selectedColor: AppColors.primary,
-                backgroundColor:
-                    isDark ? AppColors.surfaceDark : Colors.grey.shade100,
-                labelStyle: TextStyle(
-                  fontSize: 12,
-                  color: selected
-                      ? Colors.white
-                      : (isDark ? AppColors.textSecondaryDark : Colors.black87),
-                ),
-                side: BorderSide(
-                  color: selected
-                      ? AppColors.primary
-                      : (isDark ? Colors.white24 : Colors.black12),
-                ),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
-              );
-            }).toList(),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
           SizedBox(
