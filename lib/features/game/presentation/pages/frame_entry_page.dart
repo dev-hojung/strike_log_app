@@ -110,21 +110,29 @@ class _FrameEntryPageState extends State<FrameEntryPage> {
     // 방 상태 업데이트 수신 (점수/통계 변경 포함)
     _socketService.on('roomStateUpdated', (data) {
       if (!mounted) return;
-      if (data['participants'] != null) {
-        final participants = data['participants'] as Map<String, dynamic>;
-        setState(() {
-          for (final userId in participants.keys) {
-            if (userId == _userId) continue;
-            final p = participants[userId];
-            _participantScores[userId] = (p?['score'] as int?) ?? 0;
-            _participantStats[userId] = (
-              strikes: (p?['strikes'] as int?) ?? 0,
-              spares: (p?['spares'] as int?) ?? 0,
-              opens: (p?['opens'] as int?) ?? 0,
-            );
-          }
+      if (data['participants'] == null) return;
+      final participants = data['participants'] as Map<String, dynamic>;
+      setState(() {
+        final serverKeys = participants.keys.toSet();
+        // 서버에 없는 참가자 제거 (퇴장/연결 끊김 반영)
+        _participantScores.removeWhere((k, _) => !serverKeys.contains(k));
+        _participantStats.removeWhere((k, _) => !serverKeys.contains(k));
+        _participants.removeWhere((p) {
+          final uid = p['userId']?.toString() ?? '';
+          return uid.isNotEmpty && !serverKeys.contains(uid);
         });
-      }
+        // 서버 정보로 갱신 (본인 제외)
+        for (final userId in participants.keys) {
+          if (userId == _userId) continue;
+          final p = participants[userId];
+          _participantScores[userId] = (p?['score'] as int?) ?? 0;
+          _participantStats[userId] = (
+            strikes: (p?['strikes'] as int?) ?? 0,
+            spares: (p?['spares'] as int?) ?? 0,
+            opens: (p?['opens'] as int?) ?? 0,
+          );
+        }
+      });
     });
 
     // 내기 게임: 방장이 아닌 참가자가 gameEnded 이벤트를 받아 BetResultPage로 이동

@@ -107,22 +107,26 @@ class _ClubGameSummaryPageState extends State<ClubGameSummaryPage> {
     _socketService.off('roomStateUpdated');
     _socketService.on('roomStateUpdated', (data) {
       if (!mounted) return;
-      if (data['participants'] != null) {
-        final ps = data['participants'] as Map<String, dynamic>;
-        setState(() {
-          for (final uid in ps.keys) {
-            if (uid == widget.userId) continue;
-            final p = ps[uid];
-            final score = p?['score'];
-            if (score is int) _scores[uid] = score;
-            _stats[uid] = (
-              strikes: (p?['strikes'] as int?) ?? _stats[uid]?.strikes ?? 0,
-              spares: (p?['spares'] as int?) ?? _stats[uid]?.spares ?? 0,
-              opens: (p?['opens'] as int?) ?? _stats[uid]?.opens ?? 0,
-            );
-          }
-        });
-      }
+      if (data['participants'] == null) return;
+      final ps = data['participants'] as Map<String, dynamic>;
+      setState(() {
+        final serverKeys = ps.keys.toSet();
+        // 서버에 없는 참가자 제거 (퇴장/연결 끊김 반영)
+        _scores.removeWhere((k, _) => !serverKeys.contains(k));
+        _stats.removeWhere((k, _) => !serverKeys.contains(k));
+        // 서버 정보로 갱신 (본인 제외)
+        for (final uid in ps.keys) {
+          if (uid == widget.userId) continue;
+          final p = ps[uid];
+          final score = p?['score'];
+          if (score is int) _scores[uid] = score;
+          _stats[uid] = (
+            strikes: (p?['strikes'] as int?) ?? _stats[uid]?.strikes ?? 0,
+            spares: (p?['spares'] as int?) ?? _stats[uid]?.spares ?? 0,
+            opens: (p?['opens'] as int?) ?? _stats[uid]?.opens ?? 0,
+          );
+        }
+      });
     });
 
     // P0-1: 내기 게임에서 호스트도 gameEnded 수신 → BetResultPage로 이동
@@ -602,6 +606,9 @@ class _ClubGameSummaryPageState extends State<ClubGameSummaryPage> {
       final uid = p['userId']?.toString() ?? '';
       final nickname = p['nickname']?.toString() ?? '?';
       final isMe = uid == widget.userId;
+      // 게임 중 나간 참가자는 _scores 동기화 시 제거됨 → 순위표에서도 제외.
+      // 본인은 _scores에 없어도 widget.totalScore로 항상 표시.
+      if (!isMe && !_scores.containsKey(uid)) continue;
       final score = isMe ? widget.totalScore : (_scores[uid] ?? 0);
       final stat = _stats[uid] ??
           (
