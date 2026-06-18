@@ -1005,6 +1005,9 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
     final userId = member['user_id']?.toString() ?? '';
     final isMe = userId == _currentUserId;
     final role = member['role'] ?? 'MEMBER';
+    // 플랫폼 어드민(앱 전체관리자)이면 ADMIN 뱃지를 숨긴다.
+    // 권한은 클럽 단위 ADMIN role 그대로 동작, UI 표시만 제거.
+    final isPlatformAdmin = member['is_platform_admin'] == true;
 
     return Container(
       padding: const EdgeInsets.all(2),
@@ -1097,7 +1100,7 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
                           ),
                         ),
                       ],
-                      if (role == 'ADMIN' && !isMe) ...[
+                      if (role == 'ADMIN' && !isMe && !isPlatformAdmin) ...[
                         const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),

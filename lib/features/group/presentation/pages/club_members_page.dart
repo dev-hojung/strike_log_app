@@ -305,6 +305,8 @@ class _ClubMembersPageState extends State<ClubMembersPage> {
     final role = member['role']?.toString() ?? 'MEMBER';
     final isAdmin = role == 'ADMIN';
     final isMe = userId == _myUserId;
+    // 플랫폼 어드민(앱 전체관리자)은 운영자 뱃지를 숨긴다 (UI만; 권한은 그대로).
+    final isPlatformAdmin = member['is_platform_admin'] == true;
     final avgScore = (member['avg_score'] as num?)?.toDouble();
 
     return ListTile(
@@ -334,7 +336,7 @@ class _ClubMembersPageState extends State<ClubMembersPage> {
             const SizedBox(width: 6),
             _badge('나', color: AppColors.primary),
           ],
-          if (isAdmin) ...[
+          if (isAdmin && !isPlatformAdmin) ...[
             const SizedBox(width: 6),
             _badge('운영자', color: const Color(0xFFFBBF24)),
           ],
