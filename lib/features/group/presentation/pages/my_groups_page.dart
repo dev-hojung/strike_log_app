@@ -10,6 +10,7 @@ import '../../../../core/services/app_logger.dart';
 import '../../../../core/services/pending_join_requests_service.dart';
 import '../../../../core/widgets/avatar_image.dart';
 import '../../../../core/widgets/error_retry_view.dart';
+import '../../../../core/widgets/main_container.dart';
 import '../../data/services/group_creation_requests_service.dart';
 import '../../data/services/groups_api_service.dart';
 import 'club_join_requests_page.dart';
@@ -868,6 +869,9 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
         ),
       );
       await _fetchData();
+      // 더 머물 클럽 컨텍스트가 없으므로 홈 탭으로 이동.
+      if (!mounted) return;
+      context.findAncestorStateOfType<MainContainerState>()?.switchToTab(0);
     } else {
       // 위임 등 일부 변경만 있어도 멤버 권한 표시가 바뀌므로 동기화.
       await _fetchData();
@@ -920,6 +924,9 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
         ),
       );
       await _fetchData();
+      // 더 머물 클럽 컨텍스트가 없으므로 홈 탭으로 이동.
+      if (!mounted) return;
+      context.findAncestorStateOfType<MainContainerState>()?.switchToTab(0);
     } on DioException catch (e) {
       if (!mounted) return;
       final msg = e.response?.data is Map

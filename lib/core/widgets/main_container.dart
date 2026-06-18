@@ -25,10 +25,10 @@ class MainContainer extends StatefulWidget {
   const MainContainer({super.key, this.initialTabIndex = 0});
 
   @override
-  State<MainContainer> createState() => _MainContainerState();
+  State<MainContainer> createState() => MainContainerState();
 }
 
-class _MainContainerState extends State<MainContainer> with RouteAware {
+class MainContainerState extends State<MainContainer> with RouteAware {
   /// 현재 선택된 탭의 인덱스입니다.
   late int _selectedIndex = widget.initialTabIndex;
   bool _isCheckingClub = false;
@@ -65,6 +65,17 @@ class _MainContainerState extends State<MainContainer> with RouteAware {
   void dispose() {
     appRouteObserver.unsubscribe(this);
     super.dispose();
+  }
+
+  /// 외부에서 탭을 전환하기 위한 진입점.
+  /// 예) 클럽 탈퇴 후 클럽 탭에 더 머물 이유가 없을 때 홈(0)으로 이동.
+  void switchToTab(int index) {
+    if (!mounted) return;
+    if (index == _selectedIndex) return;
+    setState(() {
+      _selectedIndex = index;
+      _refreshKey = UniqueKey();
+    });
   }
 
   /// 위쪽 라우트가 pop되어 MainContainer가 다시 topmost가 되었을 때 호출.
