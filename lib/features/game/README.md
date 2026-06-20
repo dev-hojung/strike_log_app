@@ -5,7 +5,10 @@
 백엔드 응답에 동봉된 신규 배지를 모달로 노출.
 
 ## 페이지
-- `GameModePage` — 모드 선택 (개인/시리즈/클럽), 위치 입력
+- `GameModePage` — 모드 선택 (개인/시리즈/클럽/내기), 위치 입력
+  - 노출 조건: 개인·시리즈·내기는 누구나. **클럽 게임은 클럽 무료 체험(`club_trial_status == 'active'`)일 때만 노출.**
+  - 내기 게임은 클럽 불필요(방 코드로 친구 초대) — 서버도 `mode='bet'`은 체험 검사 면제(`game-rooms.gateway.ts`).
+- `GameRoomPage` — 클럽/내기 게임 대기실 (Socket.IO). `mode='bet'`이면 핸디캡 UI.
 - `FrameEntryPage` — 10프레임 점수 입력 + 클럽 게임 라이브 순위표 + 시리즈 인디케이터
 - `GameSummaryPage` — 단일 게임 결과 (베스트 갱신 배너, 스트릭 하이라이트)
 - `SeriesSummaryPage` — 시리즈 종합 결과

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/services/user_profile_cache.dart';
 import '../../data/services/series_api_service.dart';
 import 'frame_entry_page.dart';
 import 'game_room_page.dart';
@@ -12,8 +13,31 @@ import '../widgets/location_input_dialog.dart';
 /// - 개인 게임: 혼자 점수 기록 (단일)
 /// - 시리즈 게임: 한 세션의 여러 게임을 묶어 기록 (3/6게임 기본 옵션)
 /// - 클럽 게임: 소켓으로 방 생성, 여러 유저가 참가하여 점수 입력
-class GameModePage extends StatelessWidget {
+class GameModePage extends StatefulWidget {
   const GameModePage({super.key});
+
+  @override
+  State<GameModePage> createState() => _GameModePageState();
+}
+
+class _GameModePageState extends State<GameModePage> {
+  // 클럽 게임은 클럽 무료 체험이 active일 때만 노출 (서버 game-rooms 게이트와 동일 신호).
+  // 내기/시리즈/개인은 누구나 사용 가능.
+  bool _clubTrialActive =
+      UserProfileCache.cached?['club_trial_status'] == 'active';
+
+  @override
+  void initState() {
+    super.initState();
+    // 최신 체험 상태로 갱신 (stale-while-revalidate).
+    UserProfileCache.refresh().then((_) {
+      if (!mounted) return;
+      final active = UserProfileCache.cached?['club_trial_status'] == 'active';
+      if (active != _clubTrialActive) {
+        setState(() => _clubTrialActive = active);
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -103,18 +127,20 @@ class GameModePage extends StatelessWidget {
             ),
             const SizedBox(height: 16),
 
-            // 클럽 게임
-            _buildModeCard(
-              context,
-              icon: Symbols.groups,
-              title: '클럽 게임',
-              description: '방을 만들어 클럽 멤버들과 함께 점수를 기록합니다.',
-              iconBgColor: const Color(0xFF4CAF50).withValues(alpha: 0.1),
-              iconColor: const Color(0xFF4CAF50),
-              isDark: isDark,
-              onTap: () => _startClubGame(context),
-            ),
-            const SizedBox(height: 16),
+            // 클럽 게임 (클럽 무료 체험이 active일 때만 노출)
+            if (_clubTrialActive) ...[
+              _buildModeCard(
+                context,
+                icon: Symbols.groups,
+                title: '클럽 게임',
+                description: '방을 만들어 클럽 멤버들과 함께 점수를 기록합니다.',
+                iconBgColor: const Color(0xFF4CAF50).withValues(alpha: 0.1),
+                iconColor: const Color(0xFF4CAF50),
+                isDark: isDark,
+                onTap: () => _startClubGame(context),
+              ),
+              const SizedBox(height: 16),
+            ],
 
             // 내기 게임
             _buildModeCard(
