@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:io' show Platform;
 
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -127,7 +127,7 @@ class FcmService {
 
     try {
       _token = await _messaging.getToken();
-      debugPrint('[FCM] token: $_token');
+      if (kDebugMode) debugPrint('[FCM] token: $_token');
     } catch (e) {
       debugPrint('[FCM] getToken skipped: $e');
       _token = null;
@@ -140,7 +140,7 @@ class FcmService {
     try {
       _messaging.onTokenRefresh.listen((t) async {
         _token = t;
-        debugPrint('[FCM] token refreshed: $t');
+        if (kDebugMode) debugPrint('[FCM] token refreshed: $t');
         // 토큰이 바뀌면 마지막 성공 캐시 무효화 후 재등록 시도.
         _lastRegisteredToken = null;
         unawaited(_ensureTokenRegistered(reason: 'refresh'));

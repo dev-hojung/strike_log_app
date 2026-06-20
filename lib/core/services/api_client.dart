@@ -96,9 +96,13 @@ class ApiClient {
       },
     ));
 
-    dio.interceptors.add(LogInterceptor(
-      requestBody: true,
-      responseBody: true,
-    ));
+    // LogInterceptor는 요청/응답 바디(JWT·비밀번호 등)를 logcat에 남기므로
+    // release 빌드에서는 절대 등록하지 않는다.
+    if (!kReleaseMode) {
+      dio.interceptors.add(LogInterceptor(
+        requestBody: true,
+        responseBody: true,
+      ));
+    }
   }
 }

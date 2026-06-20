@@ -18,10 +18,12 @@ class AppLogger {
     String? context,
     Map<String, dynamic>? extra,
   }) async {
-    // 콘솔 출력 (개발 모드에서 보임)
-    debugPrint('[AppLogger] ${context ?? ''} $error');
-    if (stackTrace != null) {
-      debugPrintStack(stackTrace: stackTrace, label: context);
+    // 콘솔 출력 (개발 모드 전용 — release logcat 유출 방지)
+    if (kDebugMode) {
+      debugPrint('[AppLogger] ${context ?? ''} $error');
+      if (stackTrace != null) {
+        debugPrintStack(stackTrace: stackTrace, label: context);
+      }
     }
 
     // Sentry 전송
@@ -43,6 +45,7 @@ class AppLogger {
 
   /// 단순 정보 메시지.
   static void info(String message) {
-    debugPrint('[AppLogger][info] $message');
+    // release logcat에 내부 정보(소켓 ID·이벤트 등)가 남지 않도록 debug 전용.
+    if (kDebugMode) debugPrint('[AppLogger][info] $message');
   }
 }
