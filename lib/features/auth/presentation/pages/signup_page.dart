@@ -100,6 +100,7 @@ class _SignupPageState extends State<SignupPage> {
       final response = await dio.post('/email/send-otp', data: {'email': email});
 
       if (response.statusCode == 200 || response.statusCode == 201) {
+        if (!mounted) return;
         setState(() {
           _isCodeSent = true;
           _isLoading = false;
@@ -115,14 +116,13 @@ class _SignupPageState extends State<SignupPage> {
         throw Exception('서버 응답 오류');
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
       });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('발송 실패: $e')),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('발송 실패: $e')),
+      );
     }
   }
 
@@ -153,6 +153,7 @@ class _SignupPageState extends State<SignupPage> {
 
       if (response.statusCode == 200) {
         _timer?.cancel();
+        if (!mounted) return;
         setState(() {
           _isEmailVerified = true;
           _isLoading = false;
@@ -167,14 +168,13 @@ class _SignupPageState extends State<SignupPage> {
         throw Exception('서버 응답 오류');
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
       });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('인증번호가 일치하지 않거나 만료되었습니다.')),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('인증번호가 일치하지 않거나 만료되었습니다.')),
+      );
     }
   }
 
@@ -245,14 +245,13 @@ class _SignupPageState extends State<SignupPage> {
         throw Exception('회원가입 실패: 서버 응답 오류');
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
       });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('오류 발생: $e')),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('오류 발생: $e')),
+      );
     }
   }
 

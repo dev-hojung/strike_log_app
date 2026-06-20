@@ -133,7 +133,13 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
   Future<void> _fetchData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final userId = prefs.getString('user_id') ?? '1';
+      final userId = prefs.getString('user_id');
+      if (userId == null) {
+        // 세션 유실 시 다른 사용자(id '1') 데이터를 불러오지 않는다.
+        // 인증 만료는 401 가드가 로그인으로 보낸다.
+        if (mounted) setState(() => _isLoading = false);
+        return;
+      }
       // 메인 dashboard + 보조 4개 fetch를 병렬 실행.
       // 보조 fetch는 각자 실패해도 그 카드만 숨기도록 catch로 격리한다.
       final results = await Future.wait([

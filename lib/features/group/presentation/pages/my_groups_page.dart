@@ -825,7 +825,7 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
       context,
       MaterialPageRoute(
         builder: (_) => ClubLeaderboardPage(
-          clubId: clubId is int ? clubId : int.parse(clubId.toString()),
+          clubId: clubId is int ? clubId : (int.tryParse(clubId.toString()) ?? 0),
           clubName: _club?['name']?.toString() ?? '',
         ),
       ),
@@ -839,7 +839,7 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
       context,
       MaterialPageRoute(
         builder: (_) => ClubAnnouncementsPage(
-          groupId: clubId is int ? clubId : int.parse(clubId.toString()),
+          groupId: clubId is int ? clubId : (int.tryParse(clubId.toString()) ?? 0),
           groupName: _club?['name']?.toString() ?? '',
           isAdmin: _isClubLeader(),
         ),
@@ -854,7 +854,7 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
       context,
       MaterialPageRoute(
         builder: (_) => ClubMembersPage(
-          groupId: clubId is int ? clubId : int.parse(clubId.toString()),
+          groupId: clubId is int ? clubId : (int.tryParse(clubId.toString()) ?? 0),
           groupName: _club?['name']?.toString() ?? '',
         ),
       ),
@@ -912,7 +912,7 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
     try {
       final api = GroupsApiService();
       final res = await api.leaveGroup(
-        clubId is int ? clubId : int.parse(clubId.toString()),
+        clubId is int ? clubId : (int.tryParse(clubId.toString()) ?? 0),
       );
       if (!mounted) return;
       final groupDeleted = res['group_deleted'] == true;

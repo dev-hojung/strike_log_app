@@ -45,8 +45,12 @@ void main() async {
   // (첫 실행 시 폰트가 시스템 폰트 → Lexend로 깜빡이며 바뀌는 현상 방지)
   GoogleFonts.config.allowRuntimeFetching = false;
 
-  // 환경변수(.env) 로드
-  await dotenv.load(fileName: ".env");
+  // 환경변수(.env) 로드. 애셋 누락 등으로 실패해도 앱이 죽지 않도록 방어.
+  try {
+    await dotenv.load(fileName: ".env");
+  } catch (e) {
+    debugPrint('[main] .env load failed: $e');
+  }
 
   // 한국어 로케일 데이터 초기화. DateFormat(..., 'ko_KR') 호출 전 필수.
   await initializeDateFormatting('ko_KR');

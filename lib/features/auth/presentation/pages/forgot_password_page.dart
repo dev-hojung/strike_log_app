@@ -46,7 +46,10 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     _timer?.cancel();
     setState(() => _remainingSec = 300);
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {
-      if (!mounted) return;
+      if (!mounted) {
+        t.cancel();
+        return;
+      }
       if (_remainingSec <= 1) {
         t.cancel();
         setState(() => _remainingSec = 0);
