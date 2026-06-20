@@ -5,8 +5,13 @@ import '../../data/services/inquiry_api_service.dart';
 
 /// 관리자에게 문의하는 폼 페이지.
 /// 카테고리 / 제목 / 내용 / 회신 이메일(선택) 입력 후 POST /inquiries 호출.
+///
+/// [initialCategory]를 지정하면 카테고리 드롭다운의 초기값으로 설정된다.
+/// 예: `InquiryPage(initialCategory: 'club_trial')`
 class InquiryPage extends StatefulWidget {
-  const InquiryPage({super.key});
+  const InquiryPage({super.key, this.initialCategory});
+
+  final String? initialCategory;
 
   @override
   State<InquiryPage> createState() => _InquiryPageState();
@@ -19,13 +24,20 @@ class _InquiryPageState extends State<InquiryPage> {
     ('bug', '버그 신고'),
   ];
 
-  String _category = 'general';
+  late String _category;
   final _subjectController = TextEditingController();
   final _bodyController = TextEditingController();
   final _contactEmailController = TextEditingController();
   bool _submitting = false;
 
   final _service = InquiryApiService();
+
+  @override
+  void initState() {
+    super.initState();
+    final valid = _categories.any((c) => c.$1 == widget.initialCategory);
+    _category = valid ? widget.initialCategory! : 'general';
+  }
 
   @override
   void dispose() {

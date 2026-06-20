@@ -3,7 +3,9 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/services/ads_service.dart';
 import '../../../../core/services/socket_service.dart';
+import '../../../../core/services/user_profile_cache.dart';
 import '../../../badges/presentation/widgets/new_badges_dialog.dart';
 import '../../../home/presentation/pages/home_dashboard_page.dart';
 import '../../data/bowling_scorer.dart';
@@ -282,10 +284,19 @@ class _ClubGameSummaryPageState extends State<ClubGameSummaryPage> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('경기가 성공적으로 저장되었습니다.')),
           );
-          // 내기 게임: 저장 완료 후 gameEnded 이벤트를 이 페이지에서 직접 수신해
-          // BetResultPage로 이동한다. (_onGameEnded 참고)
+          // 내기 게임: 광고 표시 후 gameEnded 이벤트 대기 상태로 머묾.
+          // 클럽 게임(비내기): 광고 없이 홈으로 복귀.
           if (widget.isBetGame) {
-            // 저장 완료 표시(_isSaved=true)된 상태로 머묾. gameEnded 수신 시 _onGameEnded가 이동.
+            final isPlatformAdmin =
+                UserProfileCache.cached?['is_platform_admin'] == true;
+            // 광고가 끝나도 네비게이션은 _onGameEnded가 처리하므로 onClose는 no-op.
+            AdsService.instance.maybeShowInterstitial(
+              isPlatformAdmin: isPlatformAdmin,
+              onClose: () {
+                // gameEnded 수신 시 _onGameEnded가 BetResultPage로 이동.
+                // 광고 닫힘 후 아무 동작도 필요 없음.
+              },
+            );
           } else {
             Navigator.of(context).popUntil((route) => route.isFirst);
           }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/services/ads_service.dart';
 import '../../../../core/services/socket_service.dart';
 import '../../data/bowling_scorer.dart';
 import 'bet_result_page.dart';
@@ -95,6 +96,11 @@ class _FrameEntryPageState extends State<FrameEntryPage> {
     super.initState();
     if (widget.isClubGame) {
       _initClubGame();
+    }
+    // 개인 게임 또는 내기 게임이면 결과 화면 도달 전에 광고 미리 로드.
+    // 클럽 게임(비내기)은 광고 없음.
+    if (!widget.isClubGame || widget.isBetGame) {
+      AdsService.instance.preloadInterstitial();
     }
   }
 

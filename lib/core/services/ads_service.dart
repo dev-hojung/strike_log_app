@@ -1,0 +1,174 @@
+import 'dart:async';
+import 'dart:io' show Platform;
+
+import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:google_mobile_ads/google_mobile_ads.dart';
+
+/// AdMob 전면 광고(Interstitial) 싱글톤 서비스.
+///
+/// 사용 흐름:
+/// 1. `main()`에서 `await AdsService.instance.initialize()` 호출.
+/// 2. 게임 시작 시(FrameEntryPage.initState) `preloadInterstitial()` 호출 — 결과 화면 도달 전에 광고 로드.
+/// 3. 저장 성공 후 `maybeShowInterstitial()` 호출 — 광고 show 후 콜백으로 기존 네비게이션 실행.
+class AdsService {
+  AdsService._();
+  static final AdsService instance = AdsService._();
+
+  // Google 테스트 광고 ID (출시 직전 실제 ID로 교체)
+  static const _androidInterstitialAdUnitId =
+      'ca-app-pub-3940256099942544/1033173712';
+
+  bool _initialized = false;
+  InterstitialAd? _loadedAd;
+  bool _isLoading = false;
+
+  /// MobileAds SDK 초기화. idempotent — 중복 호출 safe.
+  Future<void> initialize() async {
+    if (_initialized) return;
+    if (!Platform.isAndroid) {
+      _initialized = true;
+      return;
+    }
+    try {
+      await MobileAds.instance.initialize();
+      _initialized = true;
+      debugPrint('[AdsService] MobileAds initialized');
+    } catch (e) {
+      debugPrint('[AdsService] initialize error: $e');
+    }
+  }
+
+  /// 전면 광고를 백그라운드로 미리 로드.
+  /// 동시 다중 호출 방지: 로딩 중이거나 이미 로드된 광고가 있으면 skip.
+  void preloadInterstitial() {
+    if (!_initialized) return;
+    if (!Platform.isAndroid) return;
+    if (_isLoading || _loadedAd != null) return;
+    _isLoading = true;
+
+    InterstitialAd.load(
+      adUnitId: _androidInterstitialAdUnitId,
+      request: const AdRequest(),
+      adLoadCallback: InterstitialAdLoadCallback(
+        onAdLoaded: (ad) {
+          _loadedAd = ad;
+          _isLoading = false;
+          debugPrint('[AdsService] interstitial preloaded');
+        },
+        onAdFailedToLoad: (error) {
+          _loadedAd = null;
+          _isLoading = false;
+          debugPrint('[AdsService] preload failed: ${error.message}');
+        },
+      ),
+    );
+  }
+
+  /// 전면 광고를 표시한다.
+  ///
+  /// - [isPlatformAdmin] == true면 광고 없이 즉시 [onClose] 호출.
+  /// - iOS면 광고 없이 즉시 [onClose] 호출.
+  /// - preload된 광고가 있으면 즉시 show → 닫힘/실패 시 [onClose] 호출 후 다음 광고 preload.
+  /// - preload된 광고가 없으면 500ms 타임아웃으로 동기 로드 시도.
+  ///   성공하면 show, 실패/타임아웃이면 [onClose] 즉시 호출.
+  /// - 모든 예외는 silent fail — 광고 없이 [onClose] 호출 보장.
+  Future<void> maybeShowInterstitial({
+    required bool isPlatformAdmin,
+    required void Function() onClose,
+  }) async {
+    // 면제: 플랫폼 어드민
+    if (isPlatformAdmin) {
+      onClose();
+      return;
+    }
+
+    // iOS는 비활성
+    if (!Platform.isAndroid) {
+      onClose();
+      return;
+    }
+
+    if (!_initialized) {
+      onClose();
+      return;
+    }
+
+    try {
+      // preload된 광고가 있으면 즉시 사용
+      if (_loadedAd != null) {
+        await _showAd(_loadedAd!, onClose);
+        return;
+      }
+
+      // 500ms 타임아웃으로 sync load 시도
+      final ad = await _loadWithTimeout(
+        const Duration(milliseconds: 500),
+      );
+      if (ad != null) {
+        await _showAd(ad, onClose);
+      } else {
+        onClose();
+      }
+    } catch (e) {
+      debugPrint('[AdsService] maybeShowInterstitial error: $e');
+      onClose();
+    }
+  }
+
+  /// 광고를 표시하고 닫힘/실패 시 [onClose]를 호출한다.
+  /// 표시 후 다음 광고를 미리 로드한다.
+  Future<void> _showAd(InterstitialAd ad, void Function() onClose) async {
+    _loadedAd = null;
+
+    final completer = Completer<void>();
+
+    ad.fullScreenContentCallback = FullScreenContentCallback(
+      onAdDismissedFullScreenContent: (a) {
+        a.dispose();
+        if (!completer.isCompleted) completer.complete();
+      },
+      onAdFailedToShowFullScreenContent: (a, error) {
+        a.dispose();
+        debugPrint('[AdsService] show failed: ${error.message}');
+        if (!completer.isCompleted) completer.complete();
+      },
+    );
+
+    try {
+      await ad.show();
+    } catch (e) {
+      debugPrint('[AdsService] ad.show() error: $e');
+      ad.dispose();
+      if (!completer.isCompleted) completer.complete();
+    }
+
+    await completer.future;
+    onClose();
+    // 다음 표시를 위해 미리 로드
+    preloadInterstitial();
+  }
+
+  /// [timeout] 내에 광고 로드를 시도한다. 실패/타임아웃이면 null 반환.
+  Future<InterstitialAd?> _loadWithTimeout(Duration timeout) async {
+    final completer = Completer<InterstitialAd?>();
+
+    InterstitialAd.load(
+      adUnitId: _androidInterstitialAdUnitId,
+      request: const AdRequest(),
+      adLoadCallback: InterstitialAdLoadCallback(
+        onAdLoaded: (ad) {
+          if (!completer.isCompleted) completer.complete(ad);
+        },
+        onAdFailedToLoad: (error) {
+          debugPrint('[AdsService] sync load failed: ${error.message}');
+          if (!completer.isCompleted) completer.complete(null);
+        },
+      ),
+    );
+
+    return completer.future.timeout(timeout, onTimeout: () {
+      debugPrint('[AdsService] sync load timed out');
+      return null;
+    });
+  }
+}

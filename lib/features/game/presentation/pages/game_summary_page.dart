@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/services/ads_service.dart';
 import '../../../../core/services/share_capture.dart';
+import '../../../../core/services/user_profile_cache.dart';
 import '../../../badges/presentation/widgets/new_badges_dialog.dart';
 import '../../../home/presentation/pages/home_dashboard_page.dart';
 import '../../data/bowling_scorer.dart';
@@ -249,6 +251,20 @@ class _GameSummaryPageState extends State<GameSummaryPage> {
     messenger.showSnackBar(
       const SnackBar(content: Text('게임이 성공적으로 저장되었습니다.')),
     );
+
+    // 광고 표시 후 기존 네비게이션 흐름을 onClose 콜백으로 실행.
+    final isPlatformAdmin =
+        UserProfileCache.cached?['is_platform_admin'] == true;
+    await AdsService.instance.maybeShowInterstitial(
+      isPlatformAdmin: isPlatformAdmin,
+      onClose: () => _navigateAfterSave(result),
+    );
+  }
+
+  /// 광고 닫힘(또는 면제) 후 실제 네비게이션을 수행.
+  Future<void> _navigateAfterSave(GameSaveResult result) async {
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
 
     if (widget.hasNextSeriesGame) {
       final shouldContinue = await _askContinueSeries();

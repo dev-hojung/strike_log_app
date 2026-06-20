@@ -8,6 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'core/services/ads_service.dart';
 import 'core/services/api_client.dart';
 import 'core/services/auth_token_storage.dart';
 import 'core/services/fcm_service.dart';
@@ -19,6 +20,7 @@ import 'core/theme/app_theme.dart';
 import 'core/widgets/main_container.dart';
 import 'features/auth/presentation/pages/login_page.dart';
 import 'features/badges/data/services/badges_api_service.dart';
+import 'features/inquiry/presentation/widgets/trial_expired_dialog.dart';
 
 /// 앱 전역 RouteObserver.
 /// MainContainer가 RouteAware로 구독해, 다른 라우트가 pop되어 다시 top이 될 때마다
@@ -53,6 +55,8 @@ void main() async {
   await AuthTokenStorage.init();
   // 프로필 캐시를 메모리로 미리 로드 (페이지 initState에서 동기 접근)
   await UserProfileCache.init();
+  // AdMob SDK 초기화 (Android 전면 광고)
+  await AdsService.instance.initialize();
 
   // 401 수신 시 강제 로그아웃 후 로그인 화면으로 이동
   ApiClient.onUnauthorized = () async {
@@ -62,6 +66,14 @@ void main() async {
       MaterialPageRoute(builder: (_) => const LoginPage()),
       (_) => false,
     );
+  };
+
+  // 403 + club_trial_expired 수신 시 TrialExpiredDialog 표시
+  ApiClient.onClubTrialExpired = () {
+    final context = appNavigatorKey.currentContext;
+    if (context != null) {
+      TrialExpiredDialog.show(context);
+    }
   };
 
   final sentryDsn = dotenv.env['SENTRY_DSN'];

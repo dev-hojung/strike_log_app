@@ -56,6 +56,10 @@ class SocketService {
 
     _socket!.onAny((event, data) {
       AppLogger.info('[Socket] Event: $event, Data: $data');
+      // 소켓 에러 이벤트 중 club_trial_expired 처리 — ApiClient의 동일 콜백으로 위임
+      if (event == 'error' && data is Map && data['code'] == 'club_trial_expired') {
+        ApiClient.onClubTrialExpired?.call();
+      }
     });
 
     _socket!.onDisconnect((_) {

@@ -7,12 +7,17 @@ import 'auth_token_storage.dart';
 ///
 /// - `Authorization: Bearer <token>` 자동 부착
 /// - 401 수신 시 [onUnauthorized] 콜백 호출 (메인에서 로그아웃 처리에 연결)
+/// - 403 + code='club_trial_expired' 수신 시 [onClubTrialExpired] 콜백 호출
 class ApiClient {
   static final ApiClient _instance = ApiClient._internal();
   late Dio dio;
 
   /// 401 수신 시 실행할 콜백. main.dart에서 강제 로그아웃 구현에 사용.
   static void Function()? onUnauthorized;
+
+  /// 403 + club_trial_expired 수신 시 실행할 콜백.
+  /// main.dart에서 appNavigatorKey를 이용해 TrialExpiredDialog 표시에 연결한다.
+  static void Function()? onClubTrialExpired;
 
   /// 동시에 여러 요청이 401을 받을 때 [onUnauthorized]가 중복 호출되는 것을
   /// 방지하기 위한 가드. 재로그인 성공 시 [resetUnauthorizedGuard]로 해제.
@@ -79,6 +84,12 @@ class ApiClient {
           if (!_handlingUnauthorized) {
             _handlingUnauthorized = true;
             onUnauthorized?.call();
+          }
+        } else if (e.response?.statusCode == 403) {
+          final data = e.response?.data;
+          final code = data is Map ? data['code'] : null;
+          if (code == 'club_trial_expired') {
+            onClubTrialExpired?.call();
           }
         }
         handler.next(e);
