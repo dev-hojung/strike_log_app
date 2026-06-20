@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' show GlobalKey;
+import 'package:flutter/widgets.dart' show WidgetsBinding;
 import 'package:flutter/rendering.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -30,10 +31,10 @@ class ShareCapture {
         debugPrint('[ShareCapture] RepaintBoundary not found for key');
         return false;
       }
-      // 위젯이 완전히 페인트된 후에 호출되도록 한 프레임 대기.
-      if (boundary.debugNeedsPaint) {
-        await Future<void>.delayed(const Duration(milliseconds: 50));
-      }
+      // 위젯이 완전히 페인트된 후에 캡처되도록 다음 프레임 종료를 대기.
+      // 주의: RenderObject.debugNeedsPaint 는 release/profile 빌드에서
+      // (assert 제거로 인해) LateInitializationError 를 던지므로 사용 금지.
+      await WidgetsBinding.instance.endOfFrame;
 
       final ui.Image image = await boundary.toImage(pixelRatio: pixelRatio);
       final byteData =
