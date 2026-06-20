@@ -1,20 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../features/home/presentation/pages/home_dashboard_page.dart';
 import '../../features/group/presentation/pages/my_groups_page.dart';
 import '../services/pending_join_requests_service.dart';
 import '../../features/game/presentation/pages/game_mode_page.dart';
-import '../../features/game/presentation/pages/frame_entry_page.dart';
 import '../../features/game/presentation/pages/game_history_page.dart';
-import '../../features/game/presentation/widgets/location_input_dialog.dart';
 import '../../features/game/data/services/game_draft_repository.dart';
 import '../../features/game/data/services/game_save_service.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
 import '../../features/system_notices/data/services/system_notices_service.dart';
 import '../../main.dart' show appRouteObserver;
 import '../constants/app_colors.dart';
-import '../services/api_client.dart';
 
 /// 앱의 주요 내비게이션 구조를 담당하는 위젯입니다.
 ///
@@ -31,7 +27,6 @@ class MainContainer extends StatefulWidget {
 class MainContainerState extends State<MainContainer> with RouteAware {
   /// 현재 선택된 탭의 인덱스입니다.
   late int _selectedIndex = widget.initialTabIndex;
-  bool _isCheckingClub = false;
 
   /// 페이지 갱신을 위한 키 (값이 바뀌면 페이지가 재생성됨)
   Key _refreshKey = UniqueKey();
@@ -230,61 +225,15 @@ class MainContainerState extends State<MainContainer> with RouteAware {
     ProfilePage(key: _refreshKey),
   ];
 
-  Future<void> _startIndividualGame() async {
-    final location = await showLocationInputDialog(context);
-    if (location != null && mounted) {
-      // 게임 종료 후 대시보드 갱신은 RouteAware.didPopNext가 처리
-      // (pushReplacement 체인 환경에서는 await가 너무 이르게 resolve되므로
-      //  여기서 refresh 콜백을 걸면 실제 저장 전에 stale 데이터로 리프레시됨)
-      await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) =>
-              FrameEntryPage(isClubGame: false, location: location),
-        ),
-      );
-    }
-  }
-
   Future<void> _onAddButtonPressed() async {
-    if (_isCheckingClub) return;
-    setState(() {
-      _isCheckingClub = true;
-    });
-
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final userId = prefs.getString('user_id');
-      if (userId == null) {
-        setState(() { _isCheckingClub = false; });
-        await _startIndividualGame();
-        return;
-      }
-
-      final response = await ApiClient().dio.get('/groups/me');
-      final groups = response.data;
-
-      if (mounted) {
-        setState(() { _isCheckingClub = false; });
-        if (groups is List && groups.isNotEmpty) {
-          // 클럽(그룹)이 있는 경우 게임 모드 선택 페이지로 이동
-          // (저장 후 대시보드 갱신은 RouteAware.didPopNext가 담당)
-          await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const GameModePage()),
-          );
-        } else {
-          // 클럽이 없는 경우 개인 게임 바로 시작
-          await _startIndividualGame();
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() { _isCheckingClub = false; });
-        // 오류 발생 시 기본적으로 개인 게임 시작
-        await _startIndividualGame();
-      }
-    }
+    // 항상 게임 모드 선택 페이지로 이동한다.
+    // 개인/시리즈/내기는 누구나 사용 가능하고, 클럽 게임은 GameModePage가
+    // 클럽 구독 상태(/groups/me subscription_status)로 판단해 노출한다.
+    // 저장 후 대시보드 갱신은 RouteAware.didPopNext가 담당.
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const GameModePage()),
+    );
   }
 
   @override
@@ -322,13 +271,7 @@ class MainContainerState extends State<MainContainer> with RouteAware {
                 ),
               ],
             ),
-            child: _isCheckingClub 
-                ? const SizedBox(
-                    width: 24, 
-                    height: 24, 
-                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
-                  )
-                : const Icon(Symbols.add, color: Colors.white, size: 28),
+            child: const Icon(Symbols.add, color: Colors.white, size: 28),
           ),
         ),
       ),
