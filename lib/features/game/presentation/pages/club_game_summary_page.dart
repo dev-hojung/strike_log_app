@@ -656,7 +656,9 @@ class _ClubGameSummaryPageState extends State<ClubGameSummaryPage> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final now = DateTime.now();
-    final formattedDate = DateFormat('yyyy년 MM월 dd일').format(now);
+    // 표시 날짜는 게임 시작 시각 기준(자정 넘겨 저장 시 화면/서버 날짜 불일치 방지).
+    final formattedDate =
+        DateFormat('yyyy년 MM월 dd일').format(widget.gameStartedAt ?? now);
     final bgColor = isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
     final textColor = isDark ? Colors.white : AppColors.textPrimaryLight;
 

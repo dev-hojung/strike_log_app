@@ -40,7 +40,8 @@ class GameDraftRepository {
   Future<GameDraft> addDraft(Map<String, dynamic> payload) async {
     final drafts = await getAllDrafts();
     final draft = GameDraft(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      // 동일 마이크로초 내 동시 생성 충돌 방지: 길이 + payload 해시 접미.
+      id: '${DateTime.now().microsecondsSinceEpoch}_${drafts.length}_${payload.hashCode}',
       payload: payload,
       failedAt: DateTime.now(),
     );

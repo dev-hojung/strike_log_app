@@ -97,35 +97,44 @@ class MainContainerState extends State<MainContainer> with RouteAware {
 
   /// 저장 실패로 로컬에 보관된 드래프트들을 순차 재시도.
   /// 성공한 건은 저장소에서 제거하고, 결과를 MaterialBanner로 안내.
+  bool _isRetryingDrafts = false;
+
   Future<void> _retryPendingDrafts() async {
-    final drafts = await _draftRepo.getAllDrafts();
-    if (drafts.isEmpty || !mounted) return;
+    // 재진입 방지: 빠른 네비게이션으로 동시 호출되면 동일 드래프트를 이중 저장할 수 있다.
+    if (_isRetryingDrafts) return;
+    _isRetryingDrafts = true;
+    try {
+      final drafts = await _draftRepo.getAllDrafts();
+      if (drafts.isEmpty || !mounted) return;
 
-    int successCount = 0;
-    for (final draft in drafts) {
-      final result = await _saveService.saveGame(payload: draft.payload);
-      if (result.success) {
-        await _draftRepo.removeDraft(draft.id);
-        successCount++;
+      int successCount = 0;
+      for (final draft in drafts) {
+        final result = await _saveService.saveGame(payload: draft.payload);
+        if (result.success) {
+          await _draftRepo.removeDraft(draft.id);
+          successCount++;
+        }
+        if (!mounted) return;
       }
+
       if (!mounted) return;
+
+      if (successCount > 0) {
+        HomeDashboardPage.invalidateCache();
+        setState(() {
+          _refreshKey = UniqueKey();
+        });
+      }
+
+      final failCount = drafts.length - successCount;
+      _showDraftResultBanner(
+        totalCount: drafts.length,
+        successCount: successCount,
+        failCount: failCount,
+      );
+    } finally {
+      _isRetryingDrafts = false;
     }
-
-    if (!mounted) return;
-
-    if (successCount > 0) {
-      HomeDashboardPage.invalidateCache();
-      setState(() {
-        _refreshKey = UniqueKey();
-      });
-    }
-
-    final failCount = drafts.length - successCount;
-    _showDraftResultBanner(
-      totalCount: drafts.length,
-      successCount: successCount,
-      failCount: failCount,
-    );
   }
 
   /// 드래프트 재시도 결과를 화면 상단 MaterialBanner로 표시.

@@ -336,7 +336,10 @@ class _GameRoomPageState extends State<GameRoomPage> {
       _socketService.off('createRoomResponse');
       _socketService.off('joinRoomResponse');
       _socketService.off('handicapSuggestions');
-      // 'error', 'gameEnded', 'roomStateUpdated'는 FrameEntryPage가 이어 사용하므로 보존.
+      // FrameEntryPage는 'error'를 등록하지 않으므로 여기서 제거한다.
+      // (남겨두면 플레이 중 발생한 소켓 에러가 dispose된 컨텍스트로 전달돼 조용히 사라짐)
+      _socketService.off('error');
+      // 'gameEnded', 'roomStateUpdated'는 FrameEntryPage가 이어 사용하므로 보존.
     } else if (_isInRoom) {
       _leaveRoom();
     } else {

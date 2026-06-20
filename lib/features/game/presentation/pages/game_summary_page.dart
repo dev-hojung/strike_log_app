@@ -285,7 +285,7 @@ class _GameSummaryPageState extends State<GameSummaryPage> {
         return;
       }
       // 중도 종료 선택: 시리즈 명시 종료 후 루트로
-      unawaited(SeriesApiService().completeSeries(widget.seriesId!));
+      unawaited(SeriesApiService().completeSeries(widget.seriesId!).catchError((_) {}));
       if (!mounted) return;
       Navigator.of(context).popUntil((route) => route.isFirst);
       return;
@@ -572,7 +572,9 @@ class _GameSummaryPageState extends State<GameSummaryPage> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final now = DateTime.now();
-    final formattedDate = DateFormat('yyyy년 MM월 dd일').format(now);
+    // 표시 날짜는 게임 시작 시각 기준(자정 넘겨 저장 시 화면/서버 날짜 불일치 방지).
+    final formattedDate =
+        DateFormat('yyyy년 MM월 dd일').format(widget.gameStartedAt ?? now);
     final bgColor = isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
     final textColor = isDark ? Colors.white : AppColors.textPrimaryLight;
 
