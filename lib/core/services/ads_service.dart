@@ -15,9 +15,9 @@ class AdsService {
   AdsService._();
   static final AdsService instance = AdsService._();
 
-  // Google 테스트 광고 ID (출시 직전 실제 ID로 교체)
+  // 실제 AdMob 전면 광고 단위 ID (Android)
   static const _androidInterstitialAdUnitId =
-      'ca-app-pub-3940256099942544/1033173712';
+      'ca-app-pub-2629679506425191/5874550886';
 
   bool _initialized = false;
   InterstitialAd? _loadedAd;
