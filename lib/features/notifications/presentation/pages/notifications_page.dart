@@ -330,6 +330,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
         return Symbols.verified;
       case NotificationType.clubCreationRejected:
         return Symbols.do_not_disturb_on;
+      case NotificationType.clubTrialStarted:
+        return Symbols.celebration;
       case NotificationType.clubTrialExpiringSoon:
         return Symbols.schedule;
       case NotificationType.clubTrialExpired:
@@ -359,6 +361,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
         return Colors.green;
       case NotificationType.clubCreationRejected:
         return Colors.redAccent;
+      case NotificationType.clubTrialStarted:
+        return Colors.green;
       case NotificationType.clubTrialExpiringSoon:
         return Colors.orange;
       case NotificationType.clubTrialExpired:

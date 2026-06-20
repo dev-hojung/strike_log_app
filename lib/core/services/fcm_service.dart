@@ -279,6 +279,7 @@ class FcmService {
       case 'club_join_request':
       case 'club_creation_approved':
       case 'club_join_approved':
+      case 'club_trial_started':
       case 'club_trial_expiring_soon':
       case 'club_trial_expired':
       case 'club_game_created':
@@ -336,6 +337,7 @@ class FcmService {
           ));
         }
         break;
+      case 'club_trial_started':
       case 'club_trial_expiring_soon':
       case 'club_trial_expired':
       case 'club_game_created':

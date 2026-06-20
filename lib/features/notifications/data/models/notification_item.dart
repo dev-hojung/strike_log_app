@@ -20,6 +20,7 @@ enum NotificationType {
   clubCreationRequest,
   clubCreationApproved,
   clubCreationRejected,
+  clubTrialStarted,
   clubTrialExpiringSoon,
   clubTrialExpired,
   newBestScore,
@@ -43,6 +44,8 @@ enum NotificationType {
         return 'club_creation_approved';
       case NotificationType.clubCreationRejected:
         return 'club_creation_rejected';
+      case NotificationType.clubTrialStarted:
+        return 'club_trial_started';
       case NotificationType.clubTrialExpiringSoon:
         return 'club_trial_expiring_soon';
       case NotificationType.clubTrialExpired:
@@ -72,6 +75,8 @@ enum NotificationType {
         return NotificationType.clubCreationApproved;
       case 'club_creation_rejected':
         return NotificationType.clubCreationRejected;
+      case 'club_trial_started':
+        return NotificationType.clubTrialStarted;
       case 'club_trial_expiring_soon':
         return NotificationType.clubTrialExpiringSoon;
       case 'club_trial_expired':
