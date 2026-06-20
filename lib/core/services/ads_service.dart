@@ -20,9 +20,9 @@ class AdsService {
   static const _androidInterstitialAdUnitId =
       'ca-app-pub-2629679506425191/5874550886';
 
-  // iOS는 임시 Google 공식 테스트 전면 광고 ID (App Store 제출 전 실 ID로 교체할 것).
+  // 실제 AdMob 전면 광고 단위 ID (iOS)
   static const _iosInterstitialAdUnitId =
-      'ca-app-pub-3940256099942544/4411468910';
+      'ca-app-pub-2629679506425191/1756589313';
 
   String get _interstitialAdUnitId =>
       Platform.isIOS ? _iosInterstitialAdUnitId : _androidInterstitialAdUnitId;
