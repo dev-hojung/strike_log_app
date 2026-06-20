@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 /// AdMob 전면 광고(Interstitial) 싱글톤 서비스.
@@ -22,9 +23,20 @@ class AdsService {
   InterstitialAd? _loadedAd;
   bool _isLoading = false;
 
+  /// .env의 ADS_ENABLED 토글 — 'true'일 때만 SDK 초기화·로드·표시.
+  /// 미설정/false면 모든 광고 동작이 no-op (개발 중 에뮬레이터에서
+  /// Play Services dynamite 충돌 회피용).
+  bool get _envEnabled => dotenv.env['ADS_ENABLED']?.toLowerCase() == 'true';
+
   /// MobileAds SDK 초기화. idempotent — 중복 호출 safe.
+  /// ADS_ENABLED=true가 아니면 no-op으로 종료(개발 중 SDK 자체 로드를 막아
+  /// dynamite 모듈 충돌·SIGKILL 회피).
   Future<void> initialize() async {
     if (_initialized) return;
+    if (!_envEnabled) {
+      debugPrint('[AdsService] ADS_ENABLED=false — SDK init 스킵');
+      return;
+    }
     if (!Platform.isAndroid) {
       _initialized = true;
       return;
@@ -41,6 +53,7 @@ class AdsService {
   /// 전면 광고를 백그라운드로 미리 로드.
   /// 동시 다중 호출 방지: 로딩 중이거나 이미 로드된 광고가 있으면 skip.
   void preloadInterstitial() {
+    if (!_envEnabled) return;
     if (!_initialized) return;
     if (!Platform.isAndroid) return;
     if (_isLoading || _loadedAd != null) return;
@@ -76,6 +89,12 @@ class AdsService {
     required bool isPlatformAdmin,
     required void Function() onClose,
   }) async {
+    // ADS_ENABLED=false면 광고 동작 전체 skip
+    if (!_envEnabled) {
+      onClose();
+      return;
+    }
+
     // 면제: 플랫폼 어드민
     if (isPlatformAdmin) {
       onClose();
