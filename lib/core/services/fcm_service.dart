@@ -366,7 +366,25 @@ class FcmService {
           builder: (_) => BadgeListPage(highlightKey: targetId),
         ));
         break;
+      case 'club_kicked':
+        // 클럽에서 추방됨 — 그 클럽은 더 이상 멤버 아니라 진입 불가.
+        // 알림 페이지 자체가 종착지(인앱)지만, FCM 시스템 알림 탭처럼 외부에서
+        // 진입한 경우엔 알림 페이지로 안내(club_creation_rejected와 동일 패턴).
+        if (!fromInAppList) {
+          nav.push(MaterialPageRoute(
+            builder: (_) => const NotificationsPage(),
+          ));
+        }
+        break;
       default:
+        // 미지의 type — 백엔드에 신규 type이 추가되고 클라가 아직 업데이트 안 됐을
+        // 수 있다. 외부 진입이면 알림 페이지로 fallback해 사용자 흐름이 끊기지 않게.
+        debugPrint('[FCM][route] unknown type=$type — fallback to NotificationsPage');
+        if (!fromInAppList) {
+          nav.push(MaterialPageRoute(
+            builder: (_) => const NotificationsPage(),
+          ));
+        }
         break;
     }
   }
