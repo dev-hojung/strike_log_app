@@ -50,3 +50,6 @@ app.*.map.json
 .omc/
 .mcp.json
 
+# Kotlin compiler 세션 임시 파일
+/android/.kotlin/
+

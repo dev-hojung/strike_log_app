@@ -55,8 +55,10 @@ void main() async {
   await AuthTokenStorage.init();
   // 프로필 캐시를 메모리로 미리 로드 (페이지 initState에서 동기 접근)
   await UserProfileCache.init();
-  // AdMob SDK 초기화 (Android 전면 광고)
-  await AdsService.instance.initialize();
+  // AdMob SDK는 first frame 이후 비동기 초기화 (_BowlingAppState.initState).
+  // 부팅 단계에서 await하면 Play Services의 ads.dynamite 모듈 첫 로드 시
+  // "Module config changed → SIGKILL"로 앱이 죽는 사례가 있음. 첫 프레임 이후
+  // 로 미루면 그 충돌이 앱 부팅 흐름에 영향을 안 줌.
 
   // 401 수신 시 강제 로그아웃 후 로그인 화면으로 이동
   ApiClient.onUnauthorized = () async {
@@ -147,6 +149,11 @@ class _BowlingAppState extends State<BowlingApp> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // 첫 프레임 그려진 직후 AdMob SDK init. dynamite 모듈 첫 로드 충돌이
+    // 일어나도 UI는 이미 떠 있어 사용자 입장에선 영향 없음.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      AdsService.instance.initialize();
+    });
   }
 
   @override
