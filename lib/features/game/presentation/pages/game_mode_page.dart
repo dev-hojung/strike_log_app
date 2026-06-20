@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
-import '../../../../core/services/user_profile_cache.dart';
+import '../../../../core/services/api_client.dart';
 import '../../data/services/series_api_service.dart';
 import 'frame_entry_page.dart';
 import 'game_room_page.dart';
@@ -21,22 +21,48 @@ class GameModePage extends StatefulWidget {
 }
 
 class _GameModePageState extends State<GameModePage> {
-  // 클럽 게임은 클럽 무료 체험이 active일 때만 노출 (서버 game-rooms 게이트와 동일 신호).
+  // 클럽 게임은 클럽 구독(체험 또는 정식)이 활성일 때만 노출.
+  // 서버 game-rooms 게이트 / ClubAccessGuard와 동일 기준(subscription_status).
   // 내기/시리즈/개인은 누구나 사용 가능.
-  bool _clubTrialActive =
-      UserProfileCache.cached?['club_trial_status'] == 'active';
+  bool _clubAccessActive = false;
 
   @override
   void initState() {
     super.initState();
-    // 최신 체험 상태로 갱신 (stale-while-revalidate).
-    UserProfileCache.refresh().then((_) {
-      if (!mounted) return;
-      final active = UserProfileCache.cached?['club_trial_status'] == 'active';
-      if (active != _clubTrialActive) {
-        setState(() => _clubTrialActive = active);
+    _loadClubAccess();
+  }
+
+  /// 가입한 클럽 중 구독이 유효한(active, 또는 trial이고 만료 전) 클럽이 있으면 클럽 게임 노출.
+  Future<void> _loadClubAccess() async {
+    try {
+      final res = await ApiClient().dio.get('/groups/me');
+      final data = res.data;
+      bool active = false;
+      if (data is List) {
+        final now = DateTime.now();
+        for (final raw in data) {
+          if (raw is! Map) continue;
+          final status = raw['subscription_status']?.toString();
+          if (status == 'active') {
+            active = true;
+            break;
+          }
+          if (status == 'trial') {
+            final exp =
+                DateTime.tryParse(raw['trial_expires_at']?.toString() ?? '');
+            if (exp != null && exp.isAfter(now)) {
+              active = true;
+              break;
+            }
+          }
+        }
       }
-    });
+      if (mounted && active != _clubAccessActive) {
+        setState(() => _clubAccessActive = active);
+      }
+    } catch (_) {
+      // 조회 실패 시 클럽 카드는 숨김 유지 (안전 기본값).
+    }
   }
 
   @override
@@ -127,8 +153,8 @@ class _GameModePageState extends State<GameModePage> {
             ),
             const SizedBox(height: 16),
 
-            // 클럽 게임 (클럽 무료 체험이 active일 때만 노출)
-            if (_clubTrialActive) ...[
+            // 클럽 게임 (클럽 구독이 활성일 때만 노출)
+            if (_clubAccessActive) ...[
               _buildModeCard(
                 context,
                 icon: Symbols.groups,

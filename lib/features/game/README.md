@@ -6,8 +6,9 @@
 
 ## 페이지
 - `GameModePage` — 모드 선택 (개인/시리즈/클럽/내기), 위치 입력
-  - 노출 조건: 개인·시리즈·내기는 누구나. **클럽 게임은 클럽 무료 체험(`club_trial_status == 'active'`)일 때만 노출.**
-  - 내기 게임은 클럽 불필요(방 코드로 친구 초대) — 서버도 `mode='bet'`은 체험 검사 면제(`game-rooms.gateway.ts`).
+  - 노출 조건: 개인·시리즈·내기는 누구나. **클럽 게임은 클럽 구독(체험 또는 정식)이 활성일 때만 노출** — `/groups/me`의 `subscription_status`가 `active`거나 `trial`(만료 전)인 클럽 보유 시.
+  - 단일 권한 기준: 서버 `GroupsService.hasActiveClubAccess()` (game-rooms 게이트 + ClubAccessGuard), 프론트도 동일 신호 사용.
+  - 내기 게임은 클럽 불필요(방 코드로 친구 초대) — 서버도 `mode='bet'`은 구독 검사 면제(`game-rooms.gateway.ts`).
 - `GameRoomPage` — 클럽/내기 게임 대기실 (Socket.IO). `mode='bet'`이면 핸디캡 UI.
 - `FrameEntryPage` — 10프레임 점수 입력 + 클럽 게임 라이브 순위표 + 시리즈 인디케이터
 - `GameSummaryPage` — 단일 게임 결과 (베스트 갱신 배너, 스트릭 하이라이트)
