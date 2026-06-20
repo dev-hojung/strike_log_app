@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io' show Platform;
 
+import 'package:app_tracking_transparency/app_tracking_transparency.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
@@ -18,6 +19,13 @@ class AdsService {
   // 실제 AdMob 전면 광고 단위 ID (Android)
   static const _androidInterstitialAdUnitId =
       'ca-app-pub-2629679506425191/5874550886';
+
+  // iOS는 임시 Google 공식 테스트 전면 광고 ID (App Store 제출 전 실 ID로 교체할 것).
+  static const _iosInterstitialAdUnitId =
+      'ca-app-pub-3940256099942544/4411468910';
+
+  String get _interstitialAdUnitId =>
+      Platform.isIOS ? _iosInterstitialAdUnitId : _androidInterstitialAdUnitId;
 
   bool _initialized = false;
   InterstitialAd? _loadedAd;
@@ -37,11 +45,15 @@ class AdsService {
       debugPrint('[AdsService] ADS_ENABLED=false — SDK init 스킵');
       return;
     }
-    if (!Platform.isAndroid) {
+    if (!Platform.isAndroid && !Platform.isIOS) {
       _initialized = true;
       return;
     }
     try {
+      // iOS: 광고 요청 전 ATT(앱 추적 투명성) 동의 요청.
+      if (Platform.isIOS) {
+        await _requestTrackingAuthorization();
+      }
       await MobileAds.instance.initialize();
       _initialized = true;
       debugPrint('[AdsService] MobileAds initialized');
@@ -50,17 +62,30 @@ class AdsService {
     }
   }
 
+  /// iOS ATT 권한 요청. 미결정 상태일 때만 시스템 프롬프트 표시.
+  /// 거부해도 광고는 표시되며(비개인화), 앱 동작엔 영향 없음.
+  Future<void> _requestTrackingAuthorization() async {
+    try {
+      final status = await AppTrackingTransparency.trackingAuthorizationStatus;
+      if (status == TrackingStatus.notDetermined) {
+        await AppTrackingTransparency.requestTrackingAuthorization();
+      }
+    } catch (e) {
+      debugPrint('[AdsService] ATT request error: $e');
+    }
+  }
+
   /// 전면 광고를 백그라운드로 미리 로드.
   /// 동시 다중 호출 방지: 로딩 중이거나 이미 로드된 광고가 있으면 skip.
   void preloadInterstitial() {
     if (!_envEnabled) return;
     if (!_initialized) return;
-    if (!Platform.isAndroid) return;
+    if (!Platform.isAndroid && !Platform.isIOS) return;
     if (_isLoading || _loadedAd != null) return;
     _isLoading = true;
 
     InterstitialAd.load(
-      adUnitId: _androidInterstitialAdUnitId,
+      adUnitId: _interstitialAdUnitId,
       request: const AdRequest(),
       adLoadCallback: InterstitialAdLoadCallback(
         onAdLoaded: (ad) {
@@ -80,7 +105,6 @@ class AdsService {
   /// 전면 광고를 표시한다.
   ///
   /// - [isPlatformAdmin] == true면 광고 없이 즉시 [onClose] 호출.
-  /// - iOS면 광고 없이 즉시 [onClose] 호출.
   /// - preload된 광고가 있으면 즉시 show → 닫힘/실패 시 [onClose] 호출 후 다음 광고 preload.
   /// - preload된 광고가 없으면 500ms 타임아웃으로 동기 로드 시도.
   ///   성공하면 show, 실패/타임아웃이면 [onClose] 즉시 호출.
@@ -101,8 +125,7 @@ class AdsService {
       return;
     }
 
-    // iOS는 비활성
-    if (!Platform.isAndroid) {
+    if (!Platform.isAndroid && !Platform.isIOS) {
       onClose();
       return;
     }
@@ -172,7 +195,7 @@ class AdsService {
     final completer = Completer<InterstitialAd?>();
 
     InterstitialAd.load(
-      adUnitId: _androidInterstitialAdUnitId,
+      adUnitId: _interstitialAdUnitId,
       request: const AdRequest(),
       adLoadCallback: InterstitialAdLoadCallback(
         onAdLoaded: (ad) {
