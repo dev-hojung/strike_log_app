@@ -68,8 +68,8 @@ class PrivacyPolicyPage extends StatelessWidget {
                 title: '1. 수집하는 개인정보 항목',
                 bullets: const [
                   '필수: 이메일 주소, 비밀번호(단방향 암호화), 닉네임',
-                  '선택: 전화번호, 프로필 이미지',
-                  '서비스 이용 과정 자동 수집: 게임 점수·플레이 일자·위치(볼링장명), 시리즈 기록, 클럽 가입/활동 내역, 기기 식별자, FCM 토큰, OS/앱 버전, 오류 로그',
+                  '선택: 프로필 이미지',
+                  '서비스 이용 과정 자동 수집: 게임 점수·플레이 일자·위치(볼링장명), 시리즈 기록, 클럽 가입/활동 내역, 기기 식별자, 광고 식별자(Advertising ID), FCM 토큰, OS/앱 버전, 오류 로그',
                 ],
               ),
               _section(
@@ -80,6 +80,7 @@ class PrivacyPolicyPage extends StatelessWidget {
                   '볼링 점수·통계·랭킹 산출 및 표시',
                   '클럽 가입 신청 및 멤버 관리, 클럽 게임 알림',
                   '서비스 이용 관련 푸시 알림(베스트 갱신, 배지 획득 등)',
+                  '광고 게재 및 광고 성과 측정(AdMob)',
                   '오류 진단 및 서비스 품질 개선',
                   '문의 응대 및 분쟁 처리',
                 ],
@@ -105,6 +106,7 @@ class PrivacyPolicyPage extends StatelessWidget {
                 title: '5. 개인정보 처리의 위탁',
                 bullets: const [
                   'Google LLC (Firebase Cloud Messaging) — 푸시 알림 전송',
+                  'Google LLC (AdMob) — 광고 게재 및 광고 식별자 처리',
                   'Functional Software, Inc. (Sentry) — 오류 진단 로그 수집',
                   '각 수탁사는 위탁 업무 수행 목적 이외에 개인정보를 이용하지 않으며, 운영자는 수탁사가 정한 개인정보 보호 약관을 준수합니다.',
                 ],
