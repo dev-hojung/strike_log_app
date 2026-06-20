@@ -14,7 +14,8 @@ class BowlingScorer {
 
   /// 1~9프레임 스트라이크 여부 (10프레임은 false 반환 - 보너스 산정 대상 아님)
   static bool isStrike(List<List<int>> frames, int frameIndex) {
-    if (frameIndex < 0 || frameIndex >= 10) return false;
+    // 10프레임(index 9)은 보너스 산정 대상이 아니므로 false. (문서와 일치)
+    if (frameIndex < 0 || frameIndex >= 9) return false;
     final f = frames[frameIndex];
     if (f.isEmpty) return false;
     return f[0] == 10;

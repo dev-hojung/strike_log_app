@@ -301,16 +301,27 @@ class _FrameEntryPageState extends State<FrameEntryPage> {
     }
   }
 
+  /// 현재 투구(_currentThrow)를 기록한다.
+  /// 완료된 프레임을 다시 탭해 수정하는 경우 append 대신 해당 위치를 교체하고
+  /// 그 뒤 투구는 잘라낸다 — 1~9프레임에 3투구가 쌓여 데이터가 손상되는 것을 방지.
+  void _putThrow(int frame, int pins) {
+    if (_currentThrow < _frames[frame].length) {
+      _frames[frame] = _frames[frame].sublist(0, _currentThrow)..add(pins);
+    } else {
+      _frames[frame].add(pins);
+    }
+  }
+
   void _handleSpare() {
     if (_currentThrow == 0) return; // 1투에서 스페어 불가
     final remaining = _remainingPins;
-    if (remaining == 0) return;
+    if (remaining <= 0 || remaining >= 10) return; // 0 또는 풀스택(=스트라이크)은 스페어 아님
 
     if (_currentFrame < 9) {
-      _frames[_currentFrame].add(remaining);
+      _putThrow(_currentFrame, remaining);
       _advanceFrame();
     } else {
-      _frames[9].add(remaining);
+      _putThrow(9, remaining);
       if (_currentThrow == 1) {
         _currentThrow = 2;
       } else {
@@ -323,7 +334,7 @@ class _FrameEntryPageState extends State<FrameEntryPage> {
     if (pins > _remainingPins) return;
 
     if (_currentFrame < 9) {
-      _frames[_currentFrame].add(pins);
+      _putThrow(_currentFrame, pins);
       if (_currentThrow == 0 && pins < 10) {
         _currentThrow = 1;
       } else {
@@ -331,7 +342,7 @@ class _FrameEntryPageState extends State<FrameEntryPage> {
       }
     } else {
       // 10프레임
-      _frames[9].add(pins);
+      _putThrow(9, pins);
       if (_currentThrow == 0) {
         if (pins == 10) {
           _currentThrow = 1; // 스트라이크 → 2투로
@@ -477,6 +488,8 @@ class _FrameEntryPageState extends State<FrameEntryPage> {
         _currentThrow = 1; // 1-9프레임 완료 시 마지막 투구
       } else if (_currentFrame < 9 && _frames[frameIndex].isNotEmpty && _frames[frameIndex][0] == 10) {
         _currentThrow = 0; // 1-9프레임 스트라이크 시 1구로
+      } else if (_currentFrame == 9 && _currentThrow == 2 && _isFrameComplete(9)) {
+        _currentThrow = 1; // 10프레임 오픈 완료 → 마지막 투구 수정 위치로 (append 방지)
       }
       _showKeypad = true;
       _isGameComplete = false;
