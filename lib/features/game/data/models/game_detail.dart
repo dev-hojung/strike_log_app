@@ -111,9 +111,9 @@ class RecentGame {
   factory RecentGame.fromJson(Map<String, dynamic> json) {
     final createdRaw = json['created_at'];
     return RecentGame(
-      id: json['id'],
-      totalScore: json['total_score'],
-      playDate: DateTime.parse(json['play_date']),
+      id: (json['id'] as num).toInt(),
+      totalScore: (json['total_score'] as num?)?.toInt() ?? 0,
+      playDate: DateTime.parse(json['play_date'] as String),
       // DB의 created_at은 UTC로 저장되므로 .toLocal()로 사용자 타임존 변환
       createdAt: createdRaw is String
           ? DateTime.parse(createdRaw).toLocal()

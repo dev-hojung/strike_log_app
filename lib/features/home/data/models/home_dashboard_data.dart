@@ -77,8 +77,8 @@ class TrendData {
 
   factory TrendData.fromJson(Map<String, dynamic> json) {
     return TrendData(
-      score: json['score'] ?? 0,
-      date: DateTime.parse(json['date']),
+      score: (json['score'] as num?)?.toInt() ?? 0,
+      date: DateTime.tryParse(json['date']?.toString() ?? '') ?? DateTime.now(),
       strikes: (json['strikes'] as num?)?.toInt() ?? 0,
       spares: (json['spares'] as num?)?.toInt() ?? 0,
       opens: (json['opens'] as num?)?.toInt() ?? 0,
@@ -108,7 +108,7 @@ class ClubInfo {
 
   factory ClubInfo.fromJson(Map<String, dynamic> json) {
     return ClubInfo(
-      id: json['id'],
+      id: (json['id'] as num).toInt(),
       name: json['name'] ?? '',
       description: json['description'],
       coverImageUrl: json['cover_image_url'],

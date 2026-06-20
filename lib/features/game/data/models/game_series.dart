@@ -66,7 +66,7 @@ class GameSeries {
     final completedAt = json['completed_at'];
     final statsRaw = json['stats'];
     return GameSeries(
-      id: json['id'] as int,
+      id: (json['id'] as num).toInt(),
       userId: json['user_id']?.toString() ?? '',
       targetGameCount: (json['target_game_count'] as num?)?.toInt() ?? 0,
       startedAt: startedAt is String
@@ -112,7 +112,7 @@ class SeriesGame {
 
     final statsRaw = json['stats'];
     return SeriesGame(
-      id: json['id'] as int,
+      id: (json['id'] as num).toInt(),
       seriesIndex: (json['series_index'] as num?)?.toInt(),
       totalScore: (json['total_score'] as num?)?.toInt() ?? 0,
       playDate: json['play_date'] is String
