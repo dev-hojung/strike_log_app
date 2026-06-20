@@ -70,7 +70,9 @@ dev_dependencies:
 
 flutter_launcher_icons:
   android: "launcher_icon"        # AndroidManifest의 android:icon 이름이 됨
-  ios: false                       # iOS 비활성 (Android 우선 출시)
+  ios: true                        # iOS App Store 출시 — 동일 소스로 아이콘 생성
+  remove_alpha_ios: true           # App Store는 알파 채널 금지 → 흰 배경으로 평탄화
+  background_color_ios: "#FFFFFF"
   image_path: "assets/icons/app_icon.png"
   # foreground 이미지에 이미 디자인 프레임이 포함되어 있으므로 background는 흰색.
   # 런처 마스크가 외곽을 자르더라도 halo와 자연스럽게 이어지게 함.
