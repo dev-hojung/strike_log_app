@@ -27,6 +27,11 @@ import 'signup_page.dart';
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
+  /// 현재 로그인 화면이 표시 중인지 여부.
+  /// onUnauthorized가 이미 로그인 화면일 때 LoginPage를 다시 push해
+  /// 화면이 이중 렌더되는 것을 막기 위한 플래그.
+  static bool isActive = false;
+
   @override
   State<LoginPage> createState() => _LoginPageState();
 }
@@ -47,6 +52,7 @@ class _LoginPageState extends State<LoginPage> {
   @override
   void initState() {
     super.initState();
+    LoginPage.isActive = true;
     _loadRememberedEmail();
     // 시스템 공지 모달 — 로그인 전에도 호출 가능한 public endpoint를 사용.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -71,6 +77,7 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   void dispose() {
+    LoginPage.isActive = false;
     _scrollController.dispose();
     _emailController.dispose();
     _passwordController.dispose();

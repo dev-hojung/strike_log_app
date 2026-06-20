@@ -67,6 +67,8 @@ void main() async {
   // 401 수신 시 강제 로그아웃 후 로그인 화면으로 이동
   ApiClient.onUnauthorized = () async {
     await SessionManager.clearAll();
+    // 이미 로그인 화면이면 다시 push하지 않는다 (이중 렌더 방지).
+    if (LoginPage.isActive) return;
     final nav = appNavigatorKey.currentState;
     nav?.pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const LoginPage()),
