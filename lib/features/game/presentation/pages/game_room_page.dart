@@ -3,7 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/services/ads_service.dart';
 import '../../../../core/services/socket_service.dart';
+import '../../../../core/services/user_profile_cache.dart';
 import 'bet_result_page.dart';
 import 'frame_entry_page.dart';
 
@@ -29,6 +31,7 @@ class _GameRoomPageState extends State<GameRoomPage> {
   bool _isInRoom = false;
   bool _isConnecting = false;
   bool _isGameStarted = false;
+  bool _betAdShown = false; // 내기 광고(생성/참여 시) 1회 노출 가드
   final List<Map<String, String>> _participants = [];
 
   // 내기 게임 전용
@@ -45,6 +48,20 @@ class _GameRoomPageState extends State<GameRoomPage> {
   void initState() {
     super.initState();
     _loadUserInfo();
+    // 내기 게임은 생성/참여 시점에 광고를 띄우므로 미리 로드.
+    AdsService.instance.preloadInterstitial();
+  }
+
+  /// 내기 게임 광고를 1회 노출 (생성자=생성 시, 참여자=참여 시).
+  void _maybeShowBetAd() {
+    if (!_isBet || _betAdShown) return;
+    _betAdShown = true;
+    final isPlatformAdmin =
+        UserProfileCache.cached?['is_platform_admin'] == true;
+    AdsService.instance.maybeShowInterstitial(
+      isPlatformAdmin: isPlatformAdmin,
+      onClose: () {},
+    );
   }
 
   void _updateParticipantsFromState(dynamic state) {
@@ -102,16 +119,21 @@ class _GameRoomPageState extends State<GameRoomPage> {
         _isConnecting = false;
       });
       _updateParticipantsFromState(data['state']);
+      // 내기 생성자: 방 생성 직후 광고 노출.
+      _maybeShowBetAd();
     });
 
     _socketService.on('roomStateUpdated', (data) {
       if (!mounted) return;
+      final wasInRoom = _isInRoom;
       setState(() {
         _roomId = data['roomId'] ?? _roomId;
         _isInRoom = true;
         _isConnecting = false;
       });
       _updateParticipantsFromState(data);
+      // 내기 참여자: 코드 입력 후 막 입장한 순간(호스트 제외) 광고 노출.
+      if (!wasInRoom && !_isHost) _maybeShowBetAd();
     });
 
     _socketService.on('gameStarted', (data) {
