@@ -703,7 +703,7 @@ class _ClubGameSummaryPageState extends State<ClubGameSummaryPage> {
             },
           ),
           title: Text(
-            '클럽 경기 요약',
+            widget.isBetGame ? '내기 경기 요약' : '클럽 경기 요약',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,

@@ -588,7 +588,9 @@ class _FrameEntryPageState extends State<FrameEntryPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              widget.isClubGame ? '클럽 게임' : '개인 게임',
+              widget.isBetGame
+                  ? '내기 게임'
+                  : (widget.isClubGame ? '클럽 게임' : '개인 게임'),
               style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
