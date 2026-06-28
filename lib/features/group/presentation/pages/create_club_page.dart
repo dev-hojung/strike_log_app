@@ -403,32 +403,44 @@ class _CreateClubPageState extends State<CreateClubPage> {
   Widget _buildRegionDropdown(
     Color surfaceColor, Color textColor, Color secondaryColor, Color borderColor,
   ) {
-    Widget dropdown({
+    // 탭하면 바텀시트 목록을 띄우는 필드. (기본 DropdownButton 대신 사용)
+    Widget field({
       required String? value,
       required String hint,
-      required List<String> items,
-      required void Function(String?)? onChanged,
+      required bool enabled,
+      required VoidCallback onTap,
     }) {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        decoration: BoxDecoration(
-          color: surfaceColor,
+      final showValue = value != null && value.isNotEmpty;
+      return Opacity(
+        opacity: enabled ? 1 : 0.5,
+        child: InkWell(
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: borderColor),
-        ),
-        child: DropdownButtonHideUnderline(
-          child: DropdownButton<String>(
-            value: value,
-            hint: Text(hint,
-                style: TextStyle(color: secondaryColor, fontSize: 14)),
-            isExpanded: true,
-            icon: Icon(Symbols.keyboard_arrow_down, color: secondaryColor),
-            dropdownColor: surfaceColor,
-            style: TextStyle(color: textColor, fontSize: 14),
-            items: items
-                .map((v) => DropdownMenuItem(value: v, child: Text(v)))
-                .toList(),
-            onChanged: onChanged,
+          onTap: enabled ? onTap : null,
+          child: Container(
+            height: 52,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(
+              color: surfaceColor,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: borderColor),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    showValue ? value : hint,
+                    maxLines: 1,
+                    overflow: TextOverflow.fade,
+                    softWrap: false,
+                    style: TextStyle(
+                      color: showValue ? textColor : secondaryColor,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+                Icon(Symbols.keyboard_arrow_down, color: secondaryColor),
+              ],
+            ),
           ),
         ),
       );
@@ -437,28 +449,119 @@ class _CreateClubPageState extends State<CreateClubPage> {
     return Row(
       children: [
         Expanded(
-          child: dropdown(
+          child: field(
             value: _selectedProvince,
             hint: '시/도 선택',
-            items: kProvinces,
-            onChanged: (v) => setState(() {
-              _selectedProvince = v;
-              _selectedCity = null; // 시/도 바뀌면 시/군/구 리셋
-            }),
+            enabled: true,
+            onTap: () async {
+              final picked = await _pickRegion(
+                title: '시/도 선택',
+                items: kProvinces,
+                selected: _selectedProvince,
+              );
+              if (picked != null) {
+                setState(() {
+                  _selectedProvince = picked;
+                  _selectedCity = null; // 시/도 바뀌면 시/군/구 리셋
+                });
+              }
+            },
           ),
         ),
         const SizedBox(width: 8),
         Expanded(
-          child: dropdown(
+          child: field(
             value: _selectedCity,
             hint: '시/군/구 선택',
-            items: citiesOf(_selectedProvince),
-            onChanged: _selectedProvince == null
-                ? null
-                : (v) => setState(() => _selectedCity = v),
+            enabled: _selectedProvince != null,
+            onTap: () async {
+              final picked = await _pickRegion(
+                title: '시/군/구 선택',
+                items: citiesOf(_selectedProvince),
+                selected: _selectedCity,
+              );
+              if (picked != null) {
+                setState(() => _selectedCity = picked);
+              }
+            },
           ),
         ),
       ],
+    );
+  }
+
+  /// 지역 목록을 전체 폭 바텀시트로 띄워 하나를 고른다.
+  Future<String?> _pickRegion({
+    required String title,
+    required List<String> items,
+    required String? selected,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surfaceColor = isDark ? AppColors.surfaceDark : Colors.white;
+    final textColor = isDark ? Colors.white : AppColors.textPrimaryLight;
+
+    return showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: surfaceColor,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(ctx).size.height * 0.6,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: textColor,
+                    ),
+                  ),
+                ),
+                Flexible(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    itemCount: items.length,
+                    itemBuilder: (_, i) {
+                      final item = items[i];
+                      final isSelected = item == selected;
+                      return ListTile(
+                        title: Text(
+                          item,
+                          style: TextStyle(
+                            color: isSelected
+                                ? AppColors.primary
+                                : textColor,
+                            fontSize: 15,
+                            fontWeight: isSelected
+                                ? FontWeight.w600
+                                : FontWeight.normal,
+                          ),
+                        ),
+                        trailing: isSelected
+                            ? const Icon(Symbols.check,
+                                color: AppColors.primary, size: 20)
+                            : null,
+                        onTap: () => Navigator.pop(ctx, item),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

@@ -94,6 +94,60 @@ class _InquiryPageState extends State<InquiryPage> {
     );
   }
 
+  /// 문의 카테고리를 전체 폭 바텀시트로 띄워 하나를 고른다.
+  Future<String?> _pickCategory({
+    required Color surfaceColor,
+    required Color textColor,
+  }) {
+    return showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: surfaceColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
+                child: Text(
+                  '카테고리 선택',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: textColor,
+                  ),
+                ),
+              ),
+              for (final c in _categories)
+                ListTile(
+                  title: Text(
+                    c.$2,
+                    style: TextStyle(
+                      color: c.$1 == _category ? AppColors.primary : textColor,
+                      fontSize: 15,
+                      fontWeight: c.$1 == _category
+                          ? FontWeight.w600
+                          : FontWeight.normal,
+                    ),
+                  ),
+                  trailing: c.$1 == _category
+                      ? const Icon(Symbols.check,
+                          color: AppColors.primary, size: 20)
+                      : null,
+                  onTap: () => Navigator.pop(ctx, c.$1),
+                ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -139,29 +193,40 @@ class _InquiryPageState extends State<InquiryPage> {
                     // 카테고리
                     _SectionLabel(label: '카테고리', textColor: textColor),
                     const SizedBox(height: 8),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      decoration: BoxDecoration(
-                        color: surfaceColor,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: borderColor),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: _category,
-                          dropdownColor: surfaceColor,
-                          style: TextStyle(color: textColor, fontSize: 16),
-                          iconEnabledColor: secondaryColor,
-                          items: _categories
-                              .map((c) => DropdownMenuItem(
-                                    value: c.$1,
-                                    child: Text(c.$2),
-                                  ))
-                              .toList(),
-                          onChanged: (v) {
-                            if (v != null) setState(() => _category = v);
-                          },
+                    InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: () async {
+                        final picked = await _pickCategory(
+                          surfaceColor: surfaceColor,
+                          textColor: textColor,
+                        );
+                        if (picked != null) {
+                          setState(() => _category = picked);
+                        }
+                      },
+                      child: Container(
+                        width: double.infinity,
+                        height: 56,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        decoration: BoxDecoration(
+                          color: surfaceColor,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: borderColor),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                _categories
+                                    .firstWhere((c) => c.$1 == _category)
+                                    .$2,
+                                style: TextStyle(
+                                    color: textColor, fontSize: 16),
+                              ),
+                            ),
+                            Icon(Symbols.keyboard_arrow_down,
+                                color: secondaryColor),
+                          ],
                         ),
                       ),
                     ),
