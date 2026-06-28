@@ -16,7 +16,7 @@ publish_to: "none" # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.1+34
+version: 1.0.2+37
 
 environment:
   sdk: ^3.6.0
@@ -83,7 +83,7 @@ flutter_launcher_icons:
 flutter_native_splash:
   color: "#101622"                 # 앱 다크 배경(AppColors.backgroundDark)과 동일 — 깜빡임 방지
   android: true
-  ios: false                       # iOS 우선 비활성 (Android 출시 집중)
+  ios: true                        # iOS 런치 화면도 동일 다크 배경으로 생성(기본 플레이스홀더 제거)
   # Android 12+ 신규 스플래시 API 대응. 다크 배경만 사용.
   android_12:
     color: "#101622"
