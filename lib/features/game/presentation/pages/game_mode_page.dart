@@ -92,11 +92,15 @@ class _GameModePageState extends State<GameModePage> {
         ),
         centerTitle: true,
       ),
-      body: Padding(
-        padding: const EdgeInsets.only(top: 16, left: 24, right: 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      body: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          // iPad/소형 화면에서 카드 4개가 세로로 넘쳐 하단이 잘리던 문제 대응:
+          // 고정 Column 대신 스크롤 가능하게 하고 하단 여백을 SafeArea로 확보.
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             Text(
               '게임 모드를 선택하세요',
               style: TextStyle(
@@ -179,7 +183,8 @@ class _GameModePageState extends State<GameModePage> {
               isDark: isDark,
               onTap: () => _startBetGame(context),
             ),
-          ],
+            ],
+          ),
         ),
       ),
     );
