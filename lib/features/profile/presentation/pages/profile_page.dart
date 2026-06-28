@@ -85,11 +85,6 @@ class _ProfilePageState extends State<ProfilePage> {
               onTap: () => Navigator.pop(ctx, ImageSource.gallery),
             ),
             ListTile(
-              leading: const Icon(Symbols.photo_camera),
-              title: const Text('카메라로 촬영'),
-              onTap: () => Navigator.pop(ctx, ImageSource.camera),
-            ),
-            ListTile(
               leading: const Icon(Symbols.close),
               title: const Text('취소'),
               onTap: () => Navigator.pop(ctx),

@@ -192,25 +192,8 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
                                 ),
                               ),
                             ),
-                            Positioned(
-                              right: 0,
-                              bottom: 0,
-                              child: Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary,
-                                  shape: BoxShape.circle,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.15),
-                                      blurRadius: 6,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ],
-                                ),
-                                child: const Icon(Symbols.photo_camera, color: Colors.white, size: 20),
-                              ),
-                            ),
+                            // 프로필 사진 변경은 프로필 페이지 아바타에서 처리한다.
+                            // (여기 카메라 배지는 동작 핸들러가 없어 제거 — 무응답 버튼 방지)
                           ],
                         ),
                         const SizedBox(height: 24),
