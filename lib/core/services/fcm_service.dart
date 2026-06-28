@@ -22,7 +22,8 @@ import 'unread_notifications_service.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseBackgroundHandler(RemoteMessage message) async {
-  debugPrint('[FCM][background] ${message.messageId} ${message.notification?.title}');
+  debugPrint(
+      '[FCM][background] ${message.messageId} ${message.notification?.title}');
 }
 
 /// 메인 Android 알림 채널.
@@ -122,7 +123,8 @@ class FcmService {
         sound: true,
       );
     } catch (e) {
-      debugPrint('[FCM] setForegroundNotificationPresentationOptions skipped: $e');
+      debugPrint(
+          '[FCM] setForegroundNotificationPresentationOptions skipped: $e');
     }
 
     try {
@@ -164,7 +166,8 @@ class FcmService {
 
       final initial = await _messaging.getInitialMessage();
       if (initial != null) {
-        WidgetsBinding.instance.addPostFrameCallback((_) => _handleTap(initial));
+        WidgetsBinding.instance
+            .addPostFrameCallback((_) => _handleTap(initial));
       }
     } catch (e) {
       debugPrint('[FCM] message listeners skipped: $e');
@@ -173,10 +176,16 @@ class FcmService {
 
   Future<void> _initLocalNotifications() async {
     if (_localNotifReady) return;
-    // iOS의 경우 payload 받기 위한 권한 옵션은 firebase_messaging이 별도 처리.
+    // iOS 알림 권한 요청은 firebase_messaging의 requestPermission에서만 수행한다.
+    // flutter_local_notifications 초기화가 먼저 권한 팝업을 띄우면 ATT보다
+    // 알림 권한이 앞서 보일 수 있어 여기서는 명시적으로 끈다.
     const initSettings = InitializationSettings(
       android: AndroidInitializationSettings('@mipmap/ic_launcher'),
-      iOS: DarwinInitializationSettings(),
+      iOS: DarwinInitializationSettings(
+        requestAlertPermission: false,
+        requestBadgePermission: false,
+        requestSoundPermission: false,
+      ),
     );
     await _localNotifications.initialize(
       settings: initSettings,
@@ -196,8 +205,8 @@ class FcmService {
     );
 
     if (!kIsWeb && Platform.isAndroid) {
-      final androidPlugin = _localNotifications
-          .resolvePlatformSpecificImplementation<
+      final androidPlugin =
+          _localNotifications.resolvePlatformSpecificImplementation<
               AndroidFlutterLocalNotificationsPlugin>();
       await androidPlugin?.createNotificationChannel(_androidChannel);
     }
@@ -207,7 +216,8 @@ class FcmService {
   Future<void> _showForegroundNotification(RemoteMessage msg) async {
     final notification = msg.notification;
     if (notification == null) {
-      debugPrint('[FCM][foreground] no notification field — data-only message, banner skipped');
+      debugPrint(
+          '[FCM][foreground] no notification field — data-only message, banner skipped');
       return;
     }
     final payload = jsonEncode(msg.data);
@@ -246,7 +256,8 @@ class FcmService {
         ),
         payload: payload,
       );
-      debugPrint('[FCM][foreground] banner shown title="${notification.title}"');
+      debugPrint(
+          '[FCM][foreground] banner shown title="${notification.title}"');
     } catch (e, st) {
       AppLogger.captureError(e,
           stackTrace: st, context: 'fcm.showForegroundNotification');
@@ -303,7 +314,8 @@ class FcmService {
     String? targetId,
     bool fromInAppList = false,
   }) {
-    debugPrint('[FCM][route] type=$type targetId=$targetId inApp=$fromInAppList');
+    debugPrint(
+        '[FCM][route] type=$type targetId=$targetId inApp=$fromInAppList');
 
     final nav = appNavigatorKey.currentState;
     if (nav == null) return;
@@ -381,7 +393,8 @@ class FcmService {
       default:
         // 미지의 type — 백엔드에 신규 type이 추가되고 클라가 아직 업데이트 안 됐을
         // 수 있다. 외부 진입이면 알림 페이지로 fallback해 사용자 흐름이 끊기지 않게.
-        debugPrint('[FCM][route] unknown type=$type — fallback to NotificationsPage');
+        debugPrint(
+            '[FCM][route] unknown type=$type — fallback to NotificationsPage');
         if (!fromInAppList) {
           nav.push(MaterialPageRoute(
             builder: (_) => const NotificationsPage(),
@@ -439,7 +452,8 @@ class FcmService {
       // 토큰 확보. permission 거부면 null 반환.
       final t = _token ?? await _messaging.getToken();
       if (t == null || t.isEmpty) {
-        debugPrint('[FCM] register skipped — no token yet ($reason). scheduling retry.');
+        debugPrint(
+            '[FCM] register skipped — no token yet ($reason). scheduling retry.');
         _scheduleRetry(reason);
         return;
       }
@@ -456,7 +470,8 @@ class FcmService {
       final loggedIn = userId != null && userId.isNotEmpty;
       final ok = loggedIn
           ? await _api.registerFcmToken(token: t, platform: _platform())
-          : await _api.registerAnonymousFcmToken(token: t, platform: _platform());
+          : await _api.registerAnonymousFcmToken(
+              token: t, platform: _platform());
       debugPrint(
         '[FCM] register ok=$ok mode=${loggedIn ? "auth" : "anon"} user=${userId ?? "-"} reason=$reason',
       );
@@ -468,7 +483,8 @@ class FcmService {
       }
     } catch (e, st) {
       debugPrint('[FCM] _ensureTokenRegistered error: $e');
-      AppLogger.captureError(e, stackTrace: st, context: 'fcm.ensureTokenRegistered');
+      AppLogger.captureError(e,
+          stackTrace: st, context: 'fcm.ensureTokenRegistered');
       _scheduleRetry(reason);
     } finally {
       _registerInFlight = false;
@@ -478,12 +494,14 @@ class FcmService {
   void _scheduleRetry(String reason) {
     _registerRetryTimer?.cancel();
     if (_registerRetryStep >= _retryBackoff.length) {
-      debugPrint('[FCM] retry budget exhausted — will try again on next resume/login');
+      debugPrint(
+          '[FCM] retry budget exhausted — will try again on next resume/login');
       return;
     }
     final delay = _retryBackoff[_registerRetryStep];
     _registerRetryStep++;
-    debugPrint('[FCM] schedule retry in ${delay.inSeconds}s (step=$_registerRetryStep) reason=$reason');
+    debugPrint(
+        '[FCM] schedule retry in ${delay.inSeconds}s (step=$_registerRetryStep) reason=$reason');
     _registerRetryTimer = Timer(delay, () {
       unawaited(_ensureTokenRegistered(reason: 'retry:$reason'));
     });

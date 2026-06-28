@@ -67,8 +67,11 @@ class AdsService {
   Future<void> _requestTrackingAuthorization() async {
     try {
       final status = await AppTrackingTransparency.trackingAuthorizationStatus;
+      debugPrint('[AdsService] ATT status before request: $status');
       if (status == TrackingStatus.notDetermined) {
-        await AppTrackingTransparency.requestTrackingAuthorization();
+        final result =
+            await AppTrackingTransparency.requestTrackingAuthorization();
+        debugPrint('[AdsService] ATT status after request: $result');
       }
     } catch (e) {
       debugPrint('[AdsService] ATT request error: $e');

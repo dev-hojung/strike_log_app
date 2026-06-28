@@ -101,24 +101,16 @@ void main() async {
       }
     }
 
-    // 2) Firebase + FCM 초기화. iOS 시뮬레이터처럼 구성 파일이 없으면 조용히 건너뜀.
+    // 2) Firebase 기본 초기화. FCM 권한 요청은 ATT보다 먼저 뜨지 않도록
+    // 첫 화면 렌더링 후 AdsService 초기화가 끝난 뒤 실행한다.
     try {
       await Firebase.initializeApp();
-      await FcmService.instance.init();
-      // 저장된 JWT가 있을 때만 동기화 호출 (자동 로그인 케이스).
-      if (autoUserId != null) {
-        unawaited(FcmService.instance.syncTokenToServer(autoUserId));
-        unawaited(UnreadNotificationsService.instance.refresh());
-        unawaited(PendingJoinRequestsService.instance.refresh());
-        // 앱 접속 출석 체크. 실패는 사용자 흐름을 막지 않도록 silent.
-        unawaited(BadgesApiService().checkIn().catchError((_) {}));
-      }
     } catch (e, st) {
       debugPrint('[Firebase] init skipped: $e');
       debugPrintStack(stackTrace: st, label: 'Firebase init');
     }
 
-    runApp(BowlingApp(initialHome: autoLoginHome));
+    runApp(BowlingApp(initialHome: autoLoginHome, initialUserId: autoUserId));
   }
 
   if (sentryDsn != null && sentryDsn.isNotEmpty) {
@@ -141,25 +133,56 @@ void main() async {
 /// [MaterialApp]을 설정하고, 테마 및 라우팅을 관리합니다.
 /// 저장된 JWT + user_id가 모두 유효하면 [MainContainer]로 자동 진입, 아니면 [LoginPage].
 class BowlingApp extends StatefulWidget {
-  const BowlingApp({super.key, this.initialHome});
+  const BowlingApp({super.key, this.initialHome, this.initialUserId});
 
   /// 앱 시작 시 표시할 첫 화면. null이면 [LoginPage] (자동 로그인 미해당).
   final Widget? initialHome;
+
+  /// 자동 로그인된 사용자 ID. 있으면 FCM 토큰/카운트 동기화를 이어서 수행한다.
+  final String? initialUserId;
 
   @override
   State<BowlingApp> createState() => _BowlingAppState();
 }
 
 class _BowlingAppState extends State<BowlingApp> with WidgetsBindingObserver {
+  bool _postFrameServicesStarted = false;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    // 첫 프레임 그려진 직후 AdMob SDK init. dynamite 모듈 첫 로드 충돌이
-    // 일어나도 UI는 이미 떠 있어 사용자 입장에선 영향 없음.
+    // 첫 프레임 이후 잠깐 늦춰 AdMob SDK init. iOS ATT 시스템 프롬프트가
+    // 앱 active 직후 너무 이른 타이밍에 누락되는 것을 피한다.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      AdsService.instance.initialize();
+      final lifecycleState = WidgetsBinding.instance.lifecycleState;
+      debugPrint('[main] post-frame lifecycle: $lifecycleState');
+      if (lifecycleState == null ||
+          lifecycleState == AppLifecycleState.resumed) {
+        _startPostFrameServices();
+      }
     });
+  }
+
+  void _startPostFrameServices() {
+    if (_postFrameServicesStarted) return;
+    _postFrameServicesStarted = true;
+    unawaited(_initializePostFrameServices());
+  }
+
+  Future<void> _initializePostFrameServices() async {
+    await Future<void>.delayed(const Duration(seconds: 1));
+    await AdsService.instance.initialize();
+    await FcmService.instance.init();
+
+    final autoUserId = widget.initialUserId;
+    if (autoUserId == null) return;
+
+    unawaited(FcmService.instance.syncTokenToServer(autoUserId));
+    unawaited(UnreadNotificationsService.instance.refresh());
+    unawaited(PendingJoinRequestsService.instance.refresh());
+    // 앱 접속 출석 체크. 실패는 사용자 흐름을 막지 않도록 silent.
+    unawaited(BadgesApiService().checkIn().catchError((_) {}));
   }
 
   @override
@@ -170,6 +193,9 @@ class _BowlingAppState extends State<BowlingApp> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _startPostFrameServices();
+    }
     // 백그라운드 → 포어그라운드 복귀 시점에 FCM 토큰 재검증.
     // 사용자가 OS 설정에서 권한을 늦게 켰거나 등록 시도가 누적 실패한 경우 자동 복구.
     if (state == AppLifecycleState.resumed) {
