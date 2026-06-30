@@ -13,14 +13,16 @@ import '../../data/services/groups_api_service.dart';
 /// - 멤버 리스트 (아바타·닉네임·역할 배지·평균 점수)
 /// - 본인은 "나" 표시
 ///
-/// 액션:
-/// - 본인이 ADMIN이면: 다른 MEMBER 옆 "운영자 위임" 버튼
-/// - 우상단 ⋮ → "클럽 탈퇴"
+/// 액션 (내 역할 기준):
+/// - OWNER: 모든 MEMBER에게 "운영진 임명" + "추방", 모든 STAFF에게 "운영진 해제" + "추방",
+///          모든 비본인·비OWNER에게 "클럽장 이양"
+/// - STAFF: MEMBER에게 "추방"만. STAFF/OWNER에게는 아무 액션 없음.
+/// - MEMBER: 액션 없음.
 ///
 /// 탈퇴 정책:
 /// - 일반 케이스: 즉시 탈퇴 후 pop
 /// - 유일 멤버: 백엔드가 클럽 자체 삭제 → pop + "클럽이 사라졌어요"
-/// - 유일 ADMIN + 다른 멤버: 409 → 권한 위임 안내 다이얼로그
+/// - OWNER + 다른 멤버: 409 → 클럽장 이양 안내 다이얼로그
 class ClubMembersPage extends StatefulWidget {
   const ClubMembersPage({
     super.key,
@@ -73,24 +75,27 @@ class _ClubMembersPageState extends State<ClubMembersPage> {
     }
   }
 
-  bool get _amAdmin {
-    if (_myUserId == null) return false;
+  /// 내 역할 문자열. 데이터 미로드 시 'MEMBER' 반환.
+  String get _myRole {
+    if (_myUserId == null) return GroupRole.member;
     final me = _members.firstWhere(
       (m) => (m['user']?['id']?.toString() ?? '') == _myUserId,
       orElse: () => const {},
     );
-    return (me['role']?.toString() ?? '') == 'ADMIN';
+    return me['role']?.toString() ?? GroupRole.member;
   }
 
-  Future<void> _confirmPromote(Map<String, dynamic> member) async {
+  // ── 운영진 임명 ──────────────────────────────────────────────────────────
+
+  Future<void> _confirmAppointStaff(Map<String, dynamic> member) async {
     final nickname = member['user']?['nickname']?.toString() ?? '멤버';
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('운영자로 위임할까요?'),
+        title: const Text('운영진으로 임명할까요?'),
         content: Text(
-          '$nickname 님을 클럽 운영자로 위임합니다.\n'
-          '운영자는 가입 신청 승인·반려, 다른 멤버 위임을 할 수 있어요.',
+          '$nickname 님을 운영진으로 임명합니다.\n'
+          '운영진은 가입 신청 승인, 공지 작성, 일반멤버 추방을 할 수 있어요.',
         ),
         actions: [
           TextButton(
@@ -99,37 +104,140 @@ class _ClubMembersPageState extends State<ClubMembersPage> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('위임하기'),
+            child: const Text('임명하기'),
           ),
         ],
       ),
     );
     if (ok != true) return;
-    await _doPromote(member);
+    await _doAppointStaff(member);
   }
 
-  Future<void> _doPromote(Map<String, dynamic> member) async {
+  Future<void> _doAppointStaff(Map<String, dynamic> member) async {
     final targetId = member['user']?['id']?.toString();
     if (targetId == null) return;
-
     setState(() => _busy = true);
     try {
       await _api.promoteMember(groupId: widget.groupId, targetUserId: targetId);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${member['user']?['nickname'] ?? '멤버'} 님을 운영자로 위임했어요.')),
+        SnackBar(content: Text('${member['user']?['nickname'] ?? '멤버'} 님을 운영진으로 임명했어요.')),
       );
       await _refresh();
     } on DioException catch (e) {
       if (!mounted) return;
       final msg = e.response?.data is Map
-          ? (e.response!.data['message']?.toString() ?? '위임에 실패했습니다.')
-          : '위임에 실패했습니다.';
+          ? (e.response!.data['message']?.toString() ?? '임명에 실패했습니다.')
+          : '임명에 실패했습니다.';
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
+
+  // ── 운영진 해제 ──────────────────────────────────────────────────────────
+
+  Future<void> _confirmRevokeStaff(Map<String, dynamic> member) async {
+    final nickname = member['user']?['nickname']?.toString() ?? '멤버';
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('운영진을 해제할까요?'),
+        content: Text(
+          '$nickname 님의 운영진 권한을 해제합니다.\n'
+          '해제 후 일반멤버로 변경돼요.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('해제하기'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await _doRevokeStaff(member);
+  }
+
+  Future<void> _doRevokeStaff(Map<String, dynamic> member) async {
+    final targetId = member['user']?['id']?.toString();
+    if (targetId == null) return;
+    setState(() => _busy = true);
+    try {
+      await _api.revokeStaff(groupId: widget.groupId, targetUserId: targetId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${member['user']?['nickname'] ?? '멤버'} 님의 운영진을 해제했어요.')),
+      );
+      await _refresh();
+    } on DioException catch (e) {
+      if (!mounted) return;
+      final msg = e.response?.data is Map
+          ? (e.response!.data['message']?.toString() ?? '해제에 실패했습니다.')
+          : '해제에 실패했습니다.';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  // ── 클럽장 이양 ──────────────────────────────────────────────────────────
+
+  Future<void> _confirmTransferOwnership(Map<String, dynamic> member) async {
+    final nickname = member['user']?['nickname']?.toString() ?? '멤버';
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('클럽장을 이양할까요?'),
+        content: Text(
+          '$nickname 님에게 클럽장 권한을 이양합니다.\n\n'
+          '이양 후 본인은 운영진으로 변경되며,\n'
+          '클럽장 권한은 되돌릴 수 없어요.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.redAccent),
+            child: const Text('이양하기'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await _doTransferOwnership(member);
+  }
+
+  Future<void> _doTransferOwnership(Map<String, dynamic> member) async {
+    final targetId = member['user']?['id']?.toString();
+    if (targetId == null) return;
+    setState(() => _busy = true);
+    try {
+      await _api.transferOwnership(groupId: widget.groupId, targetUserId: targetId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${member['user']?['nickname'] ?? '멤버'} 님에게 클럽장을 이양했어요.')),
+      );
+      await _refresh();
+    } on DioException catch (e) {
+      if (!mounted) return;
+      final msg = e.response?.data is Map
+          ? (e.response!.data['message']?.toString() ?? '이양에 실패했습니다.')
+          : '이양에 실패했습니다.';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  // ── 추방 ─────────────────────────────────────────────────────────────────
 
   Future<void> _confirmKick(Map<String, dynamic> member) async {
     final nickname = member['user']?['nickname']?.toString() ?? '멤버';
@@ -178,6 +286,8 @@ class _ClubMembersPageState extends State<ClubMembersPage> {
     }
   }
 
+  // ── 탈퇴 ─────────────────────────────────────────────────────────────────
+
   Future<void> _confirmLeave() async {
     final ok = await showDialog<bool>(
       context: context,
@@ -222,14 +332,14 @@ class _ClubMembersPageState extends State<ClubMembersPage> {
           : '탈퇴에 실패했습니다.';
 
       if (status == 409) {
-        // 유일 ADMIN + 다른 멤버 존재 → 권한 위임 안내
+        // OWNER + 다른 멤버 존재 → 클럽장 이양 안내
         await showDialog<void>(
           context: context,
           builder: (_) => AlertDialog(
-            title: const Text('운영자 권한을 먼저 위임해주세요'),
+            title: const Text('클럽장을 먼저 이양해주세요'),
             content: Text(
               '$msg\n\n'
-              '아래 멤버 목록에서 누군가를 운영자로 위임하면 탈퇴할 수 있어요.',
+              '아래 멤버 목록에서 다른 멤버에게 클럽장을 이양하면 탈퇴할 수 있어요.',
             ),
             actions: [
               TextButton(
@@ -246,6 +356,8 @@ class _ClubMembersPageState extends State<ClubMembersPage> {
       if (mounted) setState(() => _busy = false);
     }
   }
+
+  // ── 빌드 ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -302,12 +414,18 @@ class _ClubMembersPageState extends State<ClubMembersPage> {
     final userId = user['id']?.toString() ?? '';
     final nickname = user['nickname']?.toString() ?? '익명';
     final profileUrl = user['profile_image_url']?.toString();
-    final role = member['role']?.toString() ?? 'MEMBER';
-    final isAdmin = role == 'ADMIN';
+    final role = member['role']?.toString() ?? GroupRole.member;
     final isMe = userId == _myUserId;
-    // 플랫폼 어드민(앱 전체관리자)은 운영자 뱃지를 숨긴다 (UI만; 권한은 그대로).
     final isPlatformAdmin = member['is_platform_admin'] == true;
     final avgScore = (member['avg_score'] as num?)?.toDouble();
+
+    final myRole = _myRole;
+    final trailing = _buildTrailing(
+      member: member,
+      role: role,
+      isMe: isMe,
+      myRole: myRole,
+    );
 
     return ListTile(
       leading: SizedBox(
@@ -336,9 +454,13 @@ class _ClubMembersPageState extends State<ClubMembersPage> {
             const SizedBox(width: 6),
             _badge('나', color: AppColors.primary),
           ],
-          if (isAdmin && !isPlatformAdmin) ...[
+          if (role == GroupRole.owner && !isPlatformAdmin) ...[
             const SizedBox(width: 6),
-            _badge('운영자', color: const Color(0xFFFBBF24)),
+            _badge('클럽장', color: const Color(0xFFFBBF24)),
+          ],
+          if (role == GroupRole.staff && !isPlatformAdmin) ...[
+            const SizedBox(width: 6),
+            _badge('운영진', color: AppColors.primary),
           ],
         ],
       ),
@@ -351,36 +473,106 @@ class _ClubMembersPageState extends State<ClubMembersPage> {
                 fontSize: 12,
               ))
           : null,
-      trailing: (_amAdmin && !isAdmin && !isMe)
-          ? PopupMenuButton<String>(
-              enabled: !_busy,
-              icon: const Icon(Symbols.more_vert),
-              onSelected: (v) {
-                if (v == 'promote') _confirmPromote(member);
-                if (v == 'kick') _confirmKick(member);
-              },
-              itemBuilder: (_) => const [
-                PopupMenuItem(
-                  value: 'promote',
-                  child: ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: Icon(Symbols.shield_person),
-                    title: Text('운영자로 위임'),
-                  ),
-                ),
-                PopupMenuItem(
-                  value: 'kick',
-                  child: ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading:
-                        Icon(Symbols.person_remove, color: Colors.redAccent),
-                    title: Text('추방하기',
-                        style: TextStyle(color: Colors.redAccent)),
-                  ),
-                ),
-              ],
-            )
-          : null,
+      trailing: trailing,
+    );
+  }
+
+  /// 멤버 행 우측 액션 버튼. 내 역할과 대상 역할에 따라 메뉴 항목 결정.
+  Widget? _buildTrailing({
+    required Map<String, dynamic> member,
+    required String role,
+    required bool isMe,
+    required String myRole,
+  }) {
+    // 본인 행에는 액션 없음
+    if (isMe) return null;
+    // 내가 MEMBER면 액션 없음
+    if (!GroupRole.canManage(myRole)) return null;
+    // 대상이 OWNER면 항상 액션 없음
+    if (role == GroupRole.owner) return null;
+    // STAFF는 MEMBER에게만 추방 가능 (STAFF 대상 불가)
+    if (myRole == GroupRole.staff && role == GroupRole.staff) return null;
+
+    final items = <PopupMenuEntry<String>>[];
+
+    if (myRole == GroupRole.owner) {
+      if (role == GroupRole.member) {
+        // OWNER가 MEMBER를 볼 때: 운영진 임명 + 추방 + 클럽장 이양
+        items.add(const PopupMenuItem(
+          value: 'appoint_staff',
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Symbols.shield_person),
+            title: Text('운영진 임명'),
+          ),
+        ));
+        items.add(const PopupMenuItem(
+          value: 'transfer_ownership',
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Symbols.swap_horiz),
+            title: Text('클럽장 이양'),
+          ),
+        ));
+        items.add(const PopupMenuItem(
+          value: 'kick',
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Symbols.person_remove, color: Colors.redAccent),
+            title: Text('추방하기', style: TextStyle(color: Colors.redAccent)),
+          ),
+        ));
+      } else if (role == GroupRole.staff) {
+        // OWNER가 STAFF를 볼 때: 운영진 해제 + 추방 + 클럽장 이양
+        items.add(const PopupMenuItem(
+          value: 'revoke_staff',
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Symbols.shield),
+            title: Text('운영진 해제'),
+          ),
+        ));
+        items.add(const PopupMenuItem(
+          value: 'transfer_ownership',
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Symbols.swap_horiz),
+            title: Text('클럽장 이양'),
+          ),
+        ));
+        items.add(const PopupMenuItem(
+          value: 'kick',
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Symbols.person_remove, color: Colors.redAccent),
+            title: Text('추방하기', style: TextStyle(color: Colors.redAccent)),
+          ),
+        ));
+      }
+    } else if (myRole == GroupRole.staff) {
+      // STAFF가 MEMBER를 볼 때: 추방만
+      items.add(const PopupMenuItem(
+        value: 'kick',
+        child: ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: Icon(Symbols.person_remove, color: Colors.redAccent),
+          title: Text('추방하기', style: TextStyle(color: Colors.redAccent)),
+        ),
+      ));
+    }
+
+    if (items.isEmpty) return null;
+
+    return PopupMenuButton<String>(
+      enabled: !_busy,
+      icon: const Icon(Symbols.more_vert),
+      onSelected: (v) {
+        if (v == 'appoint_staff') _confirmAppointStaff(member);
+        if (v == 'revoke_staff') _confirmRevokeStaff(member);
+        if (v == 'transfer_ownership') _confirmTransferOwnership(member);
+        if (v == 'kick') _confirmKick(member);
+      },
+      itemBuilder: (_) => items,
     );
   }
 

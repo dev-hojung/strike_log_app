@@ -12,7 +12,7 @@ import '../../../../core/widgets/avatar_image.dart';
 import '../../../../core/widgets/error_retry_view.dart';
 import '../../../../core/widgets/main_container.dart';
 import '../../data/services/group_creation_requests_service.dart';
-import '../../data/services/groups_api_service.dart';
+import '../../data/services/groups_api_service.dart' show GroupsApiService, GroupRole;
 import 'club_join_requests_page.dart';
 import 'club_announcements_page.dart';
 import 'club_leaderboard_page.dart';
@@ -55,18 +55,19 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
     super.dispose();
   }
 
-  /// 현재 사용자가 클럽장인지 판별.
-  /// 백엔드 필드명이 환경마다 달라질 수 있어 알려진 후보들을 모두 확인.
-  bool _isClubLeader() {
-    final club = _club;
+  /// 멤버 목록에서 현재 사용자의 역할 반환. 데이터 미로드 시 'MEMBER'.
+  String _myClubRole() {
     final userId = _currentUserId;
-    if (club == null || userId == null) return false;
-    for (final key in ['leader_id', 'owner_id', 'creator_id', 'created_by']) {
-      final value = club[key];
-      if (value != null && value.toString() == userId) return true;
+    if (userId == null) return GroupRole.member;
+    for (final m in _members) {
+      final mId = (m['user_id'] ?? m['user']?['id'])?.toString();
+      if (mId == userId) return m['role']?.toString() ?? GroupRole.member;
     }
-    return false;
+    return GroupRole.member;
   }
+
+  /// OWNER 또는 STAFF이면 관리 UI를 노출.
+  bool _canManage() => GroupRole.canManage(_myClubRole());
 
   Future<void> _openJoinRequests() async {
     final club = _club;
@@ -747,9 +748,9 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
             tooltip: '공지사항',
             onPressed: _openAnnouncements,
           ),
-          // 멤버 관리(운영자 위임/탈퇴)는 클럽장만 진입.
+          // 멤버 관리·가입 신청 관리는 OWNER/STAFF(운영진 이상)만 진입.
           // 일반 멤버는 옆의 [탈퇴] 아이콘으로 곧바로 탈퇴할 수 있다.
-          if (_isClubLeader())
+          if (_canManage())
             IconButton(
               icon: Icon(
                 Symbols.group,
@@ -759,7 +760,7 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
               tooltip: '멤버 관리',
               onPressed: _openMembers,
             ),
-          if (_isClubLeader())
+          if (_canManage())
             ValueListenableBuilder<int>(
               valueListenable: PendingJoinRequestsService.instance.pendingCount,
               builder: (_, count, __) => Stack(
@@ -803,7 +804,7 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
                 ],
               ),
             ),
-          if (!_isClubLeader())
+          if (!_canManage())
             IconButton(
               icon: const Icon(
                 Symbols.logout,
@@ -841,7 +842,7 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
         builder: (_) => ClubAnnouncementsPage(
           groupId: clubId is int ? clubId : (int.tryParse(clubId.toString()) ?? 0),
           groupName: _club?['name']?.toString() ?? '',
-          isAdmin: _isClubLeader(),
+          isAdmin: _canManage(),
         ),
       ),
     );
@@ -1100,18 +1101,35 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
                           ),
                         ),
                       ],
-                      if (role == 'ADMIN' && !isMe && !isPlatformAdmin) ...[
+                      if (role == GroupRole.owner && !isMe && !isPlatformAdmin) ...[
                         const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: Colors.amber.withValues(alpha: 0.2),
+                            color: const Color(0xFFFBBF24).withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: const Text(
-                            'ADMIN',
+                            '클럽장',
                             style: TextStyle(
-                              color: Colors.amber,
+                              color: Color(0xFFFBBF24),
+                              fontSize: 10,
+                            ),
+                          ),
+                        ),
+                      ],
+                      if (role == GroupRole.staff && !isMe && !isPlatformAdmin) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            '운영진',
+                            style: TextStyle(
+                              color: AppColors.primary,
                               fontSize: 10,
                             ),
                           ),
