@@ -15,6 +15,7 @@ import '../../data/services/group_creation_requests_service.dart';
 import '../../data/services/groups_api_service.dart' show GroupsApiService, GroupRole;
 import 'club_join_requests_page.dart';
 import 'club_announcements_page.dart';
+import 'club_events_page.dart';
 import 'club_leaderboard_page.dart';
 import 'club_members_page.dart';
 import 'create_club_page.dart';
@@ -748,6 +749,15 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
             tooltip: '공지사항',
             onPressed: _openAnnouncements,
           ),
+          IconButton(
+            icon: Icon(
+              Symbols.event,
+              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              size: 20,
+            ),
+            tooltip: '정기전',
+            onPressed: _openEvents,
+          ),
           // 멤버 관리·가입 신청 관리는 OWNER/STAFF(운영진 이상)만 진입.
           // 일반 멤버는 옆의 [탈퇴] 아이콘으로 곧바로 탈퇴할 수 있다.
           if (_canManage())
@@ -843,6 +853,21 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
           groupId: clubId is int ? clubId : (int.tryParse(clubId.toString()) ?? 0),
           groupName: _club?['name']?.toString() ?? '',
           isAdmin: _canManage(),
+        ),
+      ),
+    );
+  }
+
+  void _openEvents() {
+    final clubId = _club?['id'];
+    if (clubId == null) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ClubEventsPage(
+          groupId: clubId is int ? clubId : (int.tryParse(clubId.toString()) ?? 0),
+          groupName: _club?['name']?.toString() ?? '',
+          canManage: _canManage(),
         ),
       ),
     );
