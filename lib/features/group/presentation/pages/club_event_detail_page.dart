@@ -4,6 +4,8 @@ import 'package:material_symbols_icons/symbols.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/share_capture.dart';
+import '../../../game/presentation/pages/frame_entry_page.dart';
+import '../../../game/presentation/widgets/location_input_dialog.dart';
 import '../../data/models/club_event.dart';
 import '../../data/models/club_event_result.dart';
 import '../../data/services/club_events_api_service.dart';
@@ -14,9 +16,8 @@ import '../../data/services/club_events_api_service.dart';
 /// - 순위표(result)·평균
 /// - STAFF+: 레인 배치 액션시트, 완료 처리
 /// - 결과 공유 (share_capture)
-/// - TODO(event_id): "정기전에서 게임 시작" 버튼 — 현재 클럽게임 선택 화면으로
-///   이동하되, event_id를 소켓/저장 경로에 연결하는 작업은 backend game-rooms
-///   수정과 함께 이후 PR에서 구현. 버튼만 노출하고 클럽게임 흐름으로 진입함.
+/// - 참가자(STAFF 포함): "정기전에서 게임 시작" — 개인 게임 frame-entry로 진입,
+///   저장 시 event_id가 games 테이블에 기록됨. 완료 후 결과 새로고침.
 class ClubEventDetailPage extends StatefulWidget {
   const ClubEventDetailPage({
     super.key,
@@ -385,6 +386,31 @@ class _ClubEventDetailPageState extends State<ClubEventDetailPage>
     }
   }
 
+  // ── 정기전 게임 시작 ──────────────────────────────────────────────────────
+
+  /// 정기전에서 개인 게임을 시작한다.
+  /// 장소 입력 → FrameEntryPage(eventId=widget.eventId) 진입.
+  /// 완료 후 돌아오면 결과를 새로고침한다.
+  Future<void> _startEventGame() async {
+    final location = await showLocationInputDialog(context);
+    if (location == null) return;
+    if (!mounted) return;
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => FrameEntryPage(
+          isClubGame: false,
+          location: location,
+          eventId: widget.eventId,
+        ),
+      ),
+    );
+
+    // 게임이 저장됐을 수 있으므로 결과 새로고침
+    if (mounted) _refresh();
+  }
+
   // ── 결과 공유 ────────────────────────────────────────────────────────────
 
   Future<void> _shareResult() async {
@@ -425,6 +451,14 @@ class _ClubEventDetailPageState extends State<ClubEventDetailPage>
               icon: const Icon(Symbols.share),
               tooltip: '결과 공유',
               onPressed: _shareResult,
+            ),
+          if (_event != null &&
+              _event!.status != ClubEventStatus.cancelled &&
+              _event!.status != ClubEventStatus.completed)
+            IconButton(
+              icon: const Icon(Symbols.sports_score),
+              tooltip: '정기전에서 게임 시작',
+              onPressed: _busy ? null : _startEventGame,
             ),
           if (widget.canManage && _event != null) ...[
             if (_event!.status != ClubEventStatus.completed &&

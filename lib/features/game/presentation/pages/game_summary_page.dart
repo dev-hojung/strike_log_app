@@ -45,6 +45,9 @@ class GameSummaryPage extends StatefulWidget {
   /// 시리즈 총 게임 수. 단일 게임은 null.
   final int? targetGameCount;
 
+  /// 정기전에서 시작한 게임인 경우 정기전 ID. 일반 게임은 null.
+  final int? eventId;
+
   const GameSummaryPage({
     super.key,
     required this.frames,
@@ -58,6 +61,7 @@ class GameSummaryPage extends StatefulWidget {
     this.seriesId,
     this.seriesIndex,
     this.targetGameCount,
+    this.eventId,
   });
 
   /// 시리즈 중간 게임 여부(다음 게임이 남아 있는지).
@@ -198,6 +202,8 @@ class _GameSummaryPageState extends State<GameSummaryPage> {
         // 시리즈 게임이면 시리즈 정보 함께 전달
         if (widget.seriesId != null) 'series_id': widget.seriesId,
         if (widget.seriesIndex != null) 'series_index': widget.seriesIndex,
+        // 정기전에서 시작한 게임이면 정기전 ID 함께 전달
+        if (widget.eventId != null) 'event_id': widget.eventId,
       };
 
       // 재시도 루프: 자동 재시도 3회까지, 최종 실패 시 사용자에게 재시도 기회 제공
@@ -279,6 +285,7 @@ class _GameSummaryPageState extends State<GameSummaryPage> {
               seriesId: widget.seriesId,
               seriesIndex: widget.seriesIndex! + 1,
               targetGameCount: widget.targetGameCount,
+              eventId: widget.eventId,
             ),
           ),
         );

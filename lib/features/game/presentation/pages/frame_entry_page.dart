@@ -35,6 +35,9 @@ class FrameEntryPage extends StatefulWidget {
   /// 내기 게임에서 방장 여부 (finishGame 호출 주체 결정)
   final bool isHost;
 
+  /// 정기전에서 시작한 게임인 경우 정기전 ID. 일반 게임은 null.
+  final int? eventId;
+
   const FrameEntryPage({
     super.key,
     this.isClubGame = false,
@@ -46,6 +49,7 @@ class FrameEntryPage extends StatefulWidget {
     this.targetGameCount,
     this.isBetGame = false,
     this.isHost = false,
+    this.eventId,
   });
 
   @override
@@ -457,6 +461,7 @@ class _FrameEntryPageState extends State<FrameEntryPage> {
             seriesId: widget.seriesId,
             seriesIndex: widget.seriesIndex,
             targetGameCount: widget.targetGameCount,
+            eventId: widget.eventId,
           ),
         ),
       );
