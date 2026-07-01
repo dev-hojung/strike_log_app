@@ -29,6 +29,7 @@ class _CreateClubEventPageState extends State<CreateClubEventPage> {
   final _gameTargetController = TextEditingController();
 
   DateTime? _selectedDate;
+  TimeOfDay? _selectedTime;
   bool _saving = false;
 
   @override
@@ -50,6 +51,20 @@ class _CreateClubEventPageState extends State<CreateClubEventPage> {
     if (picked != null) setState(() => _selectedDate = picked);
   }
 
+  Future<void> _pickTime() async {
+    final initial = _selectedTime ?? const TimeOfDay(hour: 19, minute: 0);
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: initial,
+      builder: (context, child) => Localizations.override(
+        context: context,
+        locale: const Locale('ko'),
+        child: child,
+      ),
+    );
+    if (picked != null) setState(() => _selectedTime = picked);
+  }
+
   Future<void> _submit() async {
     final name = _nameController.text.trim();
     if (name.isEmpty) {
@@ -64,15 +79,25 @@ class _CreateClubEventPageState extends State<CreateClubEventPage> {
       );
       return;
     }
+    if (_selectedTime == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('시간을 선택해주세요.')),
+      );
+      return;
+    }
 
     final gameTargetText = _gameTargetController.text.trim();
     final gameTarget =
         gameTargetText.isNotEmpty ? int.tryParse(gameTargetText) : null;
 
+    final d = _selectedDate!;
+    final t = _selectedTime!;
     final dateStr =
-        '${_selectedDate!.year.toString().padLeft(4, '0')}-'
-        '${_selectedDate!.month.toString().padLeft(2, '0')}-'
-        '${_selectedDate!.day.toString().padLeft(2, '0')}';
+        '${d.year.toString().padLeft(4, '0')}-'
+        '${d.month.toString().padLeft(2, '0')}-'
+        '${d.day.toString().padLeft(2, '0')} '
+        '${t.hour.toString().padLeft(2, '0')}:'
+        '${t.minute.toString().padLeft(2, '0')}:00';
 
     setState(() => _saving = true);
     try {
@@ -131,12 +156,16 @@ class _CreateClubEventPageState extends State<CreateClubEventPage> {
         children: [
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // 섹션: 기본 정보
+                  _sectionHeader('기본 정보', textColor, mutedText),
+                  const SizedBox(height: 14),
+
                   // 이름
-                  _label('정기전 이름', textColor),
+                  _fieldLabel('정기전 이름', textColor),
                   const SizedBox(height: 8),
                   _textField(
                     controller: _nameController,
@@ -145,31 +174,55 @@ class _CreateClubEventPageState extends State<CreateClubEventPage> {
                     textColor: textColor,
                     mutedText: mutedText,
                     borderColor: borderColor,
+                    prefixIcon: Symbols.edit,
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
 
                   // 날짜
-                  _label('날짜', textColor),
+                  _fieldLabel('날짜', textColor),
                   const SizedBox(height: 8),
                   _datePicker(surfaceColor, textColor, mutedText, borderColor),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
+
+                  // 시간
+                  _fieldLabel('시간', textColor),
+                  const SizedBox(height: 8),
+                  _timePicker(surfaceColor, textColor, mutedText, borderColor),
+
+                  const SizedBox(height: 28),
+                  _sectionDivider(isDark),
+                  const SizedBox(height: 20),
+
+                  // 섹션: 게임 설정
+                  _sectionHeader('게임 설정', textColor, mutedText),
+                  const SizedBox(height: 14),
 
                   // 목표 게임 수 (optional)
-                  _label('목표 게임 수 (선택)', textColor),
+                  _fieldLabel('목표 게임 수', textColor, optional: true),
                   const SizedBox(height: 8),
                   _textField(
                     controller: _gameTargetController,
-                    hint: '예: 3',
+                    hint: '미입력 시 제한 없음',
                     keyboardType: TextInputType.number,
                     surfaceColor: surfaceColor,
                     textColor: textColor,
                     mutedText: mutedText,
                     borderColor: borderColor,
+                    prefixIcon: Symbols.sports_score,
                   ),
-                  const SizedBox(height: 12),
-                  Text(
-                    '정기전 생성 후 멤버들이 직접 참석 신청할 수 있습니다.',
-                    style: TextStyle(color: mutedText, fontSize: 12),
+                  const SizedBox(height: 10),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Symbols.info, size: 13, color: mutedText),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          '정기전 생성 후 멤버들이 직접 참석 신청할 수 있습니다.',
+                          style: TextStyle(color: mutedText, fontSize: 12, height: 1.5),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 32),
                 ],
@@ -217,14 +270,54 @@ class _CreateClubEventPageState extends State<CreateClubEventPage> {
     );
   }
 
-  Widget _label(String text, Color color) => Text(
-        text,
-        style: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-          color: color,
+  Widget _sectionHeader(String title, Color textColor, Color mutedText) {
+    return Row(
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: mutedText,
+            letterSpacing: 1.0,
+          ),
         ),
-      );
+      ],
+    );
+  }
+
+  Widget _sectionDivider(bool isDark) {
+    return Container(
+      height: 1,
+      color: isDark ? Colors.white.withValues(alpha: 0.07) : Colors.black.withValues(alpha: 0.07),
+    );
+  }
+
+  Widget _fieldLabel(String text, Color color, {bool optional = false}) {
+    return Row(
+      children: [
+        Text(
+          text,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: color,
+          ),
+        ),
+        if (optional) ...[
+          const SizedBox(width: 6),
+          Text(
+            '선택',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+              color: AppColors.primary.withValues(alpha: 0.7),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
 
   Widget _textField({
     required TextEditingController controller,
@@ -234,65 +327,129 @@ class _CreateClubEventPageState extends State<CreateClubEventPage> {
     required Color textColor,
     required Color mutedText,
     required Color borderColor,
+    IconData? prefixIcon,
   }) {
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
-      style: TextStyle(color: textColor, fontSize: 14),
+      style: TextStyle(color: textColor, fontSize: 15),
       decoration: InputDecoration(
         hintText: hint,
         hintStyle: TextStyle(color: mutedText),
+        prefixIcon: prefixIcon != null
+            ? Icon(prefixIcon, color: mutedText, size: 18)
+            : null,
         filled: true,
         fillColor: surfaceColor,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide(color: borderColor),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide(color: borderColor),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.primary),
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
         ),
         contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       ),
     );
   }
 
   Widget _datePicker(Color surfaceColor, Color textColor, Color mutedText,
       Color borderColor) {
-    final label = _selectedDate == null
-        ? '날짜 선택'
-        : '${_selectedDate!.year}년 ${_selectedDate!.month}월 ${_selectedDate!.day}일';
+    final hasDate = _selectedDate != null;
+    final label = hasDate
+        ? '${_selectedDate!.year}년 ${_selectedDate!.month}월 ${_selectedDate!.day}일'
+        : '날짜 선택';
     return InkWell(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(14),
       onTap: _pickDate,
       child: Container(
-        height: 52,
+        height: 54,
         padding: const EdgeInsets.symmetric(horizontal: 16),
         decoration: BoxDecoration(
           color: surfaceColor,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: _selectedDate != null ? AppColors.primary : borderColor,
+            color: hasDate ? AppColors.primary : borderColor,
+            width: hasDate ? 1.5 : 1.0,
           ),
         ),
         child: Row(
           children: [
-            Icon(Symbols.calendar_today,
-                color: _selectedDate != null ? AppColors.primary : mutedText,
-                size: 18),
-            const SizedBox(width: 10),
-            Text(
-              label,
-              style: TextStyle(
-                color: _selectedDate != null ? textColor : mutedText,
-                fontSize: 14,
+            Icon(
+              Symbols.calendar_today,
+              color: hasDate ? AppColors.primary : mutedText,
+              size: 18,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: hasDate ? textColor : mutedText,
+                  fontSize: 15,
+                ),
               ),
             ),
+            if (hasDate)
+              Icon(Symbols.check_circle, color: AppColors.primary, size: 18),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _timePicker(Color surfaceColor, Color textColor, Color mutedText,
+      Color borderColor) {
+    final hasTime = _selectedTime != null;
+    String label;
+    if (hasTime) {
+      final t = _selectedTime!;
+      final period = t.hour < 12 ? '오전' : '오후';
+      final displayHour = t.hour == 0 ? 12 : (t.hour > 12 ? t.hour - 12 : t.hour);
+      final minuteStr = t.minute.toString().padLeft(2, '0');
+      label = '$period $displayHour:$minuteStr';
+    } else {
+      label = '시간 선택';
+    }
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: _pickTime,
+      child: Container(
+        height: 54,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          color: surfaceColor,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: hasTime ? AppColors.primary : borderColor,
+            width: hasTime ? 1.5 : 1.0,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Symbols.schedule,
+              color: hasTime ? AppColors.primary : mutedText,
+              size: 18,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: hasTime ? textColor : mutedText,
+                  fontSize: 15,
+                ),
+              ),
+            ),
+            if (hasTime)
+              Icon(Symbols.check_circle, color: AppColors.primary, size: 18),
           ],
         ),
       ),

@@ -123,4 +123,66 @@ class ClubEvent {
       participantCount: (json['participant_count'] as num?)?.toInt(),
     );
   }
+
+  /// eventDate 문자열에서 날짜·시간 컴포넌트를 파싱한다.
+  ///
+  /// 서버는 'YYYY-MM-DD HH:mm:ss' 또는 'YYYY-MM-DD' 형태로 내려준다.
+  /// DateTime.parse를 쓰지 않고 직접 분해해 TZ 변환을 완전히 차단한다.
+  static Map<String, int> _parseComponents(String s) {
+    // 날짜 부분: 최소 'YYYY-MM-DD'
+    final datePart = s.length >= 10 ? s.substring(0, 10) : s;
+    final dateParts = datePart.split('-');
+    final year = dateParts.isNotEmpty ? (int.tryParse(dateParts[0]) ?? 0) : 0;
+    final month = dateParts.length > 1 ? (int.tryParse(dateParts[1]) ?? 0) : 0;
+    final day = dateParts.length > 2 ? (int.tryParse(dateParts[2]) ?? 0) : 0;
+
+    int hour = 0;
+    int minute = 0;
+    // 시간 부분: 'YYYY-MM-DD HH:mm:ss' 또는 'YYYY-MM-DDTHH:mm:ss'
+    if (s.length > 10) {
+      final timePart = s.substring(11); // skip date + separator
+      final timeParts = timePart.split(':');
+      hour = timeParts.isNotEmpty ? (int.tryParse(timeParts[0]) ?? 0) : 0;
+      minute = timeParts.length > 1 ? (int.tryParse(timeParts[1]) ?? 0) : 0;
+    }
+
+    return {
+      'year': year,
+      'month': month,
+      'day': day,
+      'hour': hour,
+      'minute': minute,
+    };
+  }
+
+  /// 카드/헤더 날짜 블럭용: 월(int), 일(int) 반환.
+  (int month, int day) get dateComponents {
+    final c = _parseComponents(eventDate);
+    return (c['month']!, c['day']!);
+  }
+
+  /// 상세 표시용 날짜 문자열. 예: "2026년 7월 5일"
+  String get formattedDate {
+    final c = _parseComponents(eventDate);
+    return '${c['year']}년 ${c['month']}월 ${c['day']}일';
+  }
+
+  /// 시간 표시 문자열. 예: "오후 7:00" (시간 정보 없으면 null 반환)
+  String? get formattedTime {
+    final c = _parseComponents(eventDate);
+    final h = c['hour']!;
+    final m = c['minute']!;
+    if (h == 0 && m == 0) return null;
+    final period = h < 12 ? '오전' : '오후';
+    final displayHour = h == 0 ? 12 : (h > 12 ? h - 12 : h);
+    final minuteStr = m.toString().padLeft(2, '0');
+    return '$period $displayHour:$minuteStr';
+  }
+
+  /// 날짜+시간 전체 표시 문자열. 예: "2026년 7월 5일 오후 7:00"
+  String get formattedDateTime {
+    final time = formattedTime;
+    if (time == null) return formattedDate;
+    return '$formattedDate $time';
+  }
 }

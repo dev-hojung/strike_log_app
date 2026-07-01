@@ -407,7 +407,10 @@ class _ClubEventDetailPageState extends State<ClubEventDetailPage>
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final nameController = TextEditingController(text: event.name);
+    // 기존 날짜 파싱 (날짜 부분만)
     DateTime selectedDate = _parseDateStr(event.eventDate) ?? DateTime.now();
+    // 기존 시간 파싱 (없으면 null 유지 — 수정 시 시간은 건드리지 않음)
+    final existingTime = _parseTimeStr(event.eventDate);
 
     Future<void> pickDate(StateSetter setDialogState) async {
       final now = DateTime.now();
@@ -555,10 +558,13 @@ class _ClubEventDetailPageState extends State<ClubEventDetailPage>
       return;
     }
 
+    // 날짜 부분 + 기존 시간 재결합 (수정 다이얼로그는 날짜만 변경)
+    final hh = existingTime?.hour.toString().padLeft(2, '0') ?? '00';
+    final mm = existingTime?.minute.toString().padLeft(2, '0') ?? '00';
     final dateStr =
         '${selectedDate.year.toString().padLeft(4, '0')}-'
         '${selectedDate.month.toString().padLeft(2, '0')}-'
-        '${selectedDate.day.toString().padLeft(2, '0')}';
+        '${selectedDate.day.toString().padLeft(2, '0')} $hh:$mm:00';
 
     setState(() => _busy = true);
     try {
@@ -586,9 +592,22 @@ class _ClubEventDetailPageState extends State<ClubEventDetailPage>
     }
   }
 
+  /// 'YYYY-MM-DD HH:mm:ss' → TimeOfDay (시간 부분만 추출). 시간 없으면 null.
+  TimeOfDay? _parseTimeStr(String s) {
+    if (s.length <= 10) return null;
+    final timePart = s.substring(11);
+    final parts = timePart.split(':');
+    final h = parts.isNotEmpty ? int.tryParse(parts[0]) : null;
+    final m = parts.length > 1 ? int.tryParse(parts[1]) : null;
+    if (h == null || m == null) return null;
+    if (h == 0 && m == 0) return null;
+    return TimeOfDay(hour: h, minute: m);
+  }
+
+  /// 'YYYY-MM-DD' 또는 'YYYY-MM-DD HH:mm:ss' → DateTime (날짜 부분만 사용).
   DateTime? _parseDateStr(String s) {
-    // 'YYYY-MM-DD'
-    final parts = s.split('-');
+    final datePart = s.length >= 10 ? s.substring(0, 10) : s;
+    final parts = datePart.split('-');
     if (parts.length != 3) return null;
     final y = int.tryParse(parts[0]);
     final m = int.tryParse(parts[1]);
@@ -626,20 +645,21 @@ class _ClubEventDetailPageState extends State<ClubEventDetailPage>
         eventId: widget.eventId,
         status: 'cancelled',
       );
-      _changed = true;
-      await _refresh();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('정기전이 취소되었습니다.')),
       );
+      Navigator.pop(context, true);
     } on DioException catch (e) {
       if (!mounted) return;
+      setState(() => _busy = false);
       final msg = e.response?.data is Map
           ? (e.response!.data['message']?.toString() ?? '취소에 실패했습니다.')
           : '취소에 실패했습니다.';
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(msg)));
     } finally {
+      // pop 성공 시 이미 unmounted이므로 mounted 체크 후 처리
       if (mounted) setState(() => _busy = false);
     }
   }
@@ -887,6 +907,8 @@ class _ClubEventDetailPageState extends State<ClubEventDetailPage>
             ? const Center(child: CircularProgressIndicator())
             : Column(
                 children: [
+                  // 이벤트 요약 헤더 영역
+                  if (event != null) _buildEventHeader(event, isDark),
                   Expanded(
                     child: TabBarView(
                       controller: _tabController,
@@ -903,6 +925,170 @@ class _ClubEventDetailPageState extends State<ClubEventDetailPage>
               ),
       ),
     );
+  }
+
+  // ── 이벤트 헤더 ───────────────────────────────────────────────────────────
+
+  Widget _buildEventHeader(ClubEvent event, bool isDark) {
+    final surface = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
+    final primaryText = isDark ? Colors.white : AppColors.textPrimaryLight;
+    final mutedText = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final statusColor = _statusColor(event.status);
+
+    final (month, day) = event.dateComponents;
+    final timeStr = event.formattedTime;
+
+    return Container(
+      color: surface,
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 날짜 블럭
+          Container(
+            width: 52,
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '$month월',
+                  style: TextStyle(
+                    color: AppColors.primary.withValues(alpha: 0.8),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                Text(
+                  '$day',
+                  style: const TextStyle(
+                    color: AppColors.primary,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    height: 1.0,
+                  ),
+                ),
+                if (timeStr != null)
+                  Text(
+                    timeStr,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: AppColors.primary.withValues(alpha: 0.7),
+                      fontSize: 9,
+                      fontWeight: FontWeight.w600,
+                      height: 1.3,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 14),
+          // 이름 + 날짜 + 상태
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  event.name,
+                  style: TextStyle(
+                    color: primaryText,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    height: 1.3,
+                  ),
+                  softWrap: true,
+                ),
+                const SizedBox(height: 5),
+                Row(
+                  children: [
+                    Icon(Symbols.calendar_today, size: 12, color: mutedText),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        event.formattedDateTime,
+                        style: TextStyle(color: mutedText, fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    _buildStatusPill(event.status, statusColor),
+                    const SizedBox(width: 8),
+                    Icon(Symbols.group, size: 13, color: mutedText),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${event.participantCount}명',
+                      style: TextStyle(color: mutedText, fontSize: 12),
+                    ),
+                    if (event.gameTarget != null) ...[
+                      Text(' · ', style: TextStyle(color: mutedText, fontSize: 12)),
+                      Icon(Symbols.sports_score, size: 13, color: mutedText),
+                      const SizedBox(width: 3),
+                      Text(
+                        '${event.gameTarget}게임',
+                        style: TextStyle(color: mutedText, fontSize: 12),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusPill(ClubEventStatus status, Color statusColor) {
+    final icon = switch (status) {
+      ClubEventStatus.scheduled => Symbols.schedule,
+      ClubEventStatus.inProgress => Symbols.play_circle,
+      ClubEventStatus.completed => Symbols.check_circle,
+      ClubEventStatus.cancelled => Symbols.cancel,
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: statusColor.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 11, color: statusColor),
+          const SizedBox(width: 4),
+          Text(
+            status.label,
+            style: TextStyle(
+              color: statusColor,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.2,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _statusColor(ClubEventStatus status) {
+    switch (status) {
+      case ClubEventStatus.scheduled:
+        return AppColors.primary;
+      case ClubEventStatus.inProgress:
+        return const Color(0xFFE8860A);
+      case ClubEventStatus.completed:
+        return const Color(0xFF16A34A);
+      case ClubEventStatus.cancelled:
+        return const Color(0xFFDC2626);
+    }
   }
 
   // ── 하단 바 (Fix #3) ───────────────────────────────────────────────────────
@@ -1003,16 +1189,7 @@ class _ClubEventDetailPageState extends State<ClubEventDetailPage>
         child: ListView(
           padding: const EdgeInsets.symmetric(vertical: 60),
           children: [
-            Center(
-              child: Text(
-                '참가자가 없어요.',
-                style: TextStyle(
-                  color: isDark
-                      ? AppColors.textSecondaryDark
-                      : AppColors.textSecondaryLight,
-                ),
-              ),
-            ),
+            _buildParticipantsEmptyState(isDark),
           ],
         ),
       );
@@ -1031,6 +1208,35 @@ class _ClubEventDetailPageState extends State<ClubEventDetailPage>
         itemCount: participants.length,
         separatorBuilder: (_, __) => const SizedBox(height: 8),
         itemBuilder: (_, i) => _buildParticipantTile(participants[i], isDark),
+      ),
+    );
+  }
+
+  Widget _buildParticipantsEmptyState(bool isDark) {
+    final mutedText = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 40),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.08),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Symbols.group_add, color: AppColors.primary.withValues(alpha: 0.5), size: 30),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              '아직 참가 신청한 멤버가 없어요.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: mutedText, fontSize: 14),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1078,6 +1284,7 @@ class _ClubEventDetailPageState extends State<ClubEventDetailPage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // 레인 헤더
           Container(
             padding:
                 const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -1088,19 +1295,44 @@ class _ClubEventDetailPageState extends State<ClubEventDetailPage>
             ),
             child: Row(
               children: [
-                Icon(Symbols.view_column,
-                    color: AppColors.primary, size: 18),
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Center(
+                    child: Text(
+                      '$lane',
+                      style: const TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ),
                 const SizedBox(width: 8),
                 Text(
-                  '$lane번 레인',
+                  '번 레인',
                   style: const TextStyle(
                     color: AppColors.primary,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w600,
                     fontSize: 14,
                   ),
                 ),
+                const Spacer(),
+                Text(
+                  '${members.length}명',
+                  style: TextStyle(
+                    color: AppColors.primary.withValues(alpha: 0.7),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
                 if (members.first.teamNo != null) ...[
-                  const Spacer(),
+                  const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 8, vertical: 2),
@@ -1121,48 +1353,105 @@ class _ClubEventDetailPageState extends State<ClubEventDetailPage>
               ],
             ),
           ),
-          ...members.map((p) => Padding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 10),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color:
-                            AppColors.primary.withValues(alpha: 0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Symbols.person,
-                          color: AppColors.primary, size: 18),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        p.nickname,
-                        style: TextStyle(
-                          color: primaryText,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
+          // 멤버 목록
+          ...members.asMap().entries.map((entry) {
+            final idx = entry.key;
+            final p = entry.value;
+            final isLast = idx == members.length - 1;
+            return Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 10),
+                  child: Row(
+                    children: [
+                      // 이니셜 아바타
+                      _buildAvatarCircle(p.nickname, size: 34),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          p.nickname,
+                          style: TextStyle(
+                            color: primaryText,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                          softWrap: true,
                         ),
                       ),
-                    ),
-                    if (p.handicap > 0)
-                      Text(
-                        '+${p.handicap}H',
-                        style: TextStyle(
-                          color: mutedText,
-                          fontSize: 12,
+                      if (p.handicap > 0)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 7, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.07)
+                                : Colors.black.withValues(alpha: 0.05),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            '+${p.handicap}H',
+                            style: TextStyle(
+                              color: mutedText,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
-              )),
+                if (!isLast)
+                  Divider(
+                    height: 1,
+                    indent: 62,
+                    endIndent: 16,
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.05)
+                        : Colors.black.withValues(alpha: 0.05),
+                  ),
+              ],
+            );
+          }),
         ],
       ),
     );
   }
+
+  Widget _buildAvatarCircle(String nickname, {double size = 36}) {
+    final initial =
+        nickname.isNotEmpty ? nickname.characters.first.toUpperCase() : '?';
+    // 닉네임 기반으로 색상 결정 (일관성 있게)
+    final colorIndex = nickname.codeUnits.fold(0, (a, b) => a + b) % _avatarColors.length;
+    final avatarColor = _avatarColors[colorIndex];
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: avatarColor.withValues(alpha: 0.2),
+        shape: BoxShape.circle,
+      ),
+      child: Center(
+        child: Text(
+          initial,
+          style: TextStyle(
+            color: avatarColor,
+            fontWeight: FontWeight.w700,
+            fontSize: size * 0.4,
+          ),
+        ),
+      ),
+    );
+  }
+
+  static const List<Color> _avatarColors = [
+    AppColors.primary,
+    Color(0xFFE8860A),
+    Color(0xFF16A34A),
+    Color(0xFF7C3AED),
+    Color(0xFFDB2777),
+    Color(0xFF0891B2),
+  ];
 
   Widget _buildParticipantTile(
       ClubEventParticipant p, bool isDark) {
@@ -1183,16 +1472,7 @@ class _ClubEventDetailPageState extends State<ClubEventDetailPage>
       ),
       child: Row(
         children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Symbols.person,
-                color: AppColors.primary, size: 20),
-          ),
+          _buildAvatarCircle(p.nickname, size: 38),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
@@ -1202,12 +1482,22 @@ class _ClubEventDetailPageState extends State<ClubEventDetailPage>
                 fontWeight: FontWeight.w600,
                 fontSize: 14,
               ),
+              softWrap: true,
             ),
           ),
           if (p.handicap > 0)
-            Text(
-              '+${p.handicap}H',
-              style: TextStyle(color: mutedText, fontSize: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              decoration: BoxDecoration(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.07)
+                    : Colors.black.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                '+${p.handicap}H',
+                style: TextStyle(color: mutedText, fontSize: 11, fontWeight: FontWeight.w600),
+              ),
             ),
         ],
       ),
@@ -1226,20 +1516,7 @@ class _ClubEventDetailPageState extends State<ClubEventDetailPage>
         child: ListView(
           padding: const EdgeInsets.symmetric(vertical: 60, horizontal: 16),
           children: [
-            Center(
-              child: Text(
-                event?.status == ClubEventStatus.scheduled
-                    ? '아직 게임이 시작되지 않았어요.'
-                    : '아직 결과가 없어요.\n게임을 진행하면 순위가 표시됩니다.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: isDark
-                      ? AppColors.textSecondaryDark
-                      : AppColors.textSecondaryLight,
-                  height: 1.6,
-                ),
-              ),
-            ),
+            _buildResultEmptyState(event, isDark),
           ],
         ),
       );
@@ -1258,135 +1535,230 @@ class _ClubEventDetailPageState extends State<ClubEventDetailPage>
     );
   }
 
+  Widget _buildResultEmptyState(ClubEvent? event, bool isDark) {
+    final mutedText = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final isScheduled = event?.status == ClubEventStatus.scheduled;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 40),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.08),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                isScheduled ? Symbols.hourglass_empty : Symbols.emoji_events,
+                color: AppColors.primary.withValues(alpha: 0.45),
+                size: 30,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              isScheduled
+                  ? '아직 게임이 시작되지 않았어요.'
+                  : '아직 기록이 없어요.\n게임을 진행하면 순위가 표시됩니다.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: mutedText,
+                fontSize: 14,
+                height: 1.6,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildResultCard(
       ClubEventResult result, ClubEvent? event, bool isDark) {
-    final cardBg = isDark ? AppColors.surfaceDark : Colors.white;
-    final border = isDark ? Colors.white12 : Colors.black12;
-    final primaryText =
-        isDark ? Colors.white : AppColors.textPrimaryLight;
-    final mutedText =
-        isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    // Share card: deep navy gradient background so it looks great as a standalone image
+    const cardBg = Color(0xFF0D1423);
+    const cardBgLight = Color(0xFFF8FAFF);
 
     return Container(
       decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: border),
+        color: isDark ? cardBg : cardBgLight,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : Colors.black.withValues(alpha: 0.07),
+        ),
       ),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 헤더
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  AppColors.primary,
-                  AppColors.primary.withValues(alpha: 0.7),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(16)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Symbols.emoji_events,
-                        color: Colors.white, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        result.eventName,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  result.eventDate,
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
+          // 공유 카드 헤더: 브랜드 + 이벤트 정보
+          _buildShareCardHeader(result, isDark),
 
           // 팀 결과 (팀전일 때)
           if (result.teams != null && result.teams!.isNotEmpty) ...[
-            Padding(
-              padding:
-                  const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Text(
-                '팀 순위',
-                style: TextStyle(
-                  color: primaryText,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
+            _buildSectionLabel('팀 순위', isDark),
+            ...result.teams!.asMap().entries.map(
+              (entry) => _buildTeamRow(entry.value, isDark),
             ),
-            ...result.teams!.map((t) => _buildTeamRow(t, mutedText, primaryText)),
-            Divider(
-                height: 24,
-                color: isDark ? Colors.white12 : Colors.black12),
+            _buildSectionDivider(isDark),
           ],
 
           // 개인 순위
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: Text(
-              '개인 순위',
-              style: TextStyle(
-                color: primaryText,
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+          _buildSectionLabel('개인 순위', isDark),
+          ...result.participants.asMap().entries.map(
+            (entry) => _buildParticipantResultRow(entry.value, isDark),
           ),
-          ...result.participants
-              .map((p) => _buildParticipantResultRow(p, mutedText, primaryText)),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
         ],
       ),
     );
   }
 
-  Widget _buildTeamRow(ClubEventResultTeam team, Color mutedText,
-      Color primaryText) {
-    final medal = _medalIcon(team.rank);
+  Widget _buildShareCardHeader(ClubEventResult result, bool isDark) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: isDark
+              ? [const Color(0xFF0F1E45), const Color(0xFF0D1423)]
+              : [AppColors.primary, AppColors.primary.withValues(alpha: 0.85)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // STRIKE LOG 브랜드 마크
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Symbols.sports_score,
+                        color: Colors.white.withValues(alpha: 0.9), size: 12),
+                    const SizedBox(width: 5),
+                    Text(
+                      'STRIKE LOG',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.9),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          // 이벤트 이름
+          Text(
+            result.eventName,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              height: 1.3,
+            ),
+            softWrap: true,
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Icon(Symbols.calendar_today,
+                  color: Colors.white.withValues(alpha: 0.6), size: 12),
+              const SizedBox(width: 5),
+              Text(
+                result.eventDate,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.7),
+                  fontSize: 12,
+                ),
+              ),
+              if (result.participants.isNotEmpty) ...[
+                Text(
+                  '  ·  ',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.4),
+                    fontSize: 12,
+                  ),
+                ),
+                Icon(Symbols.group,
+                    color: Colors.white.withValues(alpha: 0.6), size: 12),
+                const SizedBox(width: 4),
+                Text(
+                  '${result.participants.length}명 참가',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.7),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionLabel(String label, bool isDark) {
+    final mutedText = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: mutedText,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1.0,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionDivider(bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        height: 1,
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.07)
+            : Colors.black.withValues(alpha: 0.07),
+      ),
+    );
+  }
+
+  Widget _buildTeamRow(ClubEventResultTeam team, bool isDark) {
+    final primaryText = isDark ? Colors.white : AppColors.textPrimaryLight;
+    final mutedText = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final isTop3 = team.rank <= 3;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
       child: Row(
         children: [
-          SizedBox(
-            width: 28,
-            child: Text(
-              medal ?? '${team.rank}위',
-              style: TextStyle(
-                  fontSize: medal != null ? 18 : 13, color: primaryText),
-              textAlign: TextAlign.center,
-            ),
-          ),
-          const SizedBox(width: 10),
+          _buildRankBadge(team.rank, compact: !isTop3),
+          const SizedBox(width: 14),
           Expanded(
             child: Text(
               '${team.teamNo}팀',
               style: TextStyle(
                 color: primaryText,
-                fontWeight: FontWeight.w700,
-                fontSize: 14,
+                fontWeight: isTop3 ? FontWeight.w700 : FontWeight.w600,
+                fontSize: isTop3 ? 15 : 14,
               ),
             ),
           ),
@@ -1395,10 +1767,11 @@ class _ClubEventDetailPageState extends State<ClubEventDetailPage>
             children: [
               Text(
                 team.avgScore.toStringAsFixed(1),
-                style: const TextStyle(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 15,
+                style: TextStyle(
+                  color: isTop3 ? _rankColor(team.rank) : AppColors.primary,
+                  fontWeight: FontWeight.w800,
+                  fontSize: isTop3 ? 16 : 14,
+                  fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
               Text(
@@ -1412,23 +1785,18 @@ class _ClubEventDetailPageState extends State<ClubEventDetailPage>
     );
   }
 
-  Widget _buildParticipantResultRow(ClubEventResultParticipant p,
-      Color mutedText, Color primaryText) {
-    final medal = _medalIcon(p.rank);
+  Widget _buildParticipantResultRow(
+      ClubEventResultParticipant p, bool isDark) {
+    final primaryText = isDark ? Colors.white : AppColors.textPrimaryLight;
+    final mutedText = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final isTop3 = p.rank <= 3;
+
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
       child: Row(
         children: [
-          SizedBox(
-            width: 28,
-            child: Text(
-              medal ?? '${p.rank}위',
-              style: TextStyle(
-                  fontSize: medal != null ? 18 : 13, color: primaryText),
-              textAlign: TextAlign.center,
-            ),
-          ),
-          const SizedBox(width: 10),
+          _buildRankBadge(p.rank, compact: !isTop3),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1437,34 +1805,40 @@ class _ClubEventDetailPageState extends State<ClubEventDetailPage>
                   p.nickname,
                   style: TextStyle(
                     color: primaryText,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
+                    fontWeight: isTop3 ? FontWeight.w700 : FontWeight.w600,
+                    fontSize: isTop3 ? 15 : 14,
                   ),
+                  softWrap: true,
                 ),
                 if (p.laneNo != null || p.teamNo != null)
-                  Text(
-                    [
-                      if (p.laneNo != null) '${p.laneNo}레인',
-                      if (p.teamNo != null) '${p.teamNo}팀',
-                    ].join(' · '),
-                    style: TextStyle(color: mutedText, fontSize: 11),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      [
+                        if (p.laneNo != null) '${p.laneNo}레인',
+                        if (p.teamNo != null) '${p.teamNo}팀',
+                      ].join(' · '),
+                      style: TextStyle(color: mutedText, fontSize: 11),
+                    ),
                   ),
               ],
             ),
           ),
+          const SizedBox(width: 10),
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
                 p.avgScore.toStringAsFixed(1),
-                style: const TextStyle(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 15,
+                style: TextStyle(
+                  color: isTop3 ? _rankColor(p.rank) : AppColors.primary,
+                  fontWeight: FontWeight.w800,
+                  fontSize: isTop3 ? 16 : 14,
+                  fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
               Text(
-                '${p.gameCount}게임',
+                '${p.gameCount}게임 · 합계 ${p.totalScore}',
                 style: TextStyle(color: mutedText, fontSize: 11),
               ),
             ],
@@ -1474,16 +1848,56 @@ class _ClubEventDetailPageState extends State<ClubEventDetailPage>
     );
   }
 
-  String? _medalIcon(int rank) {
-    switch (rank) {
-      case 1:
-        return '🥇';
-      case 2:
-        return '🥈';
-      case 3:
-        return '🥉';
-      default:
-        return null;
+  Widget _buildRankBadge(int rank, {bool compact = false}) {
+    if (rank <= 3) {
+      final color = _rankColor(rank);
+      final label = switch (rank) {
+        1 => '1',
+        2 => '2',
+        _ => '3',
+      };
+      final bgColor = color.withValues(alpha: 0.15);
+      return Container(
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(
+          color: bgColor,
+          shape: BoxShape.circle,
+          border: Border.all(color: color.withValues(alpha: 0.5), width: 1.5),
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w800,
+              fontSize: 14,
+            ),
+          ),
+        ),
+      );
     }
+    // 4위 이하: 숫자만, 작게
+    return SizedBox(
+      width: 32,
+      child: Text(
+        '$rank',
+        style: TextStyle(
+          color: AppColors.primary.withValues(alpha: 0.6),
+          fontWeight: FontWeight.w700,
+          fontSize: 13,
+          fontFeatures: const [FontFeature.tabularFigures()],
+        ),
+        textAlign: TextAlign.center,
+      ),
+    );
+  }
+
+  Color _rankColor(int rank) {
+    return switch (rank) {
+      1 => const Color(0xFFF59E0B), // 금
+      2 => const Color(0xFF94A3B8), // 은
+      _ => const Color(0xFFCD7C3A), // 동
+    };
   }
 }
