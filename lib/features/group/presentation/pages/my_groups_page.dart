@@ -638,173 +638,241 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
   }
 
   Widget _buildClubHeader(String clubName, bool isDark) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: isDark
-            ? AppColors.backgroundDark.withValues(alpha: 0.8)
-            : AppColors.backgroundLight,
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: AppColors.primary,
-              borderRadius: BorderRadius.circular(8),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.2),
-                  blurRadius: 15,
-                  offset: const Offset(0, 10),
-                  spreadRadius: -3,
-                ),
-              ],
-            ),
-            child: const Icon(Symbols.groups, color: Colors.white, size: 16),
+    final textSecondary =
+        isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // ── 클럽 정보 행 ──────────────────────────────────────────────
+        Container(
+          padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+          decoration: BoxDecoration(
+            color: isDark
+                ? AppColors.backgroundDark.withValues(alpha: 0.8)
+                : AppColors.backgroundLight,
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  clubName,
-                  style: TextStyle(
-                    color: isDark ? const Color(0xFFF1F5F9) : AppColors.textPrimaryLight,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w500,
-                    letterSpacing: -0.45,
-                  ),
-                ),
-                Row(
-                  children: [
-                    if ((_club?['description'] ?? '').toString().isNotEmpty)
-                      Flexible(
-                        child: Text(
-                          _club?['description'] ?? '',
-                          style: TextStyle(
-                            color: isDark
-                                ? AppColors.textSecondaryDark
-                                : AppColors.textSecondaryLight,
-                            fontSize: 12,
-                            letterSpacing: 0.6,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    if ((_club?['avg_score'] as num?)?.toInt() != null &&
-                        ((_club?['avg_score'] as num?)?.toInt() ?? 0) > 0) ...[
-                      if ((_club?['description'] ?? '').toString().isNotEmpty)
-                        Text(
-                          ' · ',
-                          style: TextStyle(
-                            color: isDark
-                                ? AppColors.textSecondaryDark
-                                : AppColors.textSecondaryLight,
-                            fontSize: 12,
-                          ),
-                        ),
-                      Icon(
-                        Symbols.equalizer,
-                        size: 12,
-                        color: isDark
-                            ? AppColors.textSecondaryDark
-                            : AppColors.textSecondaryLight,
-                      ),
-                      const SizedBox(width: 2),
-                      Text(
-                        '에버 ${(_club?['avg_score'] as num).toInt()}',
-                        style: TextStyle(
-                          color: isDark
-                              ? AppColors.textSecondaryDark
-                              : AppColors.textSecondaryLight,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.2),
+                      blurRadius: 15,
+                      offset: const Offset(0, 10),
+                      spreadRadius: -3,
+                    ),
                   ],
                 ),
-              ],
-            ),
-          ),
-          IconButton(
-            icon: Icon(
-              Symbols.leaderboard,
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-              size: 20,
-            ),
-            tooltip: '랭킹',
-            onPressed: _openLeaderboard,
-          ),
-          IconButton(
-            icon: Icon(
-              Symbols.campaign,
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-              size: 20,
-            ),
-            tooltip: '공지사항',
-            onPressed: _openAnnouncements,
-          ),
-          IconButton(
-            icon: Icon(
-              Symbols.event,
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-              size: 20,
-            ),
-            tooltip: '정기전',
-            onPressed: _openEvents,
-          ),
-          // 멤버 관리·가입 신청 관리는 OWNER/STAFF(운영진 이상)만 진입.
-          // 일반 멤버는 옆의 [탈퇴] 아이콘으로 곧바로 탈퇴할 수 있다.
-          if (_canManage())
-            IconButton(
-              icon: Icon(
-                Symbols.group,
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                size: 20,
+                child: const Icon(Symbols.groups, color: Colors.white, size: 16),
               ),
-              tooltip: '멤버 관리',
-              onPressed: _openMembers,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      clubName,
+                      style: TextStyle(
+                        color: isDark
+                            ? const Color(0xFFF1F5F9)
+                            : AppColors.textPrimaryLight,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: -0.45,
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        if ((_club?['description'] ?? '').toString().isNotEmpty)
+                          Flexible(
+                            child: Text(
+                              _club?['description'] ?? '',
+                              style: TextStyle(
+                                color: textSecondary,
+                                fontSize: 12,
+                                letterSpacing: 0.6,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        if ((_club?['avg_score'] as num?)?.toInt() != null &&
+                            ((_club?['avg_score'] as num?)?.toInt() ?? 0) >
+                                0) ...[
+                          if ((_club?['description'] ?? '').toString().isNotEmpty)
+                            Text(
+                              ' · ',
+                              style: TextStyle(color: textSecondary, fontSize: 12),
+                            ),
+                          Icon(Symbols.equalizer, size: 12, color: textSecondary),
+                          const SizedBox(width: 2),
+                          Text(
+                            '에버 ${(_club?['avg_score'] as num).toInt()}',
+                            style: TextStyle(
+                              color: textSecondary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              // 탈퇴 버튼 — 일반 멤버 전용, 헤더 우상단에 유지
+              if (!_canManage())
+                IconButton(
+                  icon: const Icon(Symbols.logout, color: Colors.redAccent, size: 20),
+                  tooltip: '클럽 탈퇴',
+                  onPressed: _confirmLeaveAsMember,
+                ),
+            ],
+          ),
+        ),
+        // ── 퀵 액션 행 ───────────────────────────────────────────────
+        _buildQuickActionRow(isDark),
+      ],
+    );
+  }
+
+  /// 아이콘 + 한글 레이블 타일 형태의 빠른 기능 접근 행.
+  /// 일반 멤버: 랭킹 · 공지 · 정기전 (3개)
+  /// OWNER/STAFF: 랭킹 · 공지 · 정기전 · 멤버 · 가입 (5개)
+  Widget _buildQuickActionRow(bool isDark) {
+    final canManage = _canManage();
+    final bgColor =
+        isDark ? AppColors.surfaceDark : Colors.white;
+    final dividerColor =
+        isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.06);
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: dividerColor),
+      ),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _buildActionTile(
+              isDark: isDark,
+              icon: Symbols.leaderboard,
+              label: '랭킹',
+              onTap: _openLeaderboard,
+              isFirst: true,
             ),
-          if (_canManage())
-            ValueListenableBuilder<int>(
-              valueListenable: PendingJoinRequestsService.instance.pendingCount,
-              builder: (_, count, __) => Stack(
+            _buildActionTileDivider(isDark),
+            _buildActionTile(
+              isDark: isDark,
+              icon: Symbols.campaign,
+              label: '공지',
+              onTap: _openAnnouncements,
+            ),
+            _buildActionTileDivider(isDark),
+            _buildActionTile(
+              isDark: isDark,
+              icon: Symbols.event,
+              label: '정기전',
+              onTap: _openEvents,
+              isLast: !canManage,
+            ),
+            if (canManage) ...[
+              _buildActionTileDivider(isDark),
+              _buildActionTile(
+                isDark: isDark,
+                icon: Symbols.group,
+                label: '멤버',
+                onTap: _openMembers,
+              ),
+              _buildActionTileDivider(isDark),
+              // 가입 신청 타일 — 뱃지 포함 (Expanded는 여기서 처리)
+              Expanded(
+                child: ValueListenableBuilder<int>(
+                  valueListenable: PendingJoinRequestsService.instance.pendingCount,
+                  builder: (_, count, __) => _buildActionTile(
+                    isDark: isDark,
+                    icon: Symbols.person_add,
+                    label: '가입',
+                    onTap: _openJoinRequests,
+                    badgeCount: count,
+                    isLast: true,
+                    wrapExpanded: false,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 퀵 액션 행의 개별 타일. [badgeCount] > 0 이면 아이콘 우상단에 빨간 뱃지 표시.
+  /// [wrapExpanded] false 이면 호출자가 이미 Expanded로 감싸고 있으므로 bare 위젯 반환.
+  Widget _buildActionTile({
+    required bool isDark,
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    int badgeCount = 0,
+    bool isFirst = false,
+    bool isLast = false,
+    bool wrapExpanded = true,
+  }) {
+    final labelColor =
+        isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+
+    final tile = Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.horizontal(
+          left: isFirst ? const Radius.circular(14) : Radius.zero,
+          right: isLast ? const Radius.circular(14) : Radius.zero,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Stack(
                 clipBehavior: Clip.none,
                 children: [
-                  IconButton(
-                    icon: Icon(
-                      Symbols.person_add,
-                      color: isDark
-                          ? AppColors.textSecondaryDark
-                          : AppColors.textSecondaryLight,
-                      size: 20,
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    tooltip: '가입 신청 관리',
-                    onPressed: _openJoinRequests,
+                    child: Icon(icon, color: AppColors.primary, size: 18),
                   ),
-                  if (count > 0)
+                  if (badgeCount > 0)
                     Positioned(
-                      right: 4,
-                      top: 4,
+                      right: -4,
+                      top: -4,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 5, vertical: 1),
+                            horizontal: 4, vertical: 1),
                         constraints: const BoxConstraints(minWidth: 16),
                         decoration: BoxDecoration(
                           color: Colors.redAccent,
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          count > 99 ? '99+' : '$count',
+                          badgeCount > 99 ? '99+' : '$badgeCount',
                           textAlign: TextAlign.center,
                           style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 10,
+                            fontSize: 9,
                             fontWeight: FontWeight.w700,
                             height: 1.2,
                           ),
@@ -813,19 +881,34 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
                     ),
                 ],
               ),
-            ),
-          if (!_canManage())
-            IconButton(
-              icon: const Icon(
-                Symbols.logout,
-                color: Colors.redAccent,
-                size: 20,
+              const SizedBox(height: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  color: labelColor,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
-              tooltip: '클럽 탈퇴',
-              onPressed: _confirmLeaveAsMember,
-            ),
-        ],
+            ],
+          ),
+        ),
       ),
+    );
+
+    // 가입 신청 타일(ValueListenableBuilder)은 호출자가 Expanded로 감싸므로 bare 반환.
+    return wrapExpanded ? Expanded(child: tile) : tile;
+  }
+
+  Widget _buildActionTileDivider(bool isDark) {
+    return VerticalDivider(
+      width: 1,
+      thickness: 1,
+      indent: 12,
+      endIndent: 12,
+      color: isDark
+          ? Colors.white.withValues(alpha: 0.08)
+          : Colors.black.withValues(alpha: 0.08),
     );
   }
 
