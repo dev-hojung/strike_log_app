@@ -244,7 +244,7 @@ class _ClubEventsPageState extends State<ClubEventsPage>
                         Icon(Symbols.group, size: 14, color: mutedText),
                         const SizedBox(width: 4),
                         Text(
-                          '${event.participants.isNotEmpty ? event.participants.length : ""}명',
+                          '${event.participantCount}명',
                           style: TextStyle(color: mutedText, fontSize: 12),
                         ),
                         if (event.gameTarget != null) ...[

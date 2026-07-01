@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_colors.dart';
 
-Future<String?> showLocationInputDialog(BuildContext context) async {
+Future<String?> showLocationInputDialog(
+  BuildContext context, {
+  String? initialValue,
+}) async {
   final isDark = Theme.of(context).brightness == Brightness.dark;
-  final controller = TextEditingController();
+  final controller = TextEditingController(text: initialValue ?? '');
 
   return showDialog<String>(
     context: context,

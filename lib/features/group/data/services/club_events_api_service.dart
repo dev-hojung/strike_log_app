@@ -188,6 +188,36 @@ class ClubEventsApiService {
     }
   }
 
+  /// 본인 참석 신청. 클럽 멤버이면 누구나 호출 가능 (idempotent).
+  Future<void> attend({
+    required int groupId,
+    required int eventId,
+  }) async {
+    try {
+      await _apiClient.dio
+          .post('/groups/$groupId/events/$eventId/attend');
+    } on DioException catch (e, st) {
+      await AppLogger.captureError(e,
+          stackTrace: st, context: 'clubEvents.attend');
+      rethrow;
+    }
+  }
+
+  /// 본인 참석 취소. 클럽 멤버이면 누구나 호출 가능.
+  Future<void> unattend({
+    required int groupId,
+    required int eventId,
+  }) async {
+    try {
+      await _apiClient.dio
+          .delete('/groups/$groupId/events/$eventId/attend');
+    } on DioException catch (e, st) {
+      await AppLogger.captureError(e,
+          stackTrace: st, context: 'clubEvents.unattend');
+      rethrow;
+    }
+  }
+
   /// 결과 집계 조회 (참가자/팀별 순위·평균).
   Future<ClubEventResult> getEventResult(int groupId, int eventId) async {
     try {

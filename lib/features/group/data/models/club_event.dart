@@ -75,6 +75,9 @@ class ClubEvent {
   final String createdAt;
   final String updatedAt;
   final List<ClubEventParticipant> participants;
+  /// 목록 API에서 participant_count로 내려오는 숫자.
+  /// 상세 API에서는 participants 배열 길이로 계산.
+  final int? _participantCountFromApi;
 
   ClubEvent({
     required this.id,
@@ -88,11 +91,13 @@ class ClubEvent {
     required this.createdAt,
     required this.updatedAt,
     this.participants = const [],
-  });
+    int? participantCount,
+  }) : _participantCountFromApi = participantCount;
 
-  int get participantCount => participants.isEmpty
-      ? 0
-      : participants.length;
+  /// 참가자 수. 목록 API의 participant_count를 우선 사용하고
+  /// 없으면 participants 배열 길이로 계산한다.
+  int get participantCount =>
+      _participantCountFromApi ?? participants.length;
 
   factory ClubEvent.fromJson(Map<String, dynamic> json) {
     final rawParticipants = json['participants'];
@@ -115,6 +120,7 @@ class ClubEvent {
       createdAt: json['created_at']?.toString() ?? '',
       updatedAt: json['updated_at']?.toString() ?? '',
       participants: participants,
+      participantCount: (json['participant_count'] as num?)?.toInt(),
     );
   }
 }
