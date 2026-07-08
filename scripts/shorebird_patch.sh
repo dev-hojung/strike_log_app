@@ -17,11 +17,18 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# shorebird CLI 경로 보장
+export PATH="$HOME/.shorebird/bin:$PATH"
+
 PLATFORM="${1:-both}"
 EXPORT_OPTS="ios/ExportOptions.plist"
 
+# 패치는 대상 릴리스가 빌드된 Flutter 버전(3.41.9)을 shorebird가 자동으로 사용한다.
+# 따라서 여기서 별도로 --flutter-version 을 지정할 필요가 없다.
+# (현재 pubspec 버전과 동일한 릴리스가 게시돼 있어야 patch 가능)
+
 if ! command -v shorebird >/dev/null 2>&1; then
-  echo "❌ shorebird CLI가 없습니다. README_SHOREBIRD.md 의 설치 안내를 참고하세요."
+  echo "❌ shorebird CLI가 없습니다. docs/shorebird-code-push.md 의 설치 안내를 참고하세요."
   exit 1
 fi
 

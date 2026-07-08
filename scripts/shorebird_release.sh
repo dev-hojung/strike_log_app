@@ -13,8 +13,17 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# shorebird CLI 경로 보장
+export PATH="$HOME/.shorebird/bin:$PATH"
+
 PLATFORM="${1:-both}"
 EXPORT_OPTS="ios/ExportOptions.plist"
+
+# ⚠️ 프로젝트 로컬 Flutter(3.41.2)와 동일 minor로 고정.
+# Shorebird 기본 Flutter(3.44.x)로 빌드하면 material_symbols_icons가
+# final class IconData 상속 에러로 컴파일 실패하므로 3.41.9로 못박는다.
+# 패치도 이 릴리스의 Flutter 버전을 자동으로 따르므로 릴리스만 고정하면 됨.
+FLUTTER_VERSION="3.41.9"
 
 if ! command -v shorebird >/dev/null 2>&1; then
   echo "❌ shorebird CLI가 없습니다. 먼저 설치/로그인하세요:"
@@ -24,15 +33,15 @@ if ! command -v shorebird >/dev/null 2>&1; then
 fi
 
 release_android() {
-  echo "▶︎ Android 릴리스 빌드 (shorebird release android)…"
-  shorebird release android
+  echo "▶︎ Android 릴리스 빌드 (Flutter $FLUTTER_VERSION)…"
+  shorebird release android --flutter-version="$FLUTTER_VERSION"
   echo "✅ Android 릴리스 완료 (build/app/outputs/bundle/release/app-release.aab)"
 }
 
 release_ios() {
-  echo "▶︎ iOS 릴리스 빌드 (shorebird release ios)…"
+  echo "▶︎ iOS 릴리스 빌드 (Flutter $FLUTTER_VERSION)…"
   # 기존 flutter 빌드와 동일하게 ExportOptions.plist 로 App Store 서명/내보내기.
-  shorebird release ios -- --export-options-plist="$EXPORT_OPTS"
+  shorebird release ios --flutter-version="$FLUTTER_VERSION" -- --export-options-plist="$EXPORT_OPTS"
   echo "✅ iOS 릴리스 완료 (build/ios/ipa/*.ipa)"
 }
 
