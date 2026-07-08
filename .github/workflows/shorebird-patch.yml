@@ -1,0 +1,83 @@
+name: Shorebird Code Push (patch)
+
+# main 에 푸시되면 Dart 코드 변경분을 Shorebird 패치(OTA)로 배포한다.
+# ⚠️ 전제:
+#   - 현재 pubspec 버전과 동일한 Shorebird "릴리스"가 이미 게시돼 있어야 함
+#     (없으면 patch 가 실패 — 새 버전은 먼저 `shorebird release` + 스토어 심사 필요).
+#   - 패치 가능: Dart 코드/UI/로직만. 네이티브·에셋·의존성·Flutter 버전 변경은 새 릴리스 필요.
+#   - 필요한 GitHub Secrets:
+#       SHOREBIRD_TOKEN                (필수, 공통) — `shorebird login:ci` 로 발급
+#       [iOS 서명용]
+#       IOS_CERTIFICATE_BASE64         Apple Distribution 인증서(.p12) base64
+#       IOS_CERTIFICATE_PASSWORD       .p12 비밀번호
+#       IOS_PROVISION_PROFILE_BASE64   프로비저닝 프로파일(.mobileprovision) base64
+#       IOS_KEYCHAIN_PASSWORD          임시 키체인 비밀번호(임의 값)
+#
+# 수동 실행도 가능(Actions 탭 → Run workflow).
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: shorebird-patch-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android-patch:
+    name: Android 패치
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Shorebird
+        uses: shorebirdtech/setup-shorebird@v1
+
+      - name: Patch Android
+        run: shorebird patch android --no-confirm
+        env:
+          SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
+
+  ios-patch:
+    name: iOS 패치
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Apple 코드 서명 준비
+        env:
+          CERT_B64: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
+          CERT_PW: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          PROFILE_B64: ${{ secrets.IOS_PROVISION_PROFILE_BASE64 }}
+          KEYCHAIN_PW: ${{ secrets.IOS_KEYCHAIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          CERT_PATH="$RUNNER_TEMP/cert.p12"
+          PROFILE_PATH="$RUNNER_TEMP/profile.mobileprovision"
+          KEYCHAIN="$RUNNER_TEMP/app-signing.keychain-db"
+
+          echo "$CERT_B64" | base64 --decode > "$CERT_PATH"
+          echo "$PROFILE_B64" | base64 --decode > "$PROFILE_PATH"
+
+          security create-keychain -p "$KEYCHAIN_PW" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PW" "$KEYCHAIN"
+          security import "$CERT_PATH" -P "$CERT_PW" -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          security list-keychain -d user -s "$KEYCHAIN"
+
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          cp "$PROFILE_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/"
+
+      - name: Setup Shorebird
+        uses: shorebirdtech/setup-shorebird@v1
+
+      - name: Patch iOS
+        run: shorebird patch ios --no-confirm -- --export-options-plist=ios/ExportOptions.plist
+        env:
+          SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
