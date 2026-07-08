@@ -739,9 +739,10 @@ class _ClubEventDetailPageState extends State<ClubEventDetailPage>
       ),
     );
 
-    // 게임이 저장됐을 수 있으므로 결과 새로고침
+    // Rule A: 게임 완료 후 순위표 탭(index 1)으로 자동 전환 + 결과 새로고침.
     if (mounted) {
       _changed = true;
+      _tabController.animateTo(1);
       _refresh();
     }
   }
@@ -1091,10 +1092,51 @@ class _ClubEventDetailPageState extends State<ClubEventDetailPage>
     }
   }
 
-  // ── 하단 바 (Fix #3) ───────────────────────────────────────────────────────
+  // ── 하단 바 (Fix #3, Rule C/D/E) ──────────────────────────────────────────
+
+  /// eventDate 'YYYY-MM-DD HH:mm:ss' → local DateTime (TZ 변환 없음).
+  DateTime? _parseEventDateTime(String s) {
+    if (s.length < 10) return null;
+    final datePart = s.substring(0, 10).split('-');
+    if (datePart.length != 3) return null;
+    final y = int.tryParse(datePart[0]);
+    final mo = int.tryParse(datePart[1]);
+    final d = int.tryParse(datePart[2]);
+    if (y == null || mo == null || d == null) return null;
+    int h = 0;
+    int mi = 0;
+    if (s.length > 10) {
+      final timePart = s.substring(11).split(':');
+      h = timePart.isNotEmpty ? (int.tryParse(timePart[0]) ?? 0) : 0;
+      mi = timePart.length > 1 ? (int.tryParse(timePart[1]) ?? 0) : 0;
+    }
+    return DateTime(y, mo, d, h, mi);
+  }
 
   Widget _buildBottomBar(bool isDark, ClubEvent event) {
     final attending = _isAttending;
+    final mutedText =
+        isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+
+    // Rule C: 내 게임 수 — _result.participants 에서 현재 사용자 항목을 찾는다.
+    final myUserId = _myUserId;
+    final myGameCount = myUserId != null && _result != null
+        ? (_result!.participants
+                .where((p) => p.userId == myUserId)
+                .firstOrNull
+                ?.gameCount ??
+            0)
+        : 0;
+
+    // Rule C: 목표 게임 수 달성 여부.
+    final reachedTarget =
+        event.gameTarget != null && myGameCount >= event.gameTarget!;
+
+    // Rule D: 정기전 시작 시간 도달 여부.
+    final eventDt = _parseEventDateTime(event.eventDate);
+    final hasStarted =
+        eventDt == null || !DateTime.now().isBefore(eventDt);
+
     return SafeArea(
       top: false,
       child: Container(
@@ -1107,69 +1149,112 @@ class _ClubEventDetailPageState extends State<ClubEventDetailPage>
             ),
           ),
         ),
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            // 참석/참석취소 버튼
-            Expanded(
-              child: SizedBox(
-                height: 52,
-                child: ElevatedButton.icon(
-                  onPressed: _busy ? null : _toggleAttend,
-                  icon: Icon(
-                    attending ? Symbols.event_busy : Symbols.event_available,
-                    size: 20,
-                  ),
-                  label: Text(
-                    attending ? '참석 취소' : '참석',
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
+            Row(
+              children: [
+                // Rule E: 게임이 1개 이상 있으면 참석 취소 버튼 숨김.
+                if (!(attending && myGameCount > 0))
+                  Expanded(
+                    child: SizedBox(
+                      height: 52,
+                      child: ElevatedButton.icon(
+                        onPressed: _busy ? null : _toggleAttend,
+                        icon: Icon(
+                          attending
+                              ? Symbols.event_busy
+                              : Symbols.event_available,
+                          size: 20,
+                        ),
+                        label: Text(
+                          attending ? '참석 취소' : '참석',
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: attending
+                              ? Colors.red.shade600
+                              : AppColors.primary,
+                          disabledBackgroundColor: (attending
+                                  ? Colors.red.shade600
+                                  : AppColors.primary)
+                              .withValues(alpha: 0.5),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          elevation: 0,
+                        ),
+                      ),
                     ),
                   ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor:
-                        attending ? Colors.red.shade600 : AppColors.primary,
-                    disabledBackgroundColor: (attending
-                            ? Colors.red.shade600
-                            : AppColors.primary)
-                        .withValues(alpha: 0.5),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                // 참석 취소가 숨겨진 경우에만 간격 없음; 둘 다 있으면 간격 추가.
+                if (!(attending && myGameCount > 0)) const SizedBox(width: 10),
+                // Rule C/D: 게임 시작 버튼 — 시작 전이거나 목표 달성 시 비활성+레이블 변경.
+                Expanded(
+                  child: SizedBox(
+                    height: 52,
+                    child: ElevatedButton.icon(
+                      onPressed:
+                          (_busy || !hasStarted || reachedTarget)
+                              ? null
+                              : _startEventGame,
+                      icon: Icon(
+                        reachedTarget
+                            ? Symbols.check_circle
+                            : Symbols.sports_score,
+                        size: 20,
+                      ),
+                      label: Text(
+                        reachedTarget
+                            ? '게임 완료 ($myGameCount/${event.gameTarget})'
+                            : '게임 시작',
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor:
+                            AppColors.primary.withValues(alpha: 0.15),
+                        disabledBackgroundColor:
+                            AppColors.primary.withValues(alpha: 0.07),
+                        foregroundColor: AppColors.primary,
+                        disabledForegroundColor:
+                            AppColors.primary.withValues(alpha: 0.4),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          side: BorderSide(
+                            color: (reachedTarget || !hasStarted)
+                                ? AppColors.primary.withValues(alpha: 0.3)
+                                : AppColors.primary,
+                          ),
+                        ),
+                      ),
                     ),
-                    elevation: 0,
                   ),
                 ),
-              ),
+              ],
             ),
-            const SizedBox(width: 10),
-            // 게임 시작 버튼 (Fix #3: 아이콘만이 아닌 레이블 있는 버튼)
-            SizedBox(
-              height: 52,
-              child: ElevatedButton.icon(
-                onPressed: _busy ? null : _startEventGame,
-                icon: const Icon(Symbols.sports_score, size: 20),
-                label: const Text(
-                  '게임 시작',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
+            // Rule D: 시작 전 안내 문구.
+            if (!hasStarted) ...[
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Symbols.schedule, size: 13, color: mutedText),
+                  const SizedBox(width: 5),
+                  Text(
+                    '정기전 시작 시간 이후에 게임을 시작할 수 있어요.',
+                    style: TextStyle(color: mutedText, fontSize: 12),
                   ),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor:
-                      AppColors.primary.withValues(alpha: 0.15),
-                  disabledBackgroundColor:
-                      AppColors.primary.withValues(alpha: 0.07),
-                  foregroundColor: AppColors.primary,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    side: const BorderSide(color: AppColors.primary),
-                  ),
-                ),
+                ],
               ),
-            ),
+            ],
           ],
         ),
       ),

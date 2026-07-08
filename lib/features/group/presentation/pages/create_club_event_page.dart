@@ -86,9 +86,15 @@ class _CreateClubEventPageState extends State<CreateClubEventPage> {
       return;
     }
 
+    // Rule B: 목표 게임 수 필수 검증.
     final gameTargetText = _gameTargetController.text.trim();
-    final gameTarget =
-        gameTargetText.isNotEmpty ? int.tryParse(gameTargetText) : null;
+    final gameTarget = int.tryParse(gameTargetText);
+    if (gameTarget == null || gameTarget <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('목표 게임 수를 입력해주세요.')),
+      );
+      return;
+    }
 
     final d = _selectedDate!;
     final t = _selectedTime!;
@@ -197,12 +203,12 @@ class _CreateClubEventPageState extends State<CreateClubEventPage> {
                   _sectionHeader('게임 설정', textColor, mutedText),
                   const SizedBox(height: 14),
 
-                  // 목표 게임 수 (optional)
-                  _fieldLabel('목표 게임 수', textColor, optional: true),
+                  // 목표 게임 수 (필수)
+                  _fieldLabel('목표 게임 수', textColor),
                   const SizedBox(height: 8),
                   _textField(
                     controller: _gameTargetController,
-                    hint: '미입력 시 제한 없음',
+                    hint: '예: 3',
                     keyboardType: TextInputType.number,
                     surfaceColor: surfaceColor,
                     textColor: textColor,

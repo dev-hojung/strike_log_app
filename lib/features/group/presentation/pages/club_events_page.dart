@@ -94,6 +94,7 @@ class _ClubEventsPageState extends State<ClubEventsPage>
     final changed = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
+        settings: const RouteSettings(name: 'club_event_detail'),
         builder: (_) => ClubEventDetailPage(
           groupId: widget.groupId,
           eventId: event.id,

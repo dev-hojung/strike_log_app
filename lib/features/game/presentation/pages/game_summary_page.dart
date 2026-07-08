@@ -319,7 +319,15 @@ class _GameSummaryPageState extends State<GameSummaryPage> {
     }
 
     if (!mounted) return;
-    Navigator.of(context).popUntil((route) => route.isFirst);
+    // Rule A: 정기전에서 시작한 단일 게임이면 상세 페이지로 복귀.
+    if (widget.eventId != null) {
+      Navigator.of(context).popUntil(
+        (route) =>
+            route.settings.name == 'club_event_detail' || route.isFirst,
+      );
+    } else {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    }
   }
 
   Future<bool> _askContinueSeries() async {
