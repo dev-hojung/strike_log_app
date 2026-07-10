@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../features/badges/presentation/pages/badge_list_page.dart';
 import '../../features/game/presentation/pages/game_detail_page.dart';
 import '../../features/group/presentation/pages/admin_creation_requests_page.dart';
+import '../../features/group/presentation/pages/club_event_detail_page.dart';
 import '../../features/group/presentation/pages/club_join_requests_page.dart';
 import 'pending_join_requests_service.dart';
 import '../../features/notifications/data/services/notifications_api_service.dart';
@@ -296,6 +297,7 @@ class FcmService {
       case 'club_game_created':
       case 'club_announcement':
       case 'club_perfect_game':
+      case 'club_event_reminder':
       case 'new_best_score':
       case 'badge_earned':
         return true;
@@ -372,6 +374,25 @@ class FcmService {
           nav.push(MaterialPageRoute(
             builder: (_) => GameDetailPage(gameId: gameId),
           ));
+        }
+        break;
+      case 'club_event_reminder':
+        // targetId = "groupId:eventId". 정기전 상세(순위표)로 이동.
+        final parts = (targetId ?? '').split(':');
+        final gid = parts.length == 2 ? int.tryParse(parts[0]) ?? 0 : 0;
+        final eid = parts.length == 2 ? int.tryParse(parts[1]) ?? 0 : 0;
+        if (gid > 0 && eid > 0) {
+          nav.push(MaterialPageRoute(
+            settings: const RouteSettings(name: 'club_event_detail'),
+            builder: (_) => ClubEventDetailPage(
+              groupId: gid,
+              eventId: eid,
+              // 수신자는 참가자. 관리 UI는 상세 페이지가 내부에서 다시 게이팅하므로 false로 안전.
+              canManage: false,
+            ),
+          ));
+        } else if (!fromInAppList) {
+          _switchToClubsTab(nav);
         }
         break;
       case 'badge_earned':
