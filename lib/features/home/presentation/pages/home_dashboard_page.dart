@@ -22,6 +22,7 @@ import '../../../challenges/presentation/widgets/weekly_challenges_card.dart';
 import '../../../game/data/models/game_series.dart';
 import '../../../game/data/services/series_api_service.dart';
 import '../../../notifications/presentation/pages/notifications_page.dart';
+import '../../../game/presentation/pages/stats_analysis_page.dart';
 import '../../data/models/home_dashboard_data.dart';
 import '../../data/services/home_api_service.dart';
 
@@ -343,6 +344,10 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
             // 성적 추이 그래프
             if (data.recentTrend.isNotEmpty)
               _buildTrendChart(context, isDark, data.recentTrend),
+
+            // 기록 분석 진입 링크 (추이 차트 바로 아래)
+            const SizedBox(height: 8),
+            _buildStatsAnalysisLink(isDark),
 
             // 이번 달 요약 (이번 달 경기가 있을 때만)
             if ((data.currentMonthGameCount ?? 0) > 0) ...[
@@ -1324,6 +1329,46 @@ class _HomeDashboardPageState extends State<HomeDashboardPage> {
           fontSize: 11,
           fontWeight: FontWeight.bold,
           letterSpacing: 1.0),
+    );
+  }
+
+  /// 기록 분석 페이지 진입 링크 (추이 차트 아래 배치).
+  Widget _buildStatsAnalysisLink(bool isDark) {
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const StatsAnalysisPage()),
+      ),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: AppColors.primary.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+              color: AppColors.primary.withValues(alpha: 0.2)),
+        ),
+        child: Row(
+          children: [
+            Icon(Symbols.analytics,
+                color: AppColors.primary, size: 18),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                '기록 분석 자세히 보기',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
+            Icon(Symbols.chevron_right,
+                color: AppColors.primary.withValues(alpha: 0.7),
+                size: 18),
+          ],
+        ),
+      ),
     );
   }
 
