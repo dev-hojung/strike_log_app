@@ -98,6 +98,21 @@ class RecentGame {
   /// 시리즈 내 게임 순번(1-based). 단일 게임은 null.
   final int? seriesIndex;
 
+  /// 클럽 게임 여부.
+  final bool isClubGame;
+
+  /// 내기 게임 여부.
+  final bool isBetGame;
+
+  /// 클럽 게임 방 코드. 개인 게임은 null.
+  final String? roomId;
+
+  /// 클럽 게임 종료 시점 본인 순위(1-based). 개인 게임은 null.
+  final int? clubRank;
+
+  /// 정기전에서 시작한 게임이면 정기전 ID. 아니면 null.
+  final int? eventId;
+
   RecentGame({
     required this.id,
     required this.totalScore,
@@ -106,6 +121,11 @@ class RecentGame {
     this.location,
     this.seriesId,
     this.seriesIndex,
+    this.isClubGame = false,
+    this.isBetGame = false,
+    this.roomId,
+    this.clubRank,
+    this.eventId,
   });
 
   factory RecentGame.fromJson(Map<String, dynamic> json) {
@@ -121,6 +141,11 @@ class RecentGame {
       location: json['location'],
       seriesId: (json['series_id'] as num?)?.toInt(),
       seriesIndex: (json['series_index'] as num?)?.toInt(),
+      isClubGame: json['is_club_game'] == true,
+      isBetGame: json['is_bet_game'] == true,
+      roomId: json['room_id'] as String?,
+      clubRank: (json['club_rank'] as num?)?.toInt(),
+      eventId: (json['event_id'] as num?)?.toInt(),
     );
   }
 }

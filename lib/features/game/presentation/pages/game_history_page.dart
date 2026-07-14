@@ -78,17 +78,75 @@ class GameHistoryPage extends StatefulWidget {
   State<GameHistoryPage> createState() => _GameHistoryPageState();
 }
 
-class _GameHistoryPageState extends State<GameHistoryPage> {
+/// 기록 유형 탭. '전체'는 필터 없음, 나머지는 상호배타 버킷.
+enum _HistoryBucket { all, personal, club, bet, event, series }
+
+extension _HistoryBucketLabel on _HistoryBucket {
+  String get label => switch (this) {
+        _HistoryBucket.all => '전체',
+        _HistoryBucket.personal => '개인',
+        _HistoryBucket.club => '클럽',
+        _HistoryBucket.bet => '내기',
+        _HistoryBucket.event => '정기전',
+        _HistoryBucket.series => '시리즈',
+      };
+}
+
+class _GameHistoryPageState extends State<GameHistoryPage>
+    with SingleTickerProviderStateMixin {
   final GameApiService _apiService = GameApiService();
   List<RecentGame> _games = [];
   int _averageScore = 0;
   bool _isLoading = true;
   ApiError? _error;
 
+  static const _tabs = _HistoryBucket.values;
+  static const _prefsTabKey = 'game_history_tab_index';
+  late final TabController _tabController;
+
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: _tabs.length, vsync: this);
+    _tabController.addListener(_persistTabIndex);
+    _restoreTabIndex();
     _fetchData();
+  }
+
+  @override
+  void dispose() {
+    _tabController.removeListener(_persistTabIndex);
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _restoreTabIndex() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getInt(_prefsTabKey);
+    if (saved != null && saved >= 0 && saved < _tabs.length && mounted) {
+      _tabController.index = saved;
+    }
+  }
+
+  void _persistTabIndex() {
+    if (_tabController.indexIsChanging) return;
+    SharedPreferences.getInstance()
+        .then((p) => p.setInt(_prefsTabKey, _tabController.index));
+  }
+
+  /// 게임의 유형 버킷 결정 (상호배타, 우선순위: 정기전>시리즈>내기>클럽>개인).
+  _HistoryBucket _bucketOf(RecentGame g) {
+    if (g.eventId != null) return _HistoryBucket.event;
+    if (g.seriesId != null) return _HistoryBucket.series;
+    if (g.isBetGame) return _HistoryBucket.bet;
+    if (g.isClubGame) return _HistoryBucket.club;
+    return _HistoryBucket.personal;
+  }
+
+  /// 탭에 해당하는 게임 부분집합. 원본 정렬(play_date DESC)을 보존한다.
+  List<RecentGame> _gamesForTab(_HistoryBucket tab) {
+    if (tab == _HistoryBucket.all) return _games;
+    return _games.where((g) => _bucketOf(g) == tab).toList();
   }
 
   Future<void> _fetchData() async {
@@ -138,9 +196,9 @@ class _GameHistoryPageState extends State<GameHistoryPage> {
   }
 
   /// 게임을 월별로 그룹핑
-  Map<String, List<RecentGame>> _groupByMonth() {
+  Map<String, List<RecentGame>> _groupByMonth(List<RecentGame> games) {
     final grouped = <String, List<RecentGame>>{};
-    for (final game in _games) {
+    for (final game in games) {
       final key = DateFormat('yyyy년 M월').format(game.playDate);
       grouped.putIfAbsent(key, () => []).add(game);
     }
@@ -151,6 +209,8 @@ class _GameHistoryPageState extends State<GameHistoryPage> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bgColor = isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
+    // 로딩/전역 빈 상태/최초 에러가 아닐 때만 유형 탭을 노출.
+    final showTabs = !_isLoading && _games.isNotEmpty;
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -169,6 +229,25 @@ class _GameHistoryPageState extends State<GameHistoryPage> {
           ),
         ),
         centerTitle: true,
+        bottom: showTabs
+            ? TabBar(
+                controller: _tabController,
+                isScrollable: true,
+                tabAlignment: TabAlignment.start,
+                labelColor: AppColors.primary,
+                unselectedLabelColor: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
+                indicatorColor: AppColors.primary,
+                indicatorSize: TabBarIndicatorSize.label,
+                dividerColor: Colors.transparent,
+                labelStyle: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+                tabs: [for (final t in _tabs) Tab(text: t.label)],
+              )
+            : null,
       ),
       body: SafeArea(
         top: false,
@@ -181,16 +260,25 @@ class _GameHistoryPageState extends State<GameHistoryPage> {
                   )
                 : _games.isEmpty
                     ? _buildEmptyState(isDark)
-                    : RefreshIndicator(
-                        onRefresh: _fetchData,
-                        child: _buildGameList(isDark),
+                    : TabBarView(
+                        controller: _tabController,
+                        children: [
+                          for (final tab in _tabs)
+                            RefreshIndicator(
+                              onRefresh: _fetchData,
+                              child: _buildGameList(_gamesForTab(tab), tab, isDark),
+                            ),
+                        ],
                       ),
       ),
     );
   }
 
-  Widget _buildGameList(bool isDark) {
-    final grouped = _groupByMonth();
+  Widget _buildGameList(List<RecentGame> games, _HistoryBucket tab, bool isDark) {
+    if (games.isEmpty) {
+      return _buildTabEmptyState(tab, isDark);
+    }
+    final grouped = _groupByMonth(games);
     final months = grouped.keys.toList();
 
     return ListView.builder(
@@ -439,6 +527,10 @@ class _GameHistoryPageState extends State<GameHistoryPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (_modeBadge(game) != null) ...[
+                    _modeBadge(game)!,
+                    const SizedBox(height: 4),
+                  ],
                   Text(
                     game.location ?? '장소 정보 없음',
                     style: TextStyle(
@@ -479,6 +571,87 @@ class _GameHistoryPageState extends State<GameHistoryPage> {
                 ),
               ),
           ],
+        ),
+      ),
+    );
+  }
+
+  /// 카드용 유형 배지. 개인 게임은 null (배지 없음). 시리즈는 별도 카드라 여기 오지 않음.
+  Widget? _modeBadge(RecentGame game) {
+    final ({String label, IconData icon, Color color})? spec;
+    if (game.eventId != null) {
+      spec = (label: '정기전', icon: Symbols.emoji_events, color: const Color(0xFF60A5FA));
+    } else if (game.isBetGame) {
+      final rank = game.clubRank;
+      spec = (
+        label: rank != null ? '내기 · $rank위' : '내기',
+        icon: Symbols.paid,
+        color: const Color(0xFFA78BFA),
+      );
+    } else if (game.isClubGame) {
+      spec = (label: '클럽', icon: Symbols.groups, color: const Color(0xFF34D399));
+    } else {
+      spec = null;
+    }
+    if (spec == null) return null;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: spec.color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(spec.icon, size: 12, color: spec.color),
+          const SizedBox(width: 4),
+          Text(
+            spec.label,
+            style: TextStyle(
+              color: spec.color,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 특정 탭에 기록이 없을 때. RefreshIndicator가 동작하도록 스크롤 가능하게.
+  Widget _buildTabEmptyState(_HistoryBucket tab, bool isDark) {
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.only(left: 24, right: 24, top: 24, bottom: 100),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Symbols.filter_list_off,
+                    size: 56,
+                    color: isDark ? Colors.white24 : Colors.black12,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    '${tab.label} 기록이 없습니다.',
+                    style: TextStyle(
+                      color: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight,
+                      fontSize: 16,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );
