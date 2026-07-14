@@ -384,14 +384,164 @@ class _GameModePageState extends State<GameModePage> {
       return;
     }
 
-    if (context.mounted) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const GameRoomPage(mode: 'bet'),
+    if (!context.mounted) return;
+
+    // 팀전 여부 선택 시트
+    final betOptions = await _showBetOptionsSheet(context);
+    if (betOptions == null) return;
+    if (!context.mounted) return;
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => GameRoomPage(
+          mode: 'bet',
+          teamMode: betOptions['teamMode'] as bool,
+          teamCount: betOptions['teamCount'] as int?,
         ),
-      );
-    }
+      ),
+    );
+  }
+
+  /// 내기 게임 옵션 시트: 개인전 / 팀전(2팀/3팀) 선택.
+  /// 반환값: {'teamMode': bool, 'teamCount': int?} 또는 null(취소).
+  Future<Map<String, dynamic>?> _showBetOptionsSheet(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    const betAccent = Color(0xFFC084FC);
+    final textColor = isDark ? Colors.white : AppColors.textPrimaryLight;
+    final subTextColor = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final surfaceColor = isDark ? AppColors.surfaceDark : Colors.white;
+
+    return showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      backgroundColor: surfaceColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '내기 방식을 선택하세요',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: textColor,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '개인전 또는 팀을 나눠 팀전으로 진행할 수 있습니다.',
+                  style: TextStyle(fontSize: 13, color: subTextColor),
+                ),
+                const SizedBox(height: 20),
+
+                // 개인전
+                _betOptionTile(
+                  ctx,
+                  icon: Symbols.person,
+                  title: '개인전',
+                  subtitle: '핸디캡 적용 후 개인 순위를 가립니다.',
+                  isDark: isDark,
+                  onTap: () => Navigator.pop(ctx, {'teamMode': false, 'teamCount': null}),
+                ),
+                const SizedBox(height: 10),
+
+                // 팀전 2팀
+                _betOptionTile(
+                  ctx,
+                  icon: Symbols.groups,
+                  title: '팀전 — 2팀',
+                  subtitle: '참가자를 2팀으로 나눠 팀 평균 점수로 승패를 결정합니다.',
+                  isDark: isDark,
+                  accentColor: betAccent,
+                  onTap: () => Navigator.pop(ctx, {'teamMode': true, 'teamCount': 2}),
+                ),
+                const SizedBox(height: 10),
+
+                // 팀전 3팀
+                _betOptionTile(
+                  ctx,
+                  icon: Symbols.groups,
+                  title: '팀전 — 3팀',
+                  subtitle: '참가자를 3팀으로 나눠 팀 평균 점수로 순위를 가립니다.',
+                  isDark: isDark,
+                  accentColor: betAccent,
+                  onTap: () => Navigator.pop(ctx, {'teamMode': true, 'teamCount': 3}),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _betOptionTile(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required bool isDark,
+    Color? accentColor,
+    required VoidCallback onTap,
+  }) {
+    final color = accentColor ?? AppColors.primary;
+    final textColor = isDark ? Colors.white : AppColors.textPrimaryLight;
+    final subTextColor = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withValues(alpha: 0.4)),
+          color: color.withValues(alpha: 0.05),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: color, size: 22),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: textColor,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(fontSize: 12, color: subTextColor, height: 1.4),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Symbols.chevron_right, color: subTextColor, size: 18),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _startClubGame(BuildContext context) async {

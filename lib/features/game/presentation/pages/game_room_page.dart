@@ -9,12 +9,34 @@ import '../../../../core/services/user_profile_cache.dart';
 import 'bet_result_page.dart';
 import 'frame_entry_page.dart';
 
+/// 팀 번호에 대응하는 색상 (1팀=스카이블루, 2팀=오렌지, 3팀=초록)
+Color _teamColor(int teamNo) {
+  switch (teamNo) {
+    case 1:
+      return const Color(0xFF4FC3F7);
+    case 2:
+      return const Color(0xFFFF8A65);
+    case 3:
+      return const Color(0xFF81C784);
+    default:
+      return AppColors.textSecondaryDark;
+  }
+}
+
 /// 클럽/내기 게임 방 페이지
 ///
 /// [mode]가 'bet'이면 핸디캡 UI와 betMemo가 활성화됩니다.
+/// [teamMode]=true이면 내기 팀전 UI가 활성화됩니다.
 class GameRoomPage extends StatefulWidget {
   final String mode;
-  const GameRoomPage({super.key, this.mode = 'club'});
+  final bool teamMode;
+  final int? teamCount;
+  const GameRoomPage({
+    super.key,
+    this.mode = 'club',
+    this.teamMode = false,
+    this.teamCount,
+  });
 
   @override
   State<GameRoomPage> createState() => _GameRoomPageState();
@@ -42,11 +64,26 @@ class _GameRoomPageState extends State<GameRoomPage> {
   /// 서버 응답으로 'bet' 임을 알 수 있다. UI 분기는 이 값을 우선 사용한다.
   String? _serverMode;
 
+  // 팀전 전용
+  bool _teamMode = false;
+  int _teamCount = 2;
+  final Map<String, int?> _teamAssignments = {}; // userId → teamNo (null=미배정)
+
   bool get _isBet => (_serverMode ?? widget.mode) == 'bet';
+
+  /// 모든 참가자에게 팀이 배정됐는지 여부
+  bool get _allAssigned =>
+      _participants.isNotEmpty &&
+      _participants.every((p) {
+        final uid = p['userId'] ?? '';
+        return (_teamAssignments[uid] ?? 0) > 0;
+      });
 
   @override
   void initState() {
     super.initState();
+    _teamMode = widget.teamMode;
+    _teamCount = widget.teamCount ?? 2;
     _loadUserInfo();
     // 내기 게임은 생성/참여 시점에 광고를 띄우므로 미리 로드.
     AdsService.instance.preloadInterstitial();
@@ -79,6 +116,8 @@ class _GameRoomPageState extends State<GameRoomPage> {
         if (p?['handicap'] != null) {
           _handicaps[userId] = (p['handicap'] as num).toInt();
         }
+        // 팀 배정 저장
+        _teamAssignments[userId] = (p?['teamNo'] as num?)?.toInt();
       }
       // mode/betMemo/maxPlayers 갱신
       if (state['mode'] != null) {
@@ -89,6 +128,13 @@ class _GameRoomPageState extends State<GameRoomPage> {
       }
       if (state['maxPlayers'] != null) {
         _maxPlayers = (state['maxPlayers'] as num).toInt();
+      }
+      // 팀전 정보 갱신
+      if (state['teamMode'] != null) {
+        _teamMode = state['teamMode'] as bool? ?? _teamMode;
+      }
+      if (state['teamCount'] != null) {
+        _teamCount = (state['teamCount'] as num?)?.toInt() ?? _teamCount;
       }
     });
   }
@@ -212,12 +258,20 @@ class _GameRoomPageState extends State<GameRoomPage> {
       final rankings = (data['rankings'] as List? ?? [])
           .map((e) => Map<String, dynamic>.from(e as Map))
           .toList();
+      final isTeamMode = data['teamMode'] as bool? ?? false;
+      final teams = isTeamMode
+          ? (data['teams'] as List?)
+              ?.map((e) => Map<String, dynamic>.from(e as Map))
+              .toList()
+          : null;
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (_) => BetResultPage(
             rankings: rankings,
             betMemo: data['betMemo'] as String?,
+            teamMode: isTeamMode,
+            teams: teams,
           ),
         ),
       );
@@ -243,6 +297,8 @@ class _GameRoomPageState extends State<GameRoomPage> {
         mode: widget.mode,
         betMemo: _betMemo,
         maxPlayers: widget.mode == 'bet' ? _maxPlayers : null,
+        teamMode: _teamMode,
+        teamCount: _teamMode ? _teamCount : null,
       );
     } catch (e) {
       setState(() => _isConnecting = false);
@@ -351,15 +407,11 @@ class _GameRoomPageState extends State<GameRoomPage> {
     if (_isGameStarted) {
       // 게임이 시작되어 FrameEntryPage가 이어서 활성화된 상태.
       // 다음 페이지가 사용하는 이벤트(roomStateUpdated, gameEnded)는 off 하지 않는다.
-      // socket.io의 off는 인자 없이 호출하면 해당 이벤트 모든 리스너 제거이므로
-      // 새 페이지가 이미 등록한 핸들러까지 함께 사라져 BetResultPage 이동이 막힌다.
       _socketService.off('roomCreated');
       _socketService.off('gameStarted');
       _socketService.off('createRoomResponse');
       _socketService.off('joinRoomResponse');
       _socketService.off('handicapSuggestions');
-      // FrameEntryPage는 'error'를 등록하지 않으므로 여기서 제거한다.
-      // (남겨두면 플레이 중 발생한 소켓 에러가 dispose된 컨텍스트로 전달돼 조용히 사라짐)
       _socketService.off('error');
       // 'gameEnded', 'roomStateUpdated'는 FrameEntryPage가 이어 사용하므로 보존.
     } else if (_isInRoom) {
@@ -647,6 +699,28 @@ class _GameRoomPageState extends State<GameRoomPage> {
                   ),
                   const SizedBox(height: 12),
                 ],
+                // 팀전 배지
+                if (isBet && _teamMode) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: accentColor.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Symbols.groups, size: 14, color: accentColor),
+                        const SizedBox(width: 6),
+                        Text(
+                          '팀전 · $_teamCount팀',
+                          style: TextStyle(fontSize: 13, color: accentColor, fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 Text('방 코드', style: TextStyle(fontSize: 12, color: subTextColor)),
                 const SizedBox(height: 8),
                 Row(
@@ -691,8 +765,9 @@ class _GameRoomPageState extends State<GameRoomPage> {
 
           const SizedBox(height: 16),
 
-          // 내기 모드 자동 핸디캡 버튼
+          // 내기 모드 호스트 액션 버튼 영역
           if (isBet && _isHost) ...[
+            // 자동 핸디캡 추천
             SizedBox(
               width: double.infinity,
               height: 44,
@@ -711,6 +786,28 @@ class _GameRoomPageState extends State<GameRoomPage> {
                 ),
               ),
             ),
+            // 자동 팀 배정 (팀전 전용)
+            if (_teamMode) ...[
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: OutlinedButton.icon(
+                  onPressed: _roomId != null
+                      ? () => _socketService.autoAssignTeams(_roomId!)
+                      : null,
+                  icon: Icon(Symbols.group_add, size: 18, color: accentColor),
+                  label: Text(
+                    '자동 배정',
+                    style: TextStyle(color: accentColor, fontWeight: FontWeight.w600),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: accentColor.withValues(alpha: 0.5)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 16),
           ],
 
@@ -757,82 +854,9 @@ class _GameRoomPageState extends State<GameRoomPage> {
                   ),
                   const SizedBox(height: 16),
                   Expanded(
-                    child: ListView.separated(
-                      itemCount: _participants.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 8),
-                      itemBuilder: (context, index) {
-                        final p = _participants[index];
-                        final uid = p['userId'] ?? '';
-                        final isMe = uid == _userId;
-                        final isCreator = index == 0;
-                        final handicap = _handicaps[uid] ?? 0;
-
-                        return Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: isMe
-                                ? accentColor.withValues(alpha: 0.05)
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(12),
-                            border: isMe
-                                ? Border.all(color: accentColor.withValues(alpha: 0.2))
-                                : null,
-                          ),
-                          child: Row(
-                            children: [
-                              CircleAvatar(
-                                radius: 18,
-                                backgroundColor: accentColor.withValues(alpha: 0.1),
-                                child: Text(
-                                  (p['nickname'] ?? '?')[0],
-                                  style: TextStyle(
-                                    color: accentColor,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  '${p['nickname']}${isMe ? ' (나)' : ''}',
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600,
-                                    color: textColor,
-                                  ),
-                                ),
-                              ),
-                              if (isCreator)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: Colors.amber.withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: const Text(
-                                    '방장',
-                                    style: TextStyle(
-                                      color: Colors.amber,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              // 핸디캡 (내기 모드)
-                              if (isBet) ...[
-                                const SizedBox(width: 8),
-                                _isHost
-                                    ? GestureDetector(
-                                        onTap: () => _editHandicap(uid, handicap),
-                                        child: _handicapChip(handicap, accentColor, editable: true),
-                                      )
-                                    : _handicapChip(handicap, accentColor, editable: false),
-                              ],
-                            ],
-                          ),
-                        );
-                      },
-                    ),
+                    child: (_isBet && _teamMode)
+                        ? _buildTeamParticipantList(isDark, accentColor, textColor, subTextColor)
+                        : _buildFlatParticipantList(isDark, accentColor, textColor),
                   ),
                 ],
               ),
@@ -846,13 +870,14 @@ class _GameRoomPageState extends State<GameRoomPage> {
               width: double.infinity,
               height: 56,
               child: ElevatedButton.icon(
-                onPressed: _participants.isNotEmpty && _roomId != null
+                onPressed: _participants.isNotEmpty && _roomId != null &&
+                        (!_teamMode || _allAssigned)
                     ? () => _socketService.startGame(_roomId!)
                     : null,
                 icon: const Icon(Symbols.play_arrow, color: Colors.white),
-                label: const Text(
-                  '게임 시작',
-                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                label: Text(
+                  _teamMode && !_allAssigned ? '팀 배정 후 시작 가능' : '게임 시작',
+                  style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.green,
@@ -863,6 +888,336 @@ class _GameRoomPageState extends State<GameRoomPage> {
             ),
         ],
       ),
+    );
+  }
+
+  /// 팀전 모드: 팀별로 그룹화된 참가자 목록
+  Widget _buildTeamParticipantList(
+    bool isDark,
+    Color accentColor,
+    Color textColor,
+    Color subTextColor,
+  ) {
+    // 팀별로 분류
+    final Map<int, List<Map<String, String>>> byTeam = {};
+    final List<Map<String, String>> unassigned = [];
+    for (final p in _participants) {
+      final uid = p['userId'] ?? '';
+      final teamNo = _teamAssignments[uid];
+      if (teamNo != null && teamNo > 0) {
+        byTeam.putIfAbsent(teamNo, () => []).add(p);
+      } else {
+        unassigned.add(p);
+      }
+    }
+
+    final sections = <Widget>[];
+
+    for (int t = 1; t <= _teamCount; t++) {
+      final members = byTeam[t] ?? [];
+      sections.add(_buildTeamSection(
+        teamNo: t,
+        members: members,
+        isDark: isDark,
+        accentColor: accentColor,
+        textColor: textColor,
+        subTextColor: subTextColor,
+      ));
+      sections.add(const SizedBox(height: 12));
+    }
+
+    if (unassigned.isNotEmpty) {
+      sections.add(_buildUnassignedSection(
+        members: unassigned,
+        isDark: isDark,
+        accentColor: accentColor,
+        textColor: textColor,
+        subTextColor: subTextColor,
+      ));
+    }
+
+    return ListView(children: sections);
+  }
+
+  Widget _buildTeamSection({
+    required int teamNo,
+    required List<Map<String, String>> members,
+    required bool isDark,
+    required Color accentColor,
+    required Color textColor,
+    required Color subTextColor,
+  }) {
+    final teamCol = _teamColor(teamNo);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(color: teamCol, shape: BoxShape.circle),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              '$teamNo팀',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: teamCol,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              '${members.length}명',
+              style: TextStyle(fontSize: 12, color: subTextColor),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        ...members.map((p) => _buildParticipantRow(
+              p: p,
+              isDark: isDark,
+              accentColor: accentColor,
+              textColor: textColor,
+              subTextColor: subTextColor,
+              currentTeamNo: teamNo,
+            )),
+      ],
+    );
+  }
+
+  Widget _buildUnassignedSection({
+    required List<Map<String, String>> members,
+    required bool isDark,
+    required Color accentColor,
+    required Color textColor,
+    required Color subTextColor,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(color: subTextColor.withValues(alpha: 0.5), shape: BoxShape.circle),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              '미배정',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: subTextColor),
+            ),
+            const SizedBox(width: 6),
+            Text('${members.length}명', style: TextStyle(fontSize: 12, color: subTextColor)),
+          ],
+        ),
+        const SizedBox(height: 6),
+        ...members.map((p) => _buildParticipantRow(
+              p: p,
+              isDark: isDark,
+              accentColor: accentColor,
+              textColor: textColor,
+              subTextColor: subTextColor,
+              currentTeamNo: null,
+            )),
+      ],
+    );
+  }
+
+  Widget _buildParticipantRow({
+    required Map<String, String> p,
+    required bool isDark,
+    required Color accentColor,
+    required Color textColor,
+    required Color subTextColor,
+    required int? currentTeamNo,
+  }) {
+    final uid = p['userId'] ?? '';
+    final isMe = uid == _userId;
+    final handicap = _handicaps[uid] ?? 0;
+    final isFirstParticipant = _participants.isNotEmpty && _participants.first['userId'] == uid;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isMe ? accentColor.withValues(alpha: 0.05) : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          border: isMe ? Border.all(color: accentColor.withValues(alpha: 0.2)) : null,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 18,
+                  backgroundColor: accentColor.withValues(alpha: 0.1),
+                  child: Text(
+                    (p['nickname'] ?? '?')[0],
+                    style: TextStyle(color: accentColor, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    '${p['nickname']}${isMe ? ' (나)' : ''}',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: textColor),
+                  ),
+                ),
+                if (isFirstParticipant)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text(
+                      '방장',
+                      style: TextStyle(color: Colors.amber, fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                // 핸디캡
+                const SizedBox(width: 8),
+                _isHost
+                    ? GestureDetector(
+                        onTap: () => _editHandicap(uid, handicap),
+                        child: _handicapChip(handicap, accentColor, editable: true),
+                      )
+                    : _handicapChip(handicap, accentColor, editable: false),
+              ],
+            ),
+            // 팀 선택 칩 (팀전 전용)
+            const SizedBox(height: 8),
+            _isHost
+                ? _buildTeamSelectorChips(uid, currentTeamNo, subTextColor)
+                : _buildTeamBadge(currentTeamNo, subTextColor),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 호스트용: 탭 가능한 팀 선택 칩
+  Widget _buildTeamSelectorChips(String uid, int? currentTeamNo, Color subTextColor) {
+    return Wrap(
+      spacing: 6,
+      children: [
+        for (int t = 1; t <= _teamCount; t++)
+          _TeamChip(
+            label: '$t팀',
+            color: _teamColor(t),
+            isSelected: currentTeamNo == t,
+            onTap: () {
+              if (_roomId == null) return;
+              // 이미 선택된 팀 탭하면 배정 해제
+              final newTeamNo = currentTeamNo == t ? null : t;
+              _socketService.assignTeam(
+                roomId: _roomId!,
+                targetUserId: uid,
+                teamNo: newTeamNo,
+              );
+            },
+          ),
+      ],
+    );
+  }
+
+  /// 비호스트용: 읽기 전용 팀 배지
+  Widget _buildTeamBadge(int? teamNo, Color subTextColor) {
+    if (teamNo == null || teamNo == 0) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: subTextColor.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          '미배정',
+          style: TextStyle(fontSize: 11, color: subTextColor, fontWeight: FontWeight.w500),
+        ),
+      );
+    }
+    final col = _teamColor(teamNo);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: col.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: col.withValues(alpha: 0.4)),
+      ),
+      child: Text(
+        '$teamNo팀',
+        style: TextStyle(fontSize: 11, color: col, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+
+  /// 일반 모드(팀전 아님): 기존 플랫 리스트
+  Widget _buildFlatParticipantList(bool isDark, Color accentColor, Color textColor) {
+    return ListView.separated(
+      itemCount: _participants.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (context, index) {
+        final p = _participants[index];
+        final uid = p['userId'] ?? '';
+        final isMe = uid == _userId;
+        final isCreator = index == 0;
+        final handicap = _handicaps[uid] ?? 0;
+
+        return Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: isMe ? accentColor.withValues(alpha: 0.05) : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            border: isMe ? Border.all(color: accentColor.withValues(alpha: 0.2)) : null,
+          ),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: accentColor.withValues(alpha: 0.1),
+                child: Text(
+                  (p['nickname'] ?? '?')[0],
+                  style: TextStyle(color: accentColor, fontWeight: FontWeight.bold),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  '${p['nickname']}${isMe ? ' (나)' : ''}',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: textColor),
+                ),
+              ),
+              if (isCreator)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    '방장',
+                    style: TextStyle(color: Colors.amber, fontSize: 11, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              // 핸디캡 (내기 모드)
+              if (_isBet) ...[
+                const SizedBox(width: 8),
+                _isHost
+                    ? GestureDetector(
+                        onTap: () => _editHandicap(uid, handicap),
+                        child: _handicapChip(handicap, accentColor, editable: true),
+                      )
+                    : _handicapChip(handicap, accentColor, editable: false),
+              ],
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -938,5 +1293,44 @@ class _GameRoomPageState extends State<GameRoomPage> {
     } finally {
       controller.dispose();
     }
+  }
+}
+
+/// 팀 선택용 칩 위젯
+class _TeamChip extends StatelessWidget {
+  final String label;
+  final Color color;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _TeamChip({
+    required this.label,
+    required this.color,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+        decoration: BoxDecoration(
+          color: isSelected ? color : color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: color.withValues(alpha: isSelected ? 1.0 : 0.4)),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: isSelected ? Colors.white : color,
+          ),
+        ),
+      ),
+    );
   }
 }

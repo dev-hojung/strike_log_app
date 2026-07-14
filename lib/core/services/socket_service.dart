@@ -86,12 +86,15 @@ class SocketService {
   }
 
   /// 방 생성. mode='bet'이면 핸디캡/내기 메모/최대 인원도 함께 전달.
+  /// [teamMode]=true면 내기 팀전(팀 수 [teamCount] 2~3).
   void createRoom({
     required String userId,
     required String nickname,
     String mode = 'club',
     String? betMemo,
     int? maxPlayers,
+    bool teamMode = false,
+    int? teamCount,
   }) {
     _socket?.emit('createRoom', {
       'user_id': userId,
@@ -99,6 +102,8 @@ class SocketService {
       'mode': mode,
       if (betMemo != null) 'betMemo': betMemo,
       if (maxPlayers != null) 'maxPlayers': maxPlayers,
+      if (teamMode) 'teamMode': true,
+      if (teamMode && teamCount != null) 'teamCount': teamCount,
     });
   }
 
@@ -167,6 +172,24 @@ class SocketService {
   /// 자동 핸디캡 추천 요청. 응답은 'handicapSuggestions' 이벤트.
   void requestHandicapSuggestions(String roomId) {
     _socket?.emit('suggestHandicaps', {'roomId': roomId});
+  }
+
+  /// 내기 팀전 팀 배정 (호스트, 시작 전). [teamNo]=null이면 배정 해제.
+  void assignTeam({
+    required String roomId,
+    required String targetUserId,
+    required int? teamNo,
+  }) {
+    _socket?.emit('assignTeam', {
+      'roomId': roomId,
+      'targetUserId': targetUserId,
+      'teamNo': teamNo,
+    });
+  }
+
+  /// 내기 팀전 자동 팀 배정 (평균 기반 밸런싱, 호스트). 결과는 'roomStateUpdated'.
+  void autoAssignTeams(String roomId) {
+    _socket?.emit('autoAssignTeams', {'roomId': roomId});
   }
 
   /// 게임 종료 + 핸디 적용 순위 요청 (호스트만). 결과는 'gameEnded' 이벤트.
