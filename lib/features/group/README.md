@@ -31,7 +31,9 @@
 ## 페이지
 - `MyGroupsPage` — 내가 속한 클럽 + 멤버 목록 + 검색/정렬. OWNER/STAFF에게 멤버 관리·가입 신청 진입점 노출. MEMBER에게는 즉시 탈퇴 아이콘. 하단에 "다른 클럽 둘러보기" 진입.
 - `CreateClubPage` — 신규 클럽 생성 신청 폼. 백엔드가 동일 이름 차단(승인된 그룹 + PENDING 신청 모두) → 409 시 안내.
-- `ExploreClubsPage` — 전체 클럽 탐색 + 가입 신청. 본인이 가입한 클럽은 "내 클럽" 뱃지, 다른 카드는 1인 1클럽 정책상 disabled 처리.
+- `ExploreClubsPage` — 전체 클럽 탐색 + 가입 신청. 본인이 가입한 클럽은 "내 클럽" 뱃지, 다른 카드는 1인 1클럽 정책상 disabled 처리. 우상단 "코드로 가입" 액션 → `JoinByCodePage`.
+- `JoinByCodePage` — 초대 코드 입력 → 미리보기 조회 → **즉시 가입**(승인 생략). 성공 시 `pop(true)`로 호출자가 목록 갱신. 무효 코드/이미 소속은 인라인 에러.
+- `ClubInviteCodePage` — OWNER/STAFF 전용 초대 코드 관리(표시·복사·공유 via share_plus·재발급). `ClubMembersPage` 우상단 person_add 아이콘으로 진입. 재발급 시 이전 코드 무효화 확인 다이얼로그.
 - `ClubLeaderboardPage` — 클럽 멤버 평균점 desc 랭킹.
 - `ClubJoinRequestsPage` — OWNER/STAFF: 가입 신청 승인/거절. 결과 시 헤더/네비 뱃지 카운트 감소.
 - `AdminCreationRequestsPage` — 플랫폼 관리자: 클럽 생성 신청 심사 (RadioGroup 반려 사유).
@@ -54,7 +56,7 @@
 - `data/models/club_leaderboard.dart`
 
 ## 서비스
-- `GroupsApiService` — 멤버 조회·운영진 임명·운영진 해제·클럽장 이양·추방·탈퇴·내 pending 가입 신청 카운트
+- `GroupsApiService` — 멤버 조회·운영진 임명·운영진 해제·클럽장 이양·추방·탈퇴·내 pending 가입 신청 카운트 + **초대 코드**(`getInviteCode`/`rotateInviteCode`/`previewByInviteCode`/`joinByInviteCode`)
 - `GroupRole` (abstract class in `groups_api_service.dart`) — 역할 상수 및 헬퍼
 - `GroupCreationRequestsService` — 클럽 생성 신청 CRUD + 관리자 승인/반려
 - `LeaderboardApiService` — 클럽 랭킹
@@ -83,6 +85,10 @@
 | POST   | `/groups/creation-requests/:id/reject`                    | Admin |
 | POST   | `/groups/creation-requests/:id/cancel`                    | — |
 | POST   | `/groups/:id/join-requests`                               | — (1인 1클럽 정책 409) |
+| GET    | `/groups/by-code/:code`                                   | — (초대 코드 미리보기, 무효 404) |
+| POST   | `/groups/join-by-code`                                    | — (초대 코드 즉시 가입, 무효 404/이미 소속 409) |
+| GET    | `/groups/:id/invite-code`                                 | STAFF+ (조회, 없으면 발급) |
+| POST   | `/groups/:id/invite-code`                                 | STAFF+ (재발급/회전) |
 | GET    | `/groups/:id/join-requests`                               | STAFF+ |
 | POST   | `/groups/:id/join-requests/:rid/approve`                  | STAFF+ |
 | POST   | `/groups/:id/join-requests/:rid/reject`                   | STAFF+ |
@@ -93,7 +99,8 @@
 | DELETE | `/groups/:id/leave`                                       | — (본인 탈퇴) |
 
 ## 정책 요약
-- **1인 1클럽**: 다른 클럽에 가입된 상태에서 가입 신청 시 409.
+- **1인 1클럽**: 다른 클럽에 가입된 상태에서 가입 신청 시 409. 초대 코드 즉시 가입도 동일하게 차단.
+- **초대 코드**: STAFF+ 발급/회전. 코드 보유자는 승인 없이 즉시 MEMBER로 가입. 회전 시 이전 코드 무효화. (딥링크는 후속 네이티브 작업으로 분리)
 - **동일 클럽명 금지**: 생성 신청 시 기존 `groups.name` + `creation_requests.name`(PENDING)과 trim 비교.
 - **추방**: STAFF 이상 호출. 동급/상위 역할 추방 차단 (403). 추방 대상에게 `CLUB_KICKED` 알림.
 - **탈퇴**: OWNER + 다른 멤버 존재 시 409로 클럽장 이양 안내. 유일 멤버 탈퇴 시 클럽 함께 삭제.

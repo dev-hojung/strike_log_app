@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/widgets/avatar_image.dart';
 import '../../data/services/groups_api_service.dart';
+import 'club_invite_code_page.dart';
 
 /// 클럽 멤버 관리 페이지.
 ///
@@ -368,6 +369,22 @@ class _ClubMembersPageState extends State<ClubMembersPage> {
       appBar: AppBar(
         title: const Text('멤버 관리'),
         actions: [
+          if (GroupRole.canManage(_myRole))
+            IconButton(
+              icon: const Icon(Symbols.person_add),
+              tooltip: '초대 코드',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ClubInviteCodePage(
+                      groupId: widget.groupId,
+                      groupName: widget.groupName,
+                    ),
+                  ),
+                );
+              },
+            ),
           PopupMenuButton<String>(
             icon: const Icon(Symbols.more_vert),
             onSelected: (v) {

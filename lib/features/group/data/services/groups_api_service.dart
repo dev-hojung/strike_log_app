@@ -164,4 +164,74 @@ class GroupsApiService {
       rethrow;
     }
   }
+
+  // ── 초대 코드 ──────────────────────────────────
+
+  /// 클럽 초대 코드 조회. 없으면 백엔드가 즉시 발급해 반환 (STAFF+).
+  ///
+  /// 응답 예: `{ inviteCode: "ABCD2345" }`
+  Future<String> getInviteCode(int groupId) async {
+    try {
+      final res = await _apiClient.dio.get('/groups/$groupId/invite-code');
+      final data = res.data;
+      if (data is Map && data['inviteCode'] is String) {
+        return data['inviteCode'] as String;
+      }
+      throw StateError('초대 코드 응답 형식이 올바르지 않습니다.');
+    } on DioException catch (e, st) {
+      await AppLogger.captureError(e, stackTrace: st, context: 'groups.getInviteCode');
+      rethrow;
+    }
+  }
+
+  /// 클럽 초대 코드 재발급(회전). 이전 코드는 무효화됨 (STAFF+).
+  ///
+  /// 응답 예: `{ inviteCode: "WXYZ6789" }`
+  Future<String> rotateInviteCode(int groupId) async {
+    try {
+      final res = await _apiClient.dio.post('/groups/$groupId/invite-code');
+      final data = res.data;
+      if (data is Map && data['inviteCode'] is String) {
+        return data['inviteCode'] as String;
+      }
+      throw StateError('초대 코드 응답 형식이 올바르지 않습니다.');
+    } on DioException catch (e, st) {
+      await AppLogger.captureError(e, stackTrace: st, context: 'groups.rotateInviteCode');
+      rethrow;
+    }
+  }
+
+  /// 초대 코드로 클럽 미리보기 조회(비멤버 열람용).
+  ///
+  /// 응답 예: `{ id, name, description, activity_region, cover_image_url, memberCount }`
+  /// 유효하지 않은 코드는 404 (DioException).
+  Future<Map<String, dynamic>> previewByInviteCode(String code) async {
+    try {
+      final res = await _apiClient.dio.get('/groups/by-code/${code.trim()}');
+      final data = res.data;
+      return data is Map ? Map<String, dynamic>.from(data) : const {};
+    } on DioException catch (e, st) {
+      await AppLogger.captureError(e,
+          stackTrace: st, context: 'groups.previewByInviteCode');
+      rethrow;
+    }
+  }
+
+  /// 초대 코드로 클럽 즉시 가입(승인 생략). 1인 1클럽 정책 유지.
+  ///
+  /// 반환값은 가입한 클럽 상세. 유효하지 않은 코드는 404, 이미 클럽 소속이면 409.
+  Future<Map<String, dynamic>> joinByInviteCode(String code) async {
+    try {
+      final res = await _apiClient.dio.post(
+        '/groups/join-by-code',
+        data: {'code': code.trim()},
+      );
+      final data = res.data;
+      return data is Map ? Map<String, dynamic>.from(data) : const {};
+    } on DioException catch (e, st) {
+      await AppLogger.captureError(e,
+          stackTrace: st, context: 'groups.joinByInviteCode');
+      rethrow;
+    }
+  }
 }

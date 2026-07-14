@@ -5,6 +5,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/data/korea_regions.dart';
 import '../../../../core/services/api_client.dart';
 import 'club_join_page.dart';
+import 'join_by_code_page.dart';
 
 /// 전체 클럽을 탐색할 수 있는 페이지입니다.
 class ExploreClubsPage extends StatefulWidget {
@@ -124,6 +125,20 @@ class _ExploreClubsPageState extends State<ExploreClubsPage> {
           '클럽 탐색',
           style: TextStyle(color: textColor, fontSize: 18, fontWeight: FontWeight.w700),
         ),
+        actions: [
+          TextButton.icon(
+            onPressed: _openJoinByCode,
+            icon: Icon(Symbols.key, color: AppColors.primary, size: 18),
+            label: Text(
+              '코드로 가입',
+              style: TextStyle(
+                color: AppColors.primary,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
       ),
       body: SafeArea(
         top: false,
@@ -409,6 +424,17 @@ class _ExploreClubsPageState extends State<ExploreClubsPage> {
       ),
       ),
     );
+  }
+
+  /// 초대 코드로 가입 페이지로 이동. 가입 성공 시(pop true) 목록 갱신.
+  Future<void> _openJoinByCode() async {
+    final joined = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => const JoinByCodePage()),
+    );
+    if (joined == true && mounted) {
+      _fetchClubs();
+    }
   }
 
   void _navigateToJoin(dynamic club) {
